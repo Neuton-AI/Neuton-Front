@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorState, InlineNotice, Spinner } from '../components/feedback';
-import { IconCamera, IconChevronLeft, IconFile } from '../components/icons';
+import { IconClose } from '../components/icons';
 import type { MediaKind } from '../lib/api';
 import { uploadMedia, type UploadProgress } from '../lib/upload';
 import { useAuth, useShopMemberships } from '../lib/supabase';
@@ -17,10 +17,16 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
 
-/**
- * Capture/upload screen. The file goes straight to R2 from the browser, so the
- * API only issues presigned URLs and enqueues the extraction job.
- */
+function IconUpload(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth={1.83} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M2.75 13.75v1.83a2.75 2.75 0 0 0 2.75 2.75h11a2.75 2.75 0 0 0 2.75-2.75v-1.83" />
+      <path d="M6.42 7.33 11 2.75l4.58 4.58" />
+      <path d="M11 2.75v11" />
+    </svg>
+  );
+}
+
 export function CapturePage() {
   const { user, token } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
@@ -81,124 +87,129 @@ export function CapturePage() {
   };
 
   return (
-    <div className="shell">
-      <div className="flex-1 px-4 pb-8 pt-[max(var(--safe-top)+16px,16px)]">
+    <div className="flex min-h-[100dvh] flex-col items-center overflow-hidden bg-[#181715] px-4 pb-8 pt-[max(var(--safe-top)+16px,16px)]">
+      {/* Header */}
+      <div className="relative mb-6 flex w-full max-w-[358px] items-center justify-center">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="pressable -ml-1 flex items-center gap-1 py-2 text-label font-medium text-ink-muted"
+          className="absolute left-0 flex h-9 w-9 items-center justify-center rounded-full bg-[#252320]"
         >
-          <IconChevronLeft className="h-4 w-4" />
-          Back
+          <IconClose className="h-[18px] w-[18px] text-[#FAF9F5]" strokeWidth={1.5} />
         </button>
-
-        <h1 className="mt-1 font-display text-title text-ink">Add to catalog</h1>
-        <p className="mt-1 text-body text-ink-muted">
-          Neuton reads the document and files it for the shop automatically.
-        </p>
-
-        <div role="tablist" aria-label="Document type" className="mt-5 flex gap-1.5">
-          {KINDS.map(({ key, label }) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={kind === key}
-              type="button"
-              onClick={() => setKind(key)}
-              className={`pressable flex-1 rounded-pill px-2 py-2 text-label font-medium transition-colors duration-200 ${
-                kind === key
-                  ? 'bg-surface-dark text-ink-on-dark'
-                  : 'bg-surface-card text-ink-muted'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-5">
-          {previewUrl ? (
-            <div className="relative overflow-hidden rounded-card bg-surface-dark">
-              <img
-                src={previewUrl}
-                alt="Selected document preview"
-                className="max-h-[38vh] w-full object-contain"
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-hairline bg-surface-soft px-6 py-10 text-center">
-              <p className="text-body text-ink-muted">No document selected yet</p>
-              <p className="max-w-[34ch] text-label text-ink-muted-soft">
-                JPEG, PNG, WebP, HEIC or PDF, up to 10 MB.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => cameraInputRef.current?.click()}
-            className="pressable flex flex-col items-center gap-1.5 rounded-card bg-surface-card py-4 disabled:opacity-50"
-          >
-            <IconCamera className="h-6 w-6 text-brand-primary" />
-            <span className="text-label font-medium text-ink">Camera</span>
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => fileInputRef.current?.click()}
-            className="pressable flex flex-col items-center gap-1.5 rounded-card bg-surface-card py-4 disabled:opacity-50"
-          >
-            <IconFile className="h-6 w-6 text-brand-primary" />
-            <span className="text-label font-medium text-ink">File</span>
-          </button>
-        </div>
-
-        {/* capture="environment" opens the rear camera on phones. */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          onChange={(event) => onPick(event.target.files?.[0])}
-        />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED.join(',')}
-          className="sr-only"
-          onChange={(event) => onPick(event.target.files?.[0])}
-        />
-
-        {file ? (
-          <p className="mt-3 truncate text-center text-label text-ink-muted-soft">{file.name}</p>
-        ) : null}
-
-        {error ? (
-          <div className="mt-4">
-            <ErrorState message={error} />
-          </div>
-        ) : null}
-
-        {progress ? (
-          <div className="mt-4">
-            <InlineNotice>{describePhase(progress)}</InlineNotice>
-          </div>
-        ) : null}
-
-        <button
-          type="button"
-          disabled={!file || busy}
-          onClick={() => void submit()}
-          className="pressable mt-5 flex w-full items-center justify-center gap-2 rounded-pill bg-brand-primary py-3.5 text-body font-medium text-ink-on-primary disabled:bg-brand-primary-disabled disabled:text-ink-muted"
-        >
-          {busy ? <Spinner className="h-5 w-5" /> : null}
-          {busy ? 'Uploading…' : 'Upload and read'}
-        </button>
+        <span className="text-[18px] font-medium leading-[25px] text-[#FAF9F5]">Capture</span>
       </div>
+
+      {/* Camera preview */}
+      <div className="relative h-[370px] w-full max-w-[358px] shrink-0 overflow-hidden rounded-[16px] bg-[#1F1E1B]">
+        {previewUrl ? (
+          <img src={previewUrl} alt="Selected document preview" className="h-full w-full object-cover" />
+        ) : (
+          <>
+            {/* Guides */}
+            <div className="absolute left-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute left-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute right-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute right-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute bottom-7 left-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute bottom-7 left-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute bottom-7 right-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+            <div className="absolute bottom-7 right-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+
+            <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 rounded-full bg-[#252320] px-[14px] py-[8px]">
+              <span className="whitespace-nowrap text-[13px] font-medium leading-[18px] text-[#FAF9F5]">
+                Align receipt within frame
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Type chips */}
+      <div className="no-scrollbar mt-5 flex w-full max-w-[358px] justify-center gap-2 overflow-x-auto pb-1">
+        {KINDS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setKind(key)}
+            className={`shrink-0 rounded-full px-4 py-2 transition-colors ${
+              kind === key ? 'bg-[#CC785C] text-[#FFFFFF]' : 'bg-[#252320] text-[#A09D96]'
+            }`}
+          >
+            <span className="text-sm font-medium leading-[17px]">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Shutter */}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          if (file) {
+            void submit();
+          } else {
+            cameraInputRef.current?.click();
+          }
+        }}
+        className="mt-4 flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-[4px] border-[#FAF9F5] transition-opacity disabled:opacity-50"
+      >
+        {busy ? (
+          <Spinner className="h-6 w-6 text-[#FAF9F5]" />
+        ) : (
+          <div className="h-[56px] w-[56px] rounded-full bg-[#FAF9F5]" />
+        )}
+      </button>
+
+      {file && !busy ? (
+        <p className="mt-3 text-sm text-[#FAF9F5]">Tap to upload {file.name}</p>
+      ) : null}
+
+      <div className="flex-1 min-h-[16px]" />
+
+      {/* Error/Progress */}
+      {error ? (
+        <div className="mb-4 w-full max-w-[358px]">
+          <ErrorState message={error} />
+        </div>
+      ) : null}
+
+      {progress ? (
+        <div className="mb-4 w-full max-w-[358px]">
+          <InlineNotice>{describePhase(progress)}</InlineNotice>
+        </div>
+      ) : null}
+
+      {/* Drop zone */}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => fileInputRef.current?.click()}
+        className="flex w-full max-w-[358px] flex-col items-center justify-center gap-1 rounded-[16px] border border-dashed border-[#A09D96] bg-[#1F1E1B] px-4 py-3.5 transition-opacity disabled:opacity-50"
+      >
+        <IconUpload className="h-[22px] w-[22px] text-[#A09D96]" />
+        <span className="text-sm font-medium text-[#FAF9F5]">Drop a file here or browse</span>
+        <span className="text-center text-[13px] font-medium leading-[18px] text-[#A09D96]">
+          Receipt, recipe or product image &middot; JPG, PNG, PDF
+        </span>
+      </button>
+
+      {/* capture="environment" opens the rear camera on phones. */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={(event) => onPick(event.target.files?.[0])}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED.join(',')}
+        className="sr-only"
+        onChange={(event) => onPick(event.target.files?.[0])}
+      />
     </div>
   );
 }
