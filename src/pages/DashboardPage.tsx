@@ -95,24 +95,28 @@ export function DashboardPage() {
   const trend = data?.trend;
 
   return (
-    <div className="shell">
+    <div className="shell bg-[#FAF9F5]">
       <div className="flex-1 space-y-3 px-4 pb-32 pt-[max(var(--safe-top)+44px,44px)]">
-        <PageHeader
-          eyebrow={new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })}
-          title="Dashboard"
-          action={
-            memberships.length > 1 ? (
-              <label className="flex items-center gap-1.5 rounded-pill border border-hairline bg-surface-canvas py-1.5 pl-3 pr-2 text-label">
-                <IconStore className="h-4 w-4 text-ink-muted" />
+        <header className="flex flex-col gap-0.5 pt-2">
+          <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#CC785C]">
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'short',
+              day: 'numeric',
+            }).replace(',', ' ·')}
+          </p>
+          <div className="flex items-center justify-between">
+            <h1 className="font-['Cormorant_Garamond',serif] text-[36px] leading-[43.6px] tracking-[-0.5px] text-[#141413]">
+              Dashboard
+            </h1>
+            {memberships.length > 1 ? (
+              <label className="flex items-center gap-1.5 rounded-full border border-[#E6DFD8] bg-[#FAF9F5] py-1.5 pl-3 pr-2 text-[13px] font-medium text-[#141413]">
+                <IconStore className="h-4 w-4 text-[#A09D96]" />
                 <span className="sr-only">Active shop</span>
                 <select
                   value={activeShopId}
                   onChange={(event) => setActiveShopId(event.target.value)}
-                  className="max-w-[7rem] bg-transparent font-medium text-ink outline-none"
+                  className="max-w-[7rem] bg-transparent font-medium text-[#141413] outline-none"
                 >
                   {memberships.map((row) => (
                     <option key={row.shopId} value={row.shopId}>
@@ -121,9 +125,9 @@ export function DashboardPage() {
                   ))}
                 </select>
               </label>
-            ) : null
-          }
-        />
+            ) : null}
+          </div>
+        </header>
 
         {error ? (
           <ErrorState message={error} onRetry={() => setReloadKey((key) => key + 1)} />
@@ -131,21 +135,21 @@ export function DashboardPage() {
 
         <section
           aria-label="Net profit"
-          className="flex flex-col gap-2.5 overflow-hidden rounded-card bg-surface-dark p-4"
+          className="flex flex-col gap-2.5 overflow-hidden rounded-xl bg-[#181715] p-4"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-eyebrow font-medium uppercase text-ink-on-dark-soft">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-1">
+              <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#A09D96]">
                 Net profit
               </p>
-              <p className="truncate font-display text-title text-ink-on-dark">
+              <p className="font-['Cormorant_Garamond',serif] text-[36px] leading-[43.6px] tracking-[-0.5px] text-[#FAF9F5]">
                 {loading && !data ? '—' : formatMoney(summary?.netProfit, currency)}
               </p>
             </div>
             {trend ? (
-              <span className="mt-1 shrink-0 rounded-pill bg-brand-teal px-2.5 py-1 text-label font-medium text-ink">
-                {trend.profitPercent >= 0 ? '+' : '−'}
-                {formatPercent(Math.abs(trend.profitPercent))}
+              <span className="shrink-0 rounded-full bg-[#5DB8A6] px-2.5 py-1 text-[13px] font-medium leading-[18px] text-[#141413]">
+                {trend.profitPercent > 0 ? '+' : ''}
+                {formatPercent(trend.profitPercent)}
               </span>
             ) : null}
           </div>
@@ -154,7 +158,7 @@ export function DashboardPage() {
             <ProfitChart points={series} currency={currency} />
           </div>
 
-          <div role="tablist" aria-label="Period" className="flex gap-1.5">
+          <div role="tablist" aria-label="Period" className="mt-0.5 flex gap-1.5">
             {PERIODS.map(({ key, label }) => (
               <button
                 key={key}
@@ -162,10 +166,10 @@ export function DashboardPage() {
                 aria-selected={period === key}
                 type="button"
                 onClick={() => setPeriod(key)}
-                className={`rounded-pill px-3 py-1.5 text-label font-medium transition-colors duration-200 ${
+                className={`rounded-full px-3 py-1.5 text-[13px] font-medium leading-[18px] transition-colors duration-200 ${
                   period === key
-                    ? 'bg-surface-dark-elevated text-ink-on-dark'
-                    : 'text-ink-on-dark-soft'
+                    ? 'bg-[#252320] text-[#FAF9F5]'
+                    : 'text-[#A09D96]'
                 }`}
               >
                 {label}
@@ -174,100 +178,84 @@ export function DashboardPage() {
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            label="Revenue"
-            value={formatMoney(summary?.revenue, currency)}
-            sub={
-              trend ? (
-                <span className={trendTone(trend.revenuePercent)}>
-                  {formatPercent(trend.revenuePercent)} vs prev
-                </span>
-              ) : (
-                'Gross income'
-              )
-            }
-          />
-          <StatCard
-            label="Expenses"
-            value={formatMoney(summary?.expenses, currency)}
-            sub={
-              trend ? (
-                <span className={trendTone(-trend.expensesPercent)}>
-                  {formatPercent(trend.expensesPercent)} vs prev
-                </span>
-              ) : (
-                'Recorded receipts'
-              )
-            }
-          />
+        <div className="flex gap-3">
+          <div className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#EFE9DE] p-4">
+            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#6C6A64]">
+              Revenue
+            </p>
+            <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#141413]">
+              {formatMoney(summary?.revenue, currency)}
+            </p>
+            <p className="text-[13px] font-medium leading-[18px] text-[#6C6A64]">
+              Gross income · 30d
+            </p>
+          </div>
+          <div className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#EFE9DE] p-4">
+            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#6C6A64]">
+              Expenses
+            </p>
+            <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#141413]">
+              {formatMoney(summary?.expenses, currency)}
+            </p>
+            <p className="text-[13px] font-medium leading-[18px] text-[#6C6A64]">
+              Operational · 30d
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            label="Top seller"
-            value={data?.topItem?.name ?? '—'}
-            sub={
-              data?.topItem ? `${data.topItem.unitsSold} sold · ${formatMoney(data.topItem.revenue, currency)}` : 'No sales yet'
-            }
-            tone="primary"
-          />
-          <StatCard
-            label="Profit / order"
-            value={formatMoney(
-              profitability === 'average'
-                ? data?.orderProfitability.average
-                : data?.orderProfitability.median,
-              currency,
-            )}
-            sub={`${profitability} · ${data?.orderProfitability.sampleSize ?? 0} orders`}
-            middle={
-              <span
-                role="tablist"
-                aria-label="Statistic"
-                className="flex w-fit gap-0.5 rounded-pill bg-surface-cream-strong p-0.5"
-              >
-                {(['average', 'median'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    role="tab"
-                    aria-selected={profitability === mode}
-                    type="button"
-                    onClick={() => setProfitability(mode)}
-                    className={`rounded-pill px-2 py-0.5 text-label font-medium transition-colors duration-200 ${
-                      profitability === mode ? 'bg-surface-canvas text-ink' : 'text-ink-muted'
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </span>
-            }
-          />
+        <div className="flex gap-3">
+          <div className="flex flex-1 flex-col justify-between gap-1.5 rounded-xl bg-[#CC785C] p-4">
+            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#FFFFFF]">
+              Top item
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#FFFFFF] line-clamp-2">
+                {data?.topItem?.name ?? '—'}
+              </p>
+              <p className="text-[13px] font-medium leading-[18px] text-[#FFFFFF]">
+                {data?.topItem ? `${data.topItem.unitsSold} sold this month` : 'No sales yet'}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#EFE9DE] p-4">
+            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#6C6A64]">
+              Profit / order
+            </p>
+            <div className="flex w-fit gap-0.5 rounded-full bg-[#E8E0D2] p-0.5">
+              {(['average', 'median'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  role="tab"
+                  aria-selected={profitability === mode}
+                  type="button"
+                  onClick={() => setProfitability(mode)}
+                  className={`rounded-full px-2 py-[3px] text-[13px] font-medium leading-[18px] transition-colors duration-200 ${
+                    profitability === mode ? 'bg-[#FAF9F5] text-[#141413]' : 'text-[#6C6A64]'
+                  }`}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
+            <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#141413]">
+              {formatMoney(
+                profitability === 'average'
+                  ? data?.orderProfitability.average
+                  : data?.orderProfitability.median,
+                currency,
+              )}
+            </p>
+            <p className="text-[13px] font-medium leading-[18px] text-[#6C6A64]">
+              avg · {data?.orderProfitability.sampleSize ?? 0} orders
+            </p>
+          </div>
         </div>
-
-        {summary && summary.orderCount === 0 ? (
-          <p className="pb-2 text-center text-label text-ink-muted-soft">
-            No orders in this period yet.
-          </p>
-        ) : summary ? (
-          <p className="pb-2 text-center text-label text-ink-muted-soft">
-            {summary.orderCount} {summary.orderCount === 1 ? 'order' : 'orders'} ·{' '}
-            {formatMoney(summary.deliveryFees, currency)} delivery fees
-          </p>
-        ) : null}
       </div>
 
       <Fab {...fabNavigation} />
       <BottomNav />
     </div>
   );
-}
-
-function trendTone(percent: number): string {
-  if (percent > 0) return 'text-semantic-success';
-  if (percent < 0) return 'text-semantic-error';
-  return 'text-ink-muted-soft';
 }
 
 /**
