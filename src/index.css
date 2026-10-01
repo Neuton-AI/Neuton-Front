@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Safe-area insets so the fixed nav clears the iOS home indicator. */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface-card text-ink font-sans antialiased;
+    /* Prevents the grey tap flash on touch devices. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Removes the 300ms delay some mobile browsers add to taps. */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* iOS zooms the page when a focused input is under 16px. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  /* The phone-width column used on every screen. On desktop it stays centred
+     and readable instead of stretching to the viewport. dvh keeps the shell
+     filling the visible area when mobile browser chrome collapses. */
+  .shell {
+    @apply relative mx-auto flex min-h-[100dvh] w-full max-w-shell flex-col bg-surface-canvas;
+  }
+
+  .eyebrow {
+    @apply text-eyebrow font-medium uppercase text-ink-muted;
+  }
+
+  .card {
+    @apply rounded-card bg-surface-card;
+  }
+
+  .pressable {
+    @apply transition-transform duration-150 active:scale-[0.97];
+  }
+}
+
+@layer utilities {
+  /* Hides scrollbars on horizontal filter rails without losing scrollability. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

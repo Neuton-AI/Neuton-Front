@@ -1,0 +1,266 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
+import { Button } from '../components/ui';
+import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
+import { IconReceipt } from '../components/icons';
+import { apiFetch, type ReceiptDetail } from '../lib/api';
+import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/format';
+import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
+
+const STATUS_TONE = {
+  pending: 'card',
+  processing: 'teal',
+  completed: 'success',
+  failed: 'danger',
+} as const;
+
+/** Renders the OpenPencil "Modal / Receipt Detail" sheet from GET /receipts/:id. */
+export function ReceiptDetailPage() {
+  const { id = '' } = useParams();
+  const { user, token } = useAuth();
+  const { memberships, activeShopId } = useShopMemberships(user?.id);
+  const shop = useCurrentShop(memberships, activeShopId);
+
+  const [receipt, setReceipt] = useState<ReceiptDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reprocessing, setReprocessing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const currency = shop?.currency ?? 'USD';
+  const close = useSheetClose('/catalog?tab=receipts');
+  const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
+
+  useEffect(() => {
+    if (!token || !activeShopId || !id) return;
+    const controller = new AbortController();
+
+    setLoading(true);
+    setError(null);
+    apiFetch<{ receipt: ReceiptDetail }>(`/receipts/${id}`, {
+      token,
+      shopId: activeShopId,
+      signal: controller.signal,
+    })
+      .then((data) => setReceipt(data.receipt))
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === 'AbortError') return;
+        setError(cause instanceof Error ? cause.message : 'Could not load the receipt.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [loadKey, id]);
+
+  // A processing receipt gains its lines asynchronously, so keep polling it.
+  useEffect(() => {
+    if (receipt?.status !== 'processing') return;
+    const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
+    return () => clearTimeout(timer);
+  }, [receipt?.status, reloadKey]);
+
+  const reprocess = async () => {
+    if (!token || !activeShopId || !id || reprocessing) return;
+    setReprocessing(true);
+    setError(null);
+    try {
+      await apiFetch(`/receipts/${id}/reprocess`, {
+        method: 'POST',
+        token,
+        shopId: activeShopId,
+      });
+      setReloadKey((n) => n + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not queue the receipt.');
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  const failureMessage = receipt?.status === 'failed' ? (receipt.errorMessage ?? null) : null;
+
+  return (
+    <Sheet open onClose={close} label="Receipt details">
+      <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
+        {error ? <ErrorState message={error} onRetry={() => setReloadKey((n) => n + 1)} /> : null}
+
+        {loading && !receipt ? (
+          <>
+            <Skeleton className="h-[88px]" />
+            <Skeleton className="h-40" />
+            <Skeleton className="h-28" />
+          </>
+        ) : receipt ? (
+          <>
+            <div className="flex items-center gap-3 rounded-card bg-surface-card p-4">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <p className="text-eyebrow font-medium uppercase text-ink-muted">Receipt</p>
+                <p className="truncate font-display text-card-value text-ink">
+                  {receipt.merchantName ?? 'Unnamed merchant'}
+                </p>
+                <p className="text-label font-medium text-ink-muted">
+                  {formatDate(receipt.receiptDate ?? receipt.createdAt)} · {receipt.items.length}{' '}
+                  {receipt.items.length === 1 ? 'item' : 'items'}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-0.5">
+                <p className="text-eyebrow font-medium uppercase text-ink-muted">Total</p>
+                <p className="font-display text-card-value text-brand-primary">
+                  {formatMoney(receipt.totalAmount, receipt.currency ?? currency)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <SheetBadge tone={STATUS_TONE[receipt.status] ?? 'card'}>{receipt.status}</SheetBadge>
+              {receipt.processedAt ? (
+                <span className="text-label text-ink-muted-soft">
+                  Processed {relativeTime(receipt.processedAt)}
+                </span>
+              ) : null}
+            </div>
+
+{failureMessage ? <InlineNotice tone="error">{failureMessage}</InlineNotice> : null}
+
+            {receipt.status === 'failed' || receipt.status === 'completed' ? (
+              <Button variant="secondary" size="md" block loading={reprocessing} onClick={reprocess}>
+                {receipt.status === 'failed' ? 'Try extraction again' : 'Re-run extraction'}
+              </Button>
+            ) : null}
+
+            <SheetSection title="Expense tags">
+              <div className="flex flex-wrap gap-2">
+                <SheetBadge tone="teal">Ingredients</SheetBadge>
+                <SheetBadge>
+                  {receipt.items.filter((item) => item.inventoryItemId !== null).length} matched
+                </SheetBadge>
+                {receipt.taxAmount ? <SheetBadge>Tax included</SheetBadge> : null}
+              </div>
+            </SheetSection>
+
+            <SheetSection title="Line items">
+              {receipt.items.length === 0 ? (
+                <p className="text-body text-ink-muted">
+                  {receipt.status === 'pending' || receipt.status === 'processing'
+                    ? 'Waiting for extraction to finish.'
+                    : 'No line items were extracted.'}
+                </p>
+              ) : (
+                <ul className="flex flex-col">
+                  {receipt.items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex items-center justify-between gap-3 border-b border-hairline-soft py-2 last:border-b-0"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-body text-ink">{item.rawName}</span>
+                        <span className="text-label font-medium text-ink-muted">
+                          {formatQuantity(item.quantity)} × {formatMoney(item.unitPrice, currency)}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-[16px] font-medium text-ink">
+                        {formatMoney(item.totalPrice, currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SheetSection>
+
+            <SheetSection title="Original scan">
+              <div className="flex h-[150px] items-center justify-center overflow-hidden rounded-card bg-surface-cream-strong">
+                {receipt.storagePath ? (
+                  <SignedScan
+                    token={token}
+                    shopId={activeShopId}
+                    storagePath={receipt.storagePath}
+                    contentType={receipt.contentType}
+                    filename={receipt.originalFilename}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 px-6 text-center">
+                    <IconReceipt className="h-7 w-7 text-ink-muted-soft" />
+                    <p className="text-label text-ink-muted">
+                      The scan is stored privately and opens in a new tab.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </SheetSection>
+          </>
+        ) : !error ? (
+          <Skeleton className="h-[88px]" />
+        ) : null}
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * Receipts live in a private bucket. Rather than proxying bytes through the API,
+ * the server signs a short-lived read URL and R2 serves the object directly.
+ */
+function SignedScan({
+  token,
+  shopId,
+  storagePath,
+  contentType,
+  filename,
+}: {
+  token: string | null;
+  shopId: string | null;
+  storagePath: string;
+  contentType: string | null;
+  filename: string | null;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!token || !shopId) return;
+    const controller = new AbortController();
+
+    apiFetch<{ url: string; expiresIn: number }>('/uploads/download-url', {
+      method: 'POST',
+      token,
+      shopId,
+      signal: controller.signal,
+      body: { path: storagePath },
+    })
+      .then((data) => setUrl(data.url))
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === 'AbortError') return;
+        setFailed(true);
+      });
+
+    return () => controller.abort();
+  }, [token, shopId, storagePath]);
+
+  if (failed) {
+    return (
+      <p className="px-6 text-center text-label text-ink-muted">
+        The original scan could not be loaded.
+      </p>
+    );
+  }
+
+  if (!url) return <Skeleton className="h-full w-full rounded-none" />;
+
+  if (contentType === 'application/pdf') {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="pressable text-label font-medium text-ink underline"
+      >
+        Open {filename ?? 'PDF'}
+      </a>
+    );
+  }
+
+  return <img src={url} alt={filename ?? 'Receipt scan'} className="h-full w-full object-contain" />;
+}

@@ -1,0 +1,326 @@
+/**
+ * Typed API client for the Neuton Fastify backend.
+ *
+ * Auth is a Supabase JWT; the active shop travels in `x-shop-id` because the
+ * API resolves shop membership server-side from that header.
+ */
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+type RequestOptions = {
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  body?: unknown;
+  token?: string | null;
+  shopId?: string | null;
+  signal?: AbortSignal;
+};
+
+export async function apiFetch<T>(
+  path: string,
+  { method = 'GET', body, token, shopId, signal }: RequestOptions = {},
+): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (shopId) headers['x-shop-id'] = shopId;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ApiError('Cannot reach the server. Check your connection and try again.', 0);
+  }
+
+  if (response.status === 204) return undefined as T;
+
+  const text = await response.text();
+  const payload = text ? (JSON.parse(text) as unknown) : null;
+
+  if (!response.ok) {
+    const err = payload as { message?: string; error?: string; code?: string } | null;
+    throw new ApiError(
+      err?.message ?? err?.error ?? `Request failed (${response.status})`,
+      response.status,
+      err?.code,
+    );
+  }
+
+  return payload as T;
+}
+
+export type { RequestOptions };
+
+/* ------------------------------------------------------------------ */
+/* Response shapes                                                     */
+/* ------------------------------------------------------------------ */
+
+export type ReceiptStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export type Receipt = {
+  id: string;
+  shopId: string;
+  uploadedBy: string | null;
+  storagePath: string;
+  contentType: string | null;
+  originalFilename: string | null;
+  merchantName: string | null;
+  /** YYYY-MM-DD */
+  receiptDate: string | null;
+  totalAmount: string | null;
+  taxAmount: string | null;
+  currency: string | null;
+  status: ReceiptStatus;
+  rawExtraction: unknown;
+  errorMessage: string | null;
+  processedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReceiptItem = {
+  id: string;
+  shopId: string;
+  receiptId: string;
+  inventoryItemId: string | null;
+  rawName: string;
+  quantity: string | null;
+  unitPrice: string | null;
+  totalPrice: string | null;
+  unit: string | null;
+  confidence: string | null;
+  createdAt: string;
+};
+
+/** GET /receipts/:id nests the extracted lines under the receipt. */
+export type ReceiptDetail = Receipt & { items: ReceiptItem[] };
+
+export type InventoryItem = {
+  id: string;
+  shopId: string;
+  categoryId: string | null;
+  name: string;
+  sku: string | null;
+  imageUrl: string | null;
+  unit: string;
+  currentQuantity: string;
+  reorderLevel: string | null;
+  lastUnitCost: string | null;
+  averageUnitCost: string | null;
+  isActive: boolean;
+  isLowStock: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** One recipe line as costed against live inventory. */
+export type RecipeIngredient = {
+  name: string;
+  quantity: number;
+  unit: string;
+  averageUnitCost: number;
+  lineCost: number;
+  currentQuantity: number;
+};
+
+/** Live cost breakdown computed from stock; never stored. */
+export type RecipeCosting = {
+  ingredientsCost: number;
+  laborCost: number;
+  batchCost: number;
+  unitCost: number;
+  yieldQuantity: number;
+  retailPrice: number;
+  /** Backend field is `appliedMarginPercent`. */
+  appliedProfitMargin: number;
+  /** False when any ingredient is short for a single batch. */
+  inStock: boolean;
+  ingredients: RecipeIngredient[];
+};
+
+export type Recipe = {
+  id: string;
+  shopId: string;
+  categoryId: string | null;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  prepTimeMinutes: number;
+  yieldQuantity: string;
+  yieldUnit: string;
+  targetMarginPct: string | null;
+  allergens: string[];
+  instructions: string | null;
+  isActive: boolean;
+  costing: RecipeCosting;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Orders have no lifecycle column in the schema yet; they are simply dated. */
+export type Order = {
+  id: string;
+  shopId: string;
+  userId: string | null;
+  customerName: string | null;
+  orderDate: string;
+  destinationAddress: string | null;
+  deliveryDistanceKm: string;
+  deliveryFee: string;
+  appliedProfitMargin: string | null;
+  totalCost: string;
+  totalAmount: string;
+  documentUrl: string | null;
+  netProfit: number;
+  createdAt: string;
+};
+
+export type OrderItem = {
+  id: string;
+  orderId: string;
+  recipeId: string;
+  quantity: string;
+  unitCost: string;
+  unitPrice: string;
+};
+
+/** Line shape returned by GET /orders/:id, which joins in the recipe name. */
+export type OrderDetailItem = {
+  id: string;
+  recipeId: string;
+  name: string;
+  quantity: string;
+  unitCost: string;
+  unitPrice: string;
+};
+
+export type OrderDetail = Order & { items: OrderDetailItem[] };
+
+/** Live price line from POST /orders/quote. */
+export type OrderQuoteItem = {
+  recipeId: string;
+  name: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  appliedProfitMargin: number;
+  retailPrice: number;
+};
+
+export type OrderQuote = {
+  items: OrderQuoteItem[];
+  deliveryDistanceKm: number;
+  baseFee: number;
+  ratePerKm: number;
+  totalCost: number;
+  totalAmount: number;
+  deliveryFee: number;
+  netProfit: number;
+  profitMarginPercent: number;
+};
+
+export type Shop = {
+  id: string;
+  name: string;
+  slug: string;
+  currency: string;
+  timezone: string;
+  storeAddress: string | null;
+  targetProfitMargin: string;
+  hourlyLaborCost: string;
+  deliveryBaseFee: string;
+  deliveryRatePerKm: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ShopMembership = {
+  shopId: string;
+  role: 'owner' | 'admin' | 'member';
+  shops: Shop;
+};
+
+/** Matches the backend's Period enum: '12m', not '1y'. */
+export type DashboardPeriod = '7d' | '30d' | '90d' | '12m';
+
+export type DashboardSummary = {
+  period: DashboardPeriod;
+  range: { from: string; to: string };
+  summary: {
+    revenue: number;
+    expenses: number;
+    deliveryFees: number;
+    productionCost: number;
+    netProfit: number;
+    orderCount: number;
+    profitMarginPercent: number;
+  };
+  trend: {
+    revenuePercent: number;
+    profitPercent: number;
+    expensesPercent: number;
+  };
+  graph: { date: string; revenue: number; expenses: number; netProfit: number }[];
+  topItem: {
+    recipeId: string;
+    name: string;
+    imageUrl: string | null;
+    unitsSold: number;
+    revenue: number;
+    netProfit: number;
+  } | null;
+  orderProfitability: {
+    average: number;
+    median: number;
+    sampleSize: number;
+  };
+  lowStock: {
+    id: string;
+    name: string;
+    unit: string;
+    currentQuantity: number;
+    reorderLevel: number;
+  }[];
+};
+
+export type PresignResponse = {
+  uploadUrl: string;
+  storagePath: string;
+  receiptId: string | null;
+  method: 'PUT';
+  expiresIn: number;
+};
+
+export type UploadCompleteResponse = {
+  receiptId: string | null;
+  queued: boolean;
+  jobId: string | null;
+  reason?: string;
+};
+
+export type MediaKind = 'receipt' | 'recipe' | 'product' | 'order';
+
+/** Mirrors the backend's ALLOWED_CONTENT_TYPES. */
+export const ALLOWED_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'application/pdf',
+] as const;
