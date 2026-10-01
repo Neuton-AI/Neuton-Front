@@ -42,8 +42,8 @@ export function CapturePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Object URLs are revoked so repeated captures do not leak memory.
   useEffect(() => {
@@ -54,6 +54,40 @@ export function CapturePage() {
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  // Start the camera
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let active = true;
+
+    if (file) return;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false,
+        });
+        if (active && videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error('Camera access denied or unavailable', err);
+        if (active) {
+          setError('Camera access denied or unavailable. You can still upload a file.');
+        }
+      }
+    }
+    
+    void startCamera();
+
+    return () => {
+      active = false;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
   }, [file]);
 
   const onPick = useCallback((picked: File | undefined) => {
@@ -69,6 +103,31 @@ export function CapturePage() {
       return;
     }
     setFile(picked);
+  }, []);
+
+  const captureFrame = useCallback(() => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    
+    if (video.readyState < 2) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const newFile = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
+        setFile(newFile);
+      },
+      'image/jpeg',
+      0.9,
+    );
   }, []);
 
   const submit = async () => {
@@ -106,6 +165,13 @@ export function CapturePage() {
           <img src={previewUrl} alt="Selected document preview" className="h-full w-full object-cover" />
         ) : (
           <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 h-full w-full object-cover"
+            />
             {/* Guides */}
             <div className="absolute left-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
             <div className="absolute left-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
@@ -149,7 +215,7 @@ export function CapturePage() {
           if (file) {
             void submit();
           } else {
-            cameraInputRef.current?.click();
+            captureFrame();
           }
         }}
         className="mt-4 flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-[4px] border-[#FAF9F5] transition-opacity disabled:opacity-50"
@@ -194,15 +260,6 @@ export function CapturePage() {
         </span>
       </button>
 
-      {/* capture="environment" opens the rear camera on phones. */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="sr-only"
-        onChange={(event) => onPick(event.target.files?.[0])}
-      />
       <input
         ref={fileInputRef}
         type="file"
