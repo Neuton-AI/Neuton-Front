@@ -11,6 +11,10 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { IconBox, IconChefHat, IconPlus, IconReceipt } from '../components/icons';
 import { apiFetch, type InventoryItem, type Receipt, type Recipe } from '../lib/api';
+import {
+  getReceiptStatusLabel,
+  RECEIPT_STATUS_PILL_STYLES,
+} from '../lib/receiptStatus';
 import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/format';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
@@ -293,23 +297,13 @@ function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string 
 }
 
 function ReceiptStatusPill({ status }: { status: Receipt['status'] }) {
-  const styles: Record<Receipt['status'], string> = {
-    pending: 'bg-surface-cream-strong text-ink-muted',
-    processing: 'bg-brand-amber/20 text-ink',
-    completed: 'bg-brand-teal/20 text-ink',
-    failed: 'bg-semantic-error/15 text-ink',
-  };
-  const labels: Record<Receipt['status'], string> = {
-    pending: 'Queued',
-    processing: 'Reading…',
-    completed: 'Done',
-    failed: 'Failed',
-  };
   return (
     <span
-      className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${styles[status]}`}
+      className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${
+        RECEIPT_STATUS_PILL_STYLES[status]
+      }`}
     >
-      {labels[status]}
+      {getReceiptStatusLabel(status)}
     </span>
   );
 }
