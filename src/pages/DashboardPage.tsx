@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation } from '../components/Fab';
 import { FullPageLoader, ErrorState } from '../components/feedback';
-import { PageHeader } from '../components/PageHeader';
-import { StatCard } from '../components/StatCard';
 import { IconStore } from '../components/icons';
 import { apiFetch, type DashboardPeriod, type DashboardSummary } from '../lib/api';
 import { formatMoney, formatPercent, toNumber } from '../lib/format';

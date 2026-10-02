@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation } from '../components/Fab';
@@ -38,41 +38,75 @@ export function CatalogPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  /** Errors are per tab: one failing list must not blank the others. */
+  const [errors, setErrors] = useState<Partial<Record<Tab, string>>>({});
+  const [loadingTab, setLoadingTab] = useState<Tab | null>(null);
+  const loadedTabs = useRef<Partial<Record<Tab, boolean>>>({});
+  /** In-flight requests, so a concurrent mount joins instead of double-fetching. */
+  const inFlight = useRef<Partial<Record<Tab, Promise<void>>>>({});
 
-  const load = useCallback(async () => {
-    if (!token || !activeShopId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const [recipeData, inventoryData, receiptData] = await Promise.all([
-        apiFetch<{ recipes: Recipe[] }>('/catalog/recipes', {
-          token,
-          shopId: activeShopId,
-        }),
-        apiFetch<{ items: InventoryItem[] }>('/catalog/inventory', {
-          token,
-          shopId: activeShopId,
-        }),
-        apiFetch<{ receipts: Receipt[] }>('/receipts?limit=50', { token, shopId: activeShopId }),
-      ]);
-      setRecipes(recipeData.recipes);
-      setInventory(inventoryData.items);
-      setReceipts(receiptData.receipts);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load your catalog');
-    } finally {
-      setLoading(false);
-    }
-  }, [token, activeShopId]);
+  /**
+   * Loads only the visible tab. `/recipes` costs every recipe against live
+   * inventory, so fetching all three on mount was both wasteful and the reason
+   * one 404 could discard a successful receipts response.
+   */
+  const loadTab = useCallback(
+    async (which: Tab, { force = false }: { force?: boolean } = {}) => {
+      if (!token || !activeShopId) return;
+      if (loadedTabs.current[which] && !force) return;
+      // Join a request already in flight instead of issuing a duplicate.
+      const existing = inFlight.current[which];
+      if (existing && !force) return existing;
+
+      setLoadingTab(which);
+      setErrors((prev) => ({ ...prev, [which]: undefined }));
+
+      const request = (async () => {
+        try {
+          if (which === 'recipes') {
+            const data = await apiFetch<{ recipes: Recipe[] }>('/recipes', {
+              token,
+              shopId: activeShopId,
+            });
+            setRecipes(data.recipes);
+          } else if (which === 'inventory') {
+            const data = await apiFetch<{ items: InventoryItem[] }>('/inventory', {
+              token,
+              shopId: activeShopId,
+            });
+            setInventory(data.items);
+          } else {
+            const data = await apiFetch<{ receipts: Receipt[] }>('/receipts?limit=50', {
+              token,
+              shopId: activeShopId,
+            });
+            setReceipts(data.receipts);
+          }
+          loadedTabs.current[which] = true;
+        } catch (cause) {
+          setErrors((prev) => ({
+            ...prev,
+            [which]:
+              cause instanceof Error ? cause.message : 'Could not load this list',
+          }));
+        } finally {
+          setLoadingTab((prev) => (prev === which ? null : prev));
+        }
+      })();
+
+      inFlight.current[which] = request;
+      try {
+        await request;
+      } finally {
+        delete inFlight.current[which];
+      }
+    },
+    [token, activeShopId],
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadTab(tab);
+  }, [tab, loadTab]);
 
   const currency = shop?.currency ?? 'USD';
 
@@ -108,9 +142,11 @@ export function CatalogPage() {
         </div>
 
         <div className="mt-4 space-y-2.5 px-4">
-          {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+          {errors[tab] ? (
+            <ErrorState message={errors[tab] as string} onRetry={() => void loadTab(tab, { force: true })} />
+          ) : null}
 
-          {loading ? (
+          {loadingTab === tab ? (
             <>
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />
@@ -236,7 +272,9 @@ function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string 
           {receipt.receiptDate ? formatDate(receipt.receiptDate) : relativeTime(receipt.createdAt)}
         </p>
         <p className="font-display text-[20px] text-ink">
-          {receipt.totalAmount ? formatMoney(receipt.totalAmount, currency) : '—'}
+          {receipt.totalAmount
+            ? formatMoney(receipt.totalAmount, receipt.currency ?? currency)
+            : '—'}
         </p>
       </div>
       {receipt.status === 'failed' && receipt.errorMessage ? (

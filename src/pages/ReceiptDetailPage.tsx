@@ -81,6 +81,9 @@ export function ReceiptDetailPage() {
   };
 
   const failureMessage = receipt?.status === 'failed' ? (receipt.errorMessage ?? null) : null;
+  // A receipt can be denominated in a currency other than the shop's, so every
+  // figure on this sheet has to follow the receipt, not the shop.
+  const receiptCurrency = receipt?.currency ?? currency;
 
   return (
     <Sheet open onClose={close} label="Receipt details">
@@ -109,7 +112,7 @@ export function ReceiptDetailPage() {
               <div className="flex shrink-0 flex-col items-end gap-0.5">
                 <p className="text-eyebrow font-medium uppercase text-ink-muted">Total</p>
                 <p className="font-display text-card-value text-brand-primary">
-                  {formatMoney(receipt.totalAmount, receipt.currency ?? currency)}
+                  {formatMoney(receipt.totalAmount, receiptCurrency)}
                 </p>
               </div>
             </div>
@@ -158,11 +161,14 @@ export function ReceiptDetailPage() {
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-body text-ink">{item.rawName}</span>
                         <span className="text-label font-medium text-ink-muted">
-                          {formatQuantity(item.quantity)} × {formatMoney(item.unitPrice, currency)}
+                          {formatQuantity(item.quantity)} ×{' '}
+                          {item.unitPrice === null || item.unitPrice === undefined
+                            ? '—'
+                            : formatMoney(item.unitPrice, receiptCurrency)}
                         </span>
                       </div>
                       <span className="shrink-0 text-[16px] font-medium text-ink">
-                        {formatMoney(item.totalPrice, currency)}
+                        {formatMoney(item.totalPrice, receiptCurrency)}
                       </span>
                     </li>
                   ))}

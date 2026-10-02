@@ -26,6 +26,37 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+/**
+ * The backend wraps every failure as `{ error: { code, message } }`. Flat
+ * `{ message }` and bare-string `error` bodies are tolerated so a proxy or a
+ * future endpoint change degrades to a real message instead of the string
+ * `[object Object]`.
+ */
+function readError(payload: unknown, status: number): { message: string; code?: string } {
+  const fallback = `Request failed (${status})`;
+  if (typeof payload !== 'object' || payload === null) return { message: fallback };
+
+  const top = payload as { message?: unknown; error?: unknown; code?: unknown };
+  const topCode = typeof top.code === 'string' ? top.code : undefined;
+
+  if (typeof top.message === 'string' && top.message.length > 0) {
+    return { message: top.message, code: topCode };
+  }
+  if (typeof top.error === 'string' && top.error.length > 0) {
+    return { message: top.error, code: topCode };
+  }
+  if (typeof top.error === 'object' && top.error !== null) {
+    const nested = top.error as { message?: unknown; code?: unknown };
+    if (typeof nested.message === 'string' && nested.message.length > 0) {
+      return {
+        message: nested.message,
+        code: typeof nested.code === 'string' ? nested.code : topCode,
+      };
+    }
+  }
+  return { message: fallback };
+}
+
 export async function apiFetch<T>(
   path: string,
   { method = 'GET', body, token, shopId, signal }: RequestOptions = {},
@@ -50,16 +81,21 @@ export async function apiFetch<T>(
 
   if (response.status === 204) return undefined as T;
 
+  // A non-JSON body (HTML from a proxy, empty 502) must not throw out of
+  // JSON.parse, which would surface as an unhandled SyntaxError.
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as unknown) : null;
+  let payload: unknown = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
 
   if (!response.ok) {
-    const err = payload as { message?: string; error?: string; code?: string } | null;
-    throw new ApiError(
-      err?.message ?? err?.error ?? `Request failed (${response.status})`,
-      response.status,
-      err?.code,
-    );
+    const { message, code } = readError(payload, response.status);
+    throw new ApiError(message, response.status, code);
   }
 
   return payload as T;
