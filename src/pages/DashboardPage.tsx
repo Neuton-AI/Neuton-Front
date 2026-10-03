@@ -92,6 +92,9 @@ export function DashboardPage() {
   const currency = shop?.currency ?? 'USD';
   const summary = data?.summary;
   const trend = data?.trend;
+  // Period is a trailing window (30d != the calendar month), so captions quote
+  // the tab label instead of a calendar phrase like "this month".
+  const periodLabel = PERIODS.find((entry) => entry.key === period)?.label ?? period;
 
   return (
     <div className="shell bg-[#FAF9F5]">
@@ -208,7 +211,9 @@ export function DashboardPage() {
                   {data?.topItem?.name ?? '—'}
                 </p>
                 <p className="text-label font-medium text-ink-on-primary">
-                  {data?.topItem ? `${data.topItem.unitsSold} sold this month` : 'No sales yet'}
+                  {data?.topItem
+                    ? `${data.topItem.unitsSold} sold · ${periodLabel}`
+                    : 'No sales yet'}
                 </p>
               </div>
             }
@@ -244,7 +249,7 @@ export function DashboardPage() {
             )}
             sub={
               <>
-                avg · {data?.orderProfitability.sampleSize ?? 0} orders
+                avg · {data?.orderProfitability.sampleSize ?? 0} orders · {periodLabel}
               </>
             }
           />
