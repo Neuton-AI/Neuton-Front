@@ -4,6 +4,7 @@ import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation } from '../components/Fab';
 import { FullPageLoader, ErrorState } from '../components/feedback';
 import { IconStore } from '../components/icons';
+import { StatCard } from '../components/StatCard';
 import { apiFetch, type DashboardPeriod, type DashboardSummary } from '../lib/api';
 import { formatMoney, formatPercent, toNumber } from '../lib/format';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
@@ -177,76 +178,76 @@ export function DashboardPage() {
         </section>
 
         <div className="flex gap-3">
-          <div className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#EFE9DE] p-4">
-            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#6C6A64]">
-              Revenue
-            </p>
-            <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#141413]">
-              {formatMoney(summary?.revenue, currency)}
-            </p>
-            <p className="text-[13px] font-medium leading-[18px] text-[#6C6A64]">
-              Gross income · 30d
-            </p>
-          </div>
-          <div className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#EFE9DE] p-4">
-            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#6C6A64]">
-              Expenses
-            </p>
-            <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#141413]">
-              {formatMoney(summary?.expenses, currency)}
-            </p>
-            <p className="text-[13px] font-medium leading-[18px] text-[#6C6A64]">
-              Operational · 30d
-            </p>
-          </div>
+          <StatCard
+            label="Revenue"
+            tone="card"
+            className="flex-1"
+            labelClassName="text-ink-muted opacity-100"
+            value={formatMoney(summary?.revenue, currency)}
+            sub="Gross income · 30d"
+          />
+          <StatCard
+            label="Expenses"
+            tone="card"
+            className="flex-1"
+            labelClassName="text-ink-muted opacity-100"
+            value={formatMoney(summary?.expenses, currency)}
+            sub="Operational · 30d"
+          />
         </div>
 
         <div className="flex gap-3">
-          <div className="flex flex-1 flex-col justify-between gap-1.5 rounded-xl bg-[#CC785C] p-4">
-            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#FFFFFF]">
-              Top item
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#FFFFFF] line-clamp-2">
-                {data?.topItem?.name ?? '—'}
-              </p>
-              <p className="text-[13px] font-medium leading-[18px] text-[#FFFFFF]">
-                {data?.topItem ? `${data.topItem.unitsSold} sold this month` : 'No sales yet'}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#EFE9DE] p-4">
-            <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#6C6A64]">
-              Profit / order
-            </p>
-            <div className="flex w-fit gap-0.5 rounded-full bg-[#E8E0D2] p-0.5">
-              {(['average', 'median'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  role="tab"
-                  aria-selected={profitability === mode}
-                  type="button"
-                  onClick={() => setProfitability(mode)}
-                  className={`rounded-full px-2 py-[3px] text-[13px] font-medium leading-[18px] transition-colors duration-200 ${
-                    profitability === mode ? 'bg-[#FAF9F5] text-[#141413]' : 'text-[#6C6A64]'
-                  }`}
-                >
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
-            </div>
-            <p className="font-['Cormorant_Garamond',serif] text-[28px] leading-[34px] tracking-[-0.3px] text-[#141413]">
-              {formatMoney(
-                profitability === 'average'
-                  ? data?.orderProfitability.average
-                  : data?.orderProfitability.median,
-                currency,
-              )}
-            </p>
-            <p className="text-[13px] font-medium leading-[18px] text-[#6C6A64]">
-              avg · {data?.orderProfitability.sampleSize ?? 0} orders
-            </p>
-          </div>
+          <StatCard
+            label="Top item"
+            tone="primary"
+            className="flex-1 justify-between"
+            labelClassName="text-ink-on-primary opacity-100"
+            middle={
+              <div className="flex flex-col gap-1.5">
+                <p className="font-display text-card-value text-ink-on-primary line-clamp-2">
+                  {data?.topItem?.name ?? '—'}
+                </p>
+                <p className="text-label font-medium text-ink-on-primary">
+                  {data?.topItem ? `${data.topItem.unitsSold} sold this month` : 'No sales yet'}
+                </p>
+              </div>
+            }
+          />
+          <StatCard
+            label="Profit / order"
+            tone="card"
+            className="flex-1"
+            labelClassName="text-ink-muted opacity-100"
+            middle={
+              <div className="flex w-fit gap-0.5 rounded-full bg-[#E8E0D2] p-0.5">
+                {(['average', 'median'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    role="tab"
+                    aria-selected={profitability === mode}
+                    type="button"
+                    onClick={() => setProfitability(mode)}
+                    className={`rounded-full px-2 py-[3px] text-[13px] font-medium leading-[18px] transition-colors duration-200 ${
+                      profitability === mode ? 'bg-[#FAF9F5] text-[#141413]' : 'text-[#6C6A64]'
+                    }`}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            }
+            value={formatMoney(
+              profitability === 'average'
+                ? data?.orderProfitability.average
+                : data?.orderProfitability.median,
+              currency,
+            )}
+            sub={
+              <>
+                avg · {data?.orderProfitability.sampleSize ?? 0} orders
+              </>
+            }
+          />
         </div>
       </div>
 
