@@ -5,15 +5,9 @@ import { Button } from '../components/ui';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { IconReceipt } from '../components/icons';
 import { apiFetch, type ReceiptDetail } from '../lib/api';
+import { getReceiptStatusLabel, getReceiptStatusTone } from '../lib/receiptStatus';
 import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/format';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
-
-const STATUS_TONE = {
-  pending: 'card',
-  processing: 'teal',
-  completed: 'success',
-  failed: 'danger',
-} as const;
 
 /** Renders the OpenPencil "Modal / Receipt Detail" sheet from GET /receipts/:id. */
 export function ReceiptDetailPage() {
@@ -118,7 +112,9 @@ export function ReceiptDetailPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <SheetBadge tone={STATUS_TONE[receipt.status] ?? 'card'}>{receipt.status}</SheetBadge>
+              <SheetBadge tone={getReceiptStatusTone(receipt.status) ?? 'card'}>
+                {getReceiptStatusLabel(receipt.status)}
+              </SheetBadge>
               {receipt.processedAt ? (
                 <span className="text-label text-ink-muted-soft">
                   Processed {relativeTime(receipt.processedAt)}
