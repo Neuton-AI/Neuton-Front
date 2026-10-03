@@ -7,6 +7,8 @@ type Props = {
   middle?: ReactNode;
   sub?: ReactNode;
   tone?: 'card' | 'dark' | 'primary' | 'outline';
+  /** Extra classes for the label, used to opt out of the default faded tone. */
+  labelClassName?: string;
   className?: string;
 };
 
@@ -24,10 +26,18 @@ const SUB_TONE = {
   outline: 'text-ink-muted',
 } as const;
 
-export function StatCard({ label, value, middle, sub, tone = 'card', className = '' }: Props) {
+export function StatCard({
+  label,
+  value,
+  middle,
+  sub,
+  tone = 'card',
+  labelClassName = '',
+  className = '',
+}: Props) {
   return (
     <div className={`flex flex-col gap-1.5 rounded-card p-4 ${TONES[tone]} ${className}`}>
-      <p className="text-eyebrow font-medium uppercase opacity-80">{label}</p>
+      <p className={`text-eyebrow font-medium uppercase opacity-80 ${labelClassName}`}>{label}</p>
       {middle}
       {value !== undefined ? <p className="font-display text-card-value">{value}</p> : null}
       {sub ? <p className={`text-label font-medium ${SUB_TONE[tone]}`}>{sub}</p> : null}
