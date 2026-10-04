@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
-import { Fab, useFabNavigation } from '../components/Fab';
+import { Fab, useFabNavigation, type MediaKind } from '../components/Fab';
 import {
   EmptyState,
   ErrorState,
@@ -26,11 +26,16 @@ const TABS: { key: Tab; label: string; Icon: typeof IconChefHat }[] = [
   { key: 'receipts', label: 'Receipts', Icon: IconReceipt },
 ];
 
+const TAB_TO_KIND: Record<Tab, MediaKind> = {
+  recipes: 'recipe',
+  inventory: 'receipt',
+  receipts: 'receipt',
+};
+
 export function CatalogPage() {
   const { user, token } = useAuth();
   const { memberships, activeShopId } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
-  const fabNavigation = useFabNavigation();
 
   // The tab lives in the URL so Capture can deep-link back to receipts.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,6 +43,8 @@ export function CatalogPage() {
   const tab: Tab = TABS.some((t) => t.key === requestedTab)
     ? (requestedTab as Tab)
     : 'recipes';
+
+  const fabNavigation = useFabNavigation(TAB_TO_KIND[tab]);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -161,10 +168,10 @@ export function CatalogPage() {
               <EmptyState
                 icon={<IconChefHat className="h-9 w-9" />}
                 title="No recipes yet"
-                body="Scan a recipe card or photograph a handwritten page and Neuton will draft it with costed ingredients."
+                body="Scan a recipe card, photograph a handwritten page, or upload a recipe image and Neuton will draft it with costed ingredients."
                 action={
                   <Link
-                    to="/capture?source=camera&kind=recipe"
+                    to="/capture?kind=recipe"
                     className="pressable inline-flex items-center gap-1.5 rounded-pill bg-brand-primary px-4 py-2.5 text-label font-medium text-ink-on-primary"
                   >
                     <IconPlus className="h-4 w-4" />
@@ -189,7 +196,7 @@ export function CatalogPage() {
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-label text-ink-muted">
-                      {recipe.prepTimeMinutes} min · yields{' '}
+                      {recipe.prepTimeMinutes} min \u00B7 yields{' '}
                       {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)}
                     </p>
                     <p className="shrink-0 text-label text-ink-muted">
@@ -205,6 +212,15 @@ export function CatalogPage() {
                 icon={<IconBox className="h-9 w-9" />}
                 title="Inventory is empty"
                 body="Upload a supplier receipt and Neuton will create stock items and roll their weighted average cost."
+                action={
+                  <Link
+                    to="/capture?kind=receipt"
+                    className="pressable inline-flex items-center gap-1.5 rounded-pill bg-brand-primary px-4 py-2.5 text-label font-medium text-ink-on-primary"
+                  >
+                    <IconPlus className="h-4 w-4" />
+                    Upload a receipt
+                  </Link>
+                }
               />
             ) : (
               inventory.map((item) => (
@@ -240,7 +256,7 @@ export function CatalogPage() {
               body="Upload a shopping receipt and Neuton reads the line items, then updates your stock and costs automatically."
               action={
                 <Link
-                  to="/capture?source=file&kind=receipt"
+                  to="/capture?kind=receipt"
                   className="pressable inline-flex items-center gap-1.5 rounded-pill bg-brand-primary px-4 py-2.5 text-label font-medium text-ink-on-primary"
                 >
                   <IconPlus className="h-4 w-4" />
@@ -278,7 +294,7 @@ function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string 
         <p className="font-display text-[20px] text-ink">
           {receipt.totalAmount
             ? formatMoney(receipt.totalAmount, receipt.currency ?? currency)
-            : '—'}
+            : '\u2014'}
         </p>
       </div>
       {receipt.status === 'failed' && receipt.errorMessage ? (

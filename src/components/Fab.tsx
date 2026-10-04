@@ -94,11 +94,13 @@ export function Fab({ onCapture, onUploadFile }: Props) {
   );
 }
 
+export type MediaKind = 'receipt' | 'recipe' | 'product' | 'order';
+
 /** Routes to the media capture flow; kept here so the FAB stays self-contained. */
-export function useFabNavigation() {
+export function useFabNavigation(kind: MediaKind = 'receipt') {
   const navigate = useNavigate();
   return {
-    onCapture: () => navigate('/capture?source=camera'),
-    onUploadFile: () => navigate('/capture?source=file'),
+    onCapture: () => navigate(`/capture?source=camera&kind=${kind}`),
+    onUploadFile: () => navigate(`/capture?source=file&kind=${kind}`),
   };
 }
