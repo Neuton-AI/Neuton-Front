@@ -262,9 +262,19 @@ export function CatalogPage() {
   );
 }
 
+/**
+ * Every receipt row is a link, whatever its status. A queued, reading or failed
+ * receipt is exactly the one a user needs to open: the detail sheet is where the
+ * 3s poll watches it finish, where the failure reason is shown in full, and where
+ * "Try extraction again" lives. Gating the link on `completed` left those states
+ * as dead cards, so the sheet could only be reached by typing a deep link.
+ */
 function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string }) {
-  const body = (
-    <div className="flex flex-col gap-2 rounded-card bg-surface-card p-4">
+  return (
+    <Link
+      to={`/catalog/receipts/${receipt.id}`}
+      className="pressable flex flex-col gap-2 rounded-card bg-surface-card p-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <h2 className="min-w-0 flex-1 font-display text-[22px] leading-tight text-ink">
           {receipt.merchantName ?? receipt.originalFilename ?? 'Unnamed receipt'}
@@ -284,15 +294,7 @@ function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string 
       {receipt.status === 'failed' && receipt.errorMessage ? (
         <InlineNotice tone="error">{receipt.errorMessage}</InlineNotice>
       ) : null}
-    </div>
-  );
-
-  return receipt.status === 'completed' ? (
-    <Link to={`/catalog/receipts/${receipt.id}`} className="pressable block">
-      {body}
     </Link>
-  ) : (
-    <div>{body}</div>
   );
 }
 
