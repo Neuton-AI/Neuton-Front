@@ -65,6 +65,13 @@ function bucketKey(day: string, step: 'day' | 'week' | 'month'): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Days between consecutive buckets. The trailing keys have to advance at the
+ * same rate `bucketKey` groups by, otherwise they land on days that were never
+ * bucketed and every point falls back to zero.
+ */
+const STRIDE_DAYS: Record<'day' | 'week', number> = { day: 1, week: 7 };
+
 function trailingKeys(lastKey: string, step: 'day' | 'week' | 'month', count: number): string[] {
   const anchor = new Date(
     step === 'month' ? `${lastKey}-01T00:00:00Z` : `${lastKey}T00:00:00Z`,
@@ -75,8 +82,12 @@ function trailingKeys(lastKey: string, step: 'day' | 'week' | 'month', count: nu
   for (let back = count - 1; back >= 0; back -= 1) {
     const cursor = new Date(anchor);
     if (step === 'month') cursor.setUTCMonth(cursor.getUTCMonth() - back);
-    else cursor.setUTCDate(cursor.getUTCDate() - back * 7);
-    keys.push(cursor.toISOString().slice(step === 'month' ? 0 : 10, step === 'month' ? 7 : 10));
+    else cursor.setUTCDate(cursor.getUTCDate() - back * STRIDE_DAYS[step]);
+    // The window has to match `bucketKey` exactly — 'YYYY-MM' for months and
+    // 'YYYY-MM-DD' for the rest. Cutting a window the ISO string does not have
+    // yields keys that can never hit the `totals` map, so the period plots as a
+    // flat zero line instead of the shop's real profit.
+    keys.push(cursor.toISOString().slice(0, step === 'month' ? 7 : 10));
   }
   return keys;
 }
