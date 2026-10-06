@@ -80,6 +80,31 @@ describe('uploadMedia', () => {
     });
   });
 
+  it('omits receiptId entirely from complete when presign returns null', async () => {
+    const fetchMock = stubFetchSequence(
+      json({
+        uploadUrl: 'https://r2.test/put?sig=1',
+        storagePath: 'shop/recipes/brownies.png',
+        receiptId: null,
+        method: 'PUT',
+        expiresIn: 900,
+      }),
+      new Response(null, { status: 200 }),
+      json({ receiptId: null, queued: true, jobId: 'job-3' }),
+    );
+
+    await uploadMedia(FILE, 'recipe', { token: 'jwt', shopId: 'shop-1' });
+
+    const completeBody = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(completeBody).toEqual({
+      storagePath: 'shop/recipes/brownies.png',
+      kind: 'recipe',
+      contentType: 'image/jpeg',
+      originalFilename: 'shop.jpg',
+    });
+    expect('receiptId' in completeBody).toBe(false);
+  });
+
   it('reports every phase in order so the UI can narrate the upload', async () => {
     stubFetchSequence(
       json({ uploadUrl: 'https://r2.test/put', storagePath: 'p', receiptId: null, method: 'PUT', expiresIn: 900 }),

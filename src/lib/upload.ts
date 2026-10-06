@@ -64,7 +64,7 @@ export async function uploadMedia(
       kind,
       contentType: file.type,
       originalFilename: file.name,
-      receiptId: presign.receiptId,
+      ...(presign.receiptId ? { receiptId: presign.receiptId } : {}),
       ...(options.orderId ? { orderId: options.orderId } : {}),
     },
   });
