@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
-import { ErrorState, Skeleton } from '../components/feedback';
+import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { IconBox, IconChefHat } from '../components/icons';
 import { apiFetch, type Recipe } from '../lib/api';
 import { formatMoney, formatQuantity } from '../lib/format';
+import { getReceiptStatusLabel, RECEIPT_STATUS_PILL_STYLES } from '../lib/receiptStatus';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 /** Renders the OpenPencil "Modal / Recipe Detail" sheet from GET /recipes/:id. */
@@ -20,7 +21,7 @@ export function RecipeDetailPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
-  const close = useSheetClose('/catalog');
+  const close = useSheetClose('/catalog?tab=recipes');
   const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
 
   useEffect(() => {
@@ -45,6 +46,13 @@ export function RecipeDetailPage() {
 
     return () => controller.abort();
   }, [loadKey, id]);
+
+  // Poll every 3s while the worker is still extracting (pending/processing).
+  useEffect(() => {
+    if (!recipe || (recipe.status !== 'pending' && recipe.status !== 'processing')) return;
+    const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
+    return () => clearTimeout(timer);
+  }, [recipe?.status, reloadKey]);
 
   const steps = (recipe?.instructions ?? '')
     .split(/\r?\n+|(?:\d+[.)]\s+)/)
@@ -88,6 +96,28 @@ export function RecipeDetailPage() {
                 {formatMoney(recipe.costing.unitCost, currency)}
               </p>
             </div>
+
+            {recipe.status ? (
+              <div className="flex items-center gap-2">
+                <span
+                  className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${
+                    RECEIPT_STATUS_PILL_STYLES[recipe.status]
+                  }`}
+                >
+                  {getReceiptStatusLabel(recipe.status)}
+                </span>
+                {recipe.status === 'pending' && <span className="text-label text-ink-muted">Uploaded, extraction queued</span>}
+                {recipe.status === 'processing' && <span className="text-label text-ink-muted">Extracting recipe…</span>}
+              </div>
+            ) : null}
+
+            {recipe.status === 'pending' || recipe.status === 'processing' ? (
+              <InlineNotice>
+                Extraction in progress — check back in a moment.
+              </InlineNotice>
+            ) : recipe.status === 'failed' ? (
+              <InlineNotice tone="error">Extraction failed. Please try uploading again.</InlineNotice>
+            ) : null}
 
             <SheetSection title="Ingredients">
               {recipe.costing.ingredients.length === 0 ? (
