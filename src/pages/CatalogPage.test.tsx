@@ -8,8 +8,8 @@ import { renderWithRouter } from '../test/render';
 /**
  * The receipts tab is where a user goes to find out what happened to an upload,
  * so every row has to open its detail sheet. The sheet polls while a receipt is
- * `processing`, shows the failure reason and offers "Try extraction again" for a
- * `failed` one - none of which is reachable unless the row itself is a link.
+ * `processing` and shows the failure reason in full for a `failed` one - none of
+ * which is reachable unless the row itself is a link.
  * These tests pin that link per status, and pin that it is a real anchor so the
  * row stays keyboard- and screen-reader-navigable rather than a click handler.
  */
