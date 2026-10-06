@@ -110,12 +110,12 @@ beforeEach(() => {
 });
 
 describe('CatalogPage receipts tab', () => {
-  it.each<ReceiptStatus>(['pending', 'processing', 'failed', 'completed', 'unverified', 'verified'])(
+  it.each<ReceiptStatus>(['pending', 'processing', 'failed', 'unverified', 'verified'])(
     'renders a %s receipt row as a link to its detail sheet',
     async (status) => {
-      // The regression: the link used to be gated on `completed`, so every other
-      // status was a dead card and the sheet - including its 3s poll - could only
-      // be reached by typing the URL by hand.
+      // The regression: the link used to be gated on a single "done" status, so
+      // every other status was a dead card and the sheet - including its 3s poll
+      // - could only be reached by typing the URL by hand.
       renderCatalog([makeReceipt(status)]);
 
       const row = await screen.findByRole('link', { name: new RegExp(`Merchant ${status}`) });

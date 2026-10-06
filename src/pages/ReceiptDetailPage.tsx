@@ -49,7 +49,9 @@ export function ReceiptDetailPage() {
     return () => controller.abort();
   }, [loadKey, id]);
 
-  // A processing receipt gains its lines asynchronously, so keep polling it.
+  // Only a receipt the worker is still chewing on gains lines asynchronously, so
+  // only that one polls. `unverified` is terminal for the worker — it hands over
+  // to a human and stops — so polling it would just spin until someone reviews.
   useEffect(() => {
     if (receipt?.status !== 'processing') return;
     const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
@@ -122,9 +124,12 @@ export function ReceiptDetailPage() {
               ) : null}
             </div>
 
-{failureMessage ? <InlineNotice tone="error">{failureMessage}</InlineNotice> : null}
+            {failureMessage ? <InlineNotice tone="error">{failureMessage}</InlineNotice> : null}
 
-            {receipt.status === 'failed' || receipt.status === 'completed' ? (
+            {/* Extraction has finished — or never will — in every state other
+                than queued and reading, so those are the only two where a
+                re-run has nothing to re-run. */}
+            {receipt.status !== 'pending' && receipt.status !== 'processing' ? (
               <Button variant="secondary" size="md" block loading={reprocessing} onClick={reprocess}>
                 {receipt.status === 'failed' ? 'Try extraction again' : 'Re-run extraction'}
               </Button>
@@ -133,14 +138,25 @@ export function ReceiptDetailPage() {
             <SheetSection title="Expense tags">
               <div className="flex flex-wrap gap-2">
                 <SheetBadge tone="teal">Ingredients</SheetBadge>
-                <SheetBadge>
-                  {receipt.items.filter((item) => item.inventoryItemId !== null).length} matched
-                </SheetBadge>
+                {/* Only verification links a line to inventory, so an unreviewed
+                    receipt has zero matches. "0 matched" would read as a
+                    failure when it is really just "nobody has looked yet". */}
+                {receipt.items.some((item) => item.inventoryItemId !== null) ? (
+                  <SheetBadge>
+                    {receipt.items.filter((item) => item.inventoryItemId !== null).length} matched
+                  </SheetBadge>
+                ) : null}
                 {receipt.taxAmount ? <SheetBadge>Tax included</SheetBadge> : null}
               </div>
             </SheetSection>
 
             <SheetSection title="Line items">
+              {receipt.status === 'unverified' ? (
+                <InlineNotice>
+                  Extracted, not reviewed. These numbers have not been added to
+                  inventory yet.
+                </InlineNotice>
+              ) : null}
               {receipt.items.length === 0 ? (
                 <p className="text-body text-ink-muted">
                   {receipt.status === 'pending' || receipt.status === 'processing'
