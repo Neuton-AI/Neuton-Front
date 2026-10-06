@@ -200,9 +200,9 @@ export type Recipe = {
   imageUrl: string | null;
   categoryId: string | null;
   prepTimeMinutes: number;
-  yieldQuantity: number;
+  yieldQuantity: string;
   yieldUnit: string;
-  targetMarginPct: number | null;
+  targetMarginPct: string | null;
   allergens: string[] | null;
   instructions: string | null;
   isActive: boolean;
@@ -348,6 +348,7 @@ export type PresignResponse = {
 
 export type UploadCompleteResponse = {
   receiptId: string | null;
+  recipeId: string | null;
   queued: boolean;
   jobId: string | null;
   reason?: string;
