@@ -107,7 +107,7 @@ export type { RequestOptions };
 /* Response shapes                                                     */
 /* ------------------------------------------------------------------ */
 
-export type ReceiptStatus = 'pending' | 'processing' | 'completed' | 'unverified' | 'verified' | 'failed';
+export type ReceiptStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 
 export type Receipt = {
   id: string;
