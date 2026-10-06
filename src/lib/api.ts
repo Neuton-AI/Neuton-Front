@@ -109,6 +109,8 @@ export type { RequestOptions };
 
 export type ReceiptStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 
+export type RecipeStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
+
 export type Receipt = {
   id: string;
   shopId: string;
@@ -193,20 +195,21 @@ export type RecipeCosting = {
 export type Recipe = {
   id: string;
   shopId: string;
-  categoryId: string | null;
   name: string;
   description: string | null;
   imageUrl: string | null;
+  categoryId: string | null;
   prepTimeMinutes: number;
-  yieldQuantity: string;
+  yieldQuantity: number;
   yieldUnit: string;
-  targetMarginPct: string | null;
-  allergens: string[];
+  targetMarginPct: number | null;
+  allergens: string[] | null;
   instructions: string | null;
   isActive: boolean;
-  costing: RecipeCosting;
+  status?: RecipeStatus;
   createdAt: string;
   updatedAt: string;
+  costing: RecipeCosting;
 };
 
 /** Orders have no lifecycle column in the schema yet; they are simply dated. */

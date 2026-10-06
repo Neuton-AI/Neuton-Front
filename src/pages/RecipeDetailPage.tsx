@@ -115,7 +115,7 @@ export function RecipeDetailPage() {
               )}
             </SheetSection>
 
-            {recipe.allergens.length > 0 ? (
+            {recipe.allergens && recipe.allergens.length > 0 ? (
               <SheetSection title="Allergens">
                 <div className="flex flex-wrap gap-2">
                   {recipe.allergens.map((allergen) => (
