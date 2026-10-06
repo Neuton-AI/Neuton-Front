@@ -75,7 +75,7 @@ export function CatalogPage() {
       const request = (async () => {
         try {
           if (which === 'recipes') {
-            const data = await apiFetch<{ recipes: Recipe[] }>('/recipes', {
+            const data = await apiFetch<{ recipes: Recipe[] }>('/recipes?includeUnverified=true', {
               token,
               shopId: activeShopId,
             });
@@ -114,6 +114,18 @@ export function CatalogPage() {
     },
     [token, activeShopId],
   );
+
+  // Quiet 3s poll while any recipe is pending/processing (no skeleton flash).
+  useEffect(() => {
+    if (tab !== 'recipes') return;
+    const hasPending = recipes.some((r) => r.status === 'pending' || r.status === 'processing');
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      void loadTab('recipes', { force: true });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [recipes, tab, loadTab]);
 
   useEffect(() => {
     void loadTab(tab);
@@ -203,6 +215,9 @@ export function CatalogPage() {
                       cost {formatMoney(recipe.costing.unitCost, currency)}
                     </p>
                   </div>
+                  {recipe.status && (
+                    <RecipeStatusPill status={recipe.status} />
+                  )}
                 </Link>
               ))
             )
@@ -315,6 +330,19 @@ function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string 
 }
 
 function ReceiptStatusPill({ status }: { status: Receipt['status'] }) {
+  return (
+    <span
+      className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${
+        RECEIPT_STATUS_PILL_STYLES[status]
+      }`}
+    >
+      {getReceiptStatusLabel(status)}
+    </span>
+  );
+}
+
+function RecipeStatusPill({ status }: { status: Recipe['status'] }) {
+  if (!status) return null;
   return (
     <span
       className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${
