@@ -110,7 +110,7 @@ beforeEach(() => {
 });
 
 describe('CatalogPage receipts tab', () => {
-  it.each<ReceiptStatus>(['pending', 'processing', 'failed', 'completed'])(
+  it.each<ReceiptStatus>(['pending', 'processing', 'failed', 'completed', 'unverified', 'verified'])(
     'renders a %s receipt row as a link to its detail sheet',
     async (status) => {
       // The regression: the link used to be gated on `completed`, so every other
