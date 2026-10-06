@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
-import { Button } from '../components/ui';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { IconReceipt } from '../components/icons';
 import { apiFetch, type ReceiptDetail } from '../lib/api';
@@ -19,7 +18,6 @@ export function ReceiptDetailPage() {
   const [receipt, setReceipt] = useState<ReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reprocessing, setReprocessing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
@@ -57,24 +55,6 @@ export function ReceiptDetailPage() {
     const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
     return () => clearTimeout(timer);
   }, [receipt?.status, reloadKey]);
-
-  const reprocess = async () => {
-    if (!token || !activeShopId || !id || reprocessing) return;
-    setReprocessing(true);
-    setError(null);
-    try {
-      await apiFetch(`/receipts/${id}/reprocess`, {
-        method: 'POST',
-        token,
-        shopId: activeShopId,
-      });
-      setReloadKey((n) => n + 1);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not queue the receipt.');
-    } finally {
-      setReprocessing(false);
-    }
-  };
 
   const failureMessage = receipt?.status === 'failed' ? (receipt.errorMessage ?? null) : null;
   // A receipt can be denominated in a currency other than the shop's, so every
@@ -125,15 +105,6 @@ export function ReceiptDetailPage() {
             </div>
 
             {failureMessage ? <InlineNotice tone="error">{failureMessage}</InlineNotice> : null}
-
-            {/* Extraction has finished — or never will — in every state other
-                than queued and reading, so those are the only two where a
-                re-run has nothing to re-run. */}
-            {receipt.status !== 'pending' && receipt.status !== 'processing' ? (
-              <Button variant="secondary" size="md" block loading={reprocessing} onClick={reprocess}>
-                {receipt.status === 'failed' ? 'Try extraction again' : 'Re-run extraction'}
-              </Button>
-            ) : null}
 
             <SheetSection title="Expense tags">
               <div className="flex flex-wrap gap-2">

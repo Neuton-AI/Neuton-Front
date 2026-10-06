@@ -281,9 +281,9 @@ export function CatalogPage() {
 /**
  * Every receipt row is a link, whatever its status. A queued, reading or failed
  * receipt is exactly the one a user needs to open: the detail sheet is where the
- * 3s poll watches it finish, where the failure reason is shown in full, and where
- * "Try extraction again" lives. Gating the link on `completed` left those states
- * as dead cards, so the sheet could only be reached by typing a deep link.
+ * 3s poll watches it finish and where the failure reason is shown in full.
+ * Gating the link on `completed` left those states as dead cards, so the sheet
+ * could only be reached by typing a deep link.
  */
 function ReceiptRow({ receipt, currency }: { receipt: Receipt; currency: string }) {
   return (
