@@ -6,7 +6,6 @@ import {
   EmptyState,
   ErrorState,
   InlineNotice,
-  Skeleton,
 } from '../components/feedback';
 import { PageHeader } from '../components/PageHeader';
 import { IconBox, IconChefHat, IconPlus, IconReceipt } from '../components/icons';
@@ -183,11 +182,51 @@ export function CatalogPage() {
           ) : null}
 
           {loadingTab === tab ? (
-            <>
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </>
+            tab === 'recipes' ? (
+              <div className="flex flex-col gap-3" aria-hidden="true">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="pressable flex flex-col gap-2 rounded-card bg-surface-card p-4 animate-pulse">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="h-14 w-[200px] max-w-[50%] rounded-card bg-surface-canvas" />
+                      <div className="h-6 w-20 shrink-0 rounded-pill bg-surface-canvas" />
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="h-3 w-[120px] max-w-[40%] rounded-[6px] bg-surface-canvas" />
+                      <div className="h-3 w-[80px] max-w-[30%] rounded-[6px] bg-surface-canvas" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : tab === 'receipts' ? (
+              <div className="flex flex-col gap-3" aria-hidden="true">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="pressable flex flex-col gap-2 rounded-card bg-surface-card p-4 animate-pulse">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="h-6 w-[180px] max-w-[50%] rounded-card bg-surface-canvas" />
+                      <div className="h-5 w-16 shrink-0 rounded-pill bg-surface-canvas" />
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="h-3 w-[100px] max-w-[40%] rounded-[6px] bg-surface-canvas" />
+                      <div className="h-[18px] w-14 shrink-0 rounded-[6px] bg-surface-canvas" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="grid grid-cols-2 gap-x-5 gap-y-3"
+                aria-hidden="true"
+              >
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="flex aspect-square flex-col gap-2 rounded-card bg-surface-card p-3 animate-pulse">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-input bg-surface-canvas" />
+                    <div className="h-[18px] shrink-0" />
+                    <div className="h-3 w-[80px] max-w-full rounded-[6px] bg-surface-canvas" />
+                    <div className="h-7 w-[60px] max-w-full rounded-[6px] bg-surface-canvas" />
+                  </div>
+                ))}
+              </div>
+            )
           ) : tab === 'recipes' ? (
             recipes.length === 0 ? (
               <EmptyState
