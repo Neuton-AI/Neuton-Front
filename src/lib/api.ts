@@ -149,6 +149,19 @@ export type ReceiptItem = {
 /** GET /receipts/:id nests the extracted lines under the receipt. */
 export type ReceiptDetail = Receipt & { items: ReceiptItem[] };
 
+/** Body of POST /catalog/receipt/:id/verify: one verdict per extracted line. */
+export type VerifyReceiptBody = {
+  items: { id: string; accepted: boolean }[];
+};
+
+/** Response of POST /catalog/receipt/:id/verify. */
+export type VerifyReceiptOutcome = {
+  receiptId: string;
+  status: 'verified';
+  accepted: number;
+  rejected: number;
+};
+
 export type InventoryItem = {
   id: string;
   shopId: string;
