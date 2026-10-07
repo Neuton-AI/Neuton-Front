@@ -205,7 +205,14 @@ export function CatalogPage() {
                 }
               />
             ) : (
-              recipes.map((recipe) => (
+              recipes.map((recipe) => {
+                const total = recipe.costing.totalCount ?? recipe.costing.ingredients.length;
+                const linked = recipe.costing.linkedCount
+                  ?? recipe.costing.ingredients.filter(
+                    (i) => i.linked ?? (i.inventoryItemId != null),
+                  ).length;
+                const incomplete = linked < total;
+                return (
                 <Link
                   key={recipe.id}
                   to={`/catalog/recipes/${recipe.id}`}
@@ -216,23 +223,31 @@ export function CatalogPage() {
                       {recipe.name}
                     </h2>
                     <span className="shrink-0 rounded-pill bg-brand-teal px-2 py-0.5 text-label font-medium text-ink">
-                      {formatMoney(recipe.costing.retailPrice, currency)}
+                      {incomplete
+                        ? 'No price yet'
+                        : formatMoney(recipe.costing.retailPrice, currency)}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-label text-ink-muted">
-                      {recipe.prepTimeMinutes} min \u00B7 yields{' '}
+                      {recipe.prepTimeMinutes} min · yields{' '}
                       {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)}
                     </p>
                     <p className="shrink-0 text-label text-ink-muted">
                       cost {formatMoney(recipe.costing.unitCost, currency)}
                     </p>
                   </div>
+                  {incomplete ? (
+                    <p className="text-label font-medium text-ink-muted">
+                      {linked} of {total} ingredients linked — cost incomplete
+                    </p>
+                  ) : null}
                   {recipe.status && (
                     <RecipeStatusPill status={recipe.status} />
                   )}
                 </Link>
-              ))
+                );
+              })
             )
           ) : tab === 'inventory' ? (
             inventory.length === 0 ? (
