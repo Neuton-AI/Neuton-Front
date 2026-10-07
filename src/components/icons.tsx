@@ -47,7 +47,7 @@ export function IconBag({ className, strokeWidth }: IconProps) {
     <svg {...base(className, strokeWidth)}>
       <path d="M4 6.67h12v9.16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6.67Z" />
       <path d="M2.5 6.67h15" />
-      <path d="M6.67 10v2.5h6.66V10" />
+      <path d="M7 10a3 3 0 0 0 6 0" />
     </svg>
   );
 }
