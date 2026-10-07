@@ -175,6 +175,10 @@ export type RecipeIngredient = {
   averageUnitCost: number;
   lineCost: number;
   currentQuantity: number;
+  /** Null when the line has no SKU yet — the trusted unlinked signal (never infer from cost). */
+  inventoryItemId?: string | null;
+  rawName?: string;
+  linked?: boolean;
 };
 
 /** Live cost breakdown computed from stock; never stored. */
@@ -190,6 +194,9 @@ export type RecipeCosting = {
   /** False when any ingredient is short for a single batch. */
   inStock: boolean;
   ingredients: RecipeIngredient[];
+  /** Trusted incomplete-cost signal from costRecipe — never infer from a $0 cost. */
+  linkedCount?: number;
+  totalCount?: number;
 };
 
 export type Recipe = {

@@ -59,6 +59,14 @@ export function RecipeDetailPage() {
     .map((step) => step.replace(/^\s*\d+[.)]\s*/, '').trim())
     .filter(Boolean);
 
+  const total = recipe?.costing.totalCount ?? recipe?.costing.ingredients.length ?? 0;
+  const linked = recipe?.costing.linkedCount
+    ?? recipe?.costing.ingredients.filter(
+      (i) => i.linked ?? (i.inventoryItemId != null),
+    ).length
+    ?? 0;
+  const incomplete = (recipe != null) && linked < total;
+
   return (
     <Sheet open onClose={close} label="Recipe details">
       <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
@@ -120,22 +128,48 @@ export function RecipeDetailPage() {
             ) : null}
 
             <SheetSection title="Ingredients">
+              {incomplete ? (
+                <InlineNotice>
+                  {linked} of {total} ingredients linked — cost incomplete. Selling price
+                  on hold until all ingredients are linked.
+                </InlineNotice>
+              ) : null}
               {recipe.costing.ingredients.length === 0 ? (
                 <p className="text-body text-ink-muted">No ingredients linked yet.</p>
               ) : (
                 <>
                   <ul className="flex flex-col">
-                    {recipe.costing.ingredients.map((ingredient) => (
+                    {recipe.costing.ingredients.map((ingredient) => {
+                      const isLinked = ingredient.linked ?? (ingredient.inventoryItemId != null);
+                      return (
                       <li
-                        key={ingredient.name}
+                        key={ingredient.rawName ?? ingredient.name}
                         className="flex items-center justify-between gap-2 py-1.5"
                       >
-                        <span className="truncate text-body text-ink">{ingredient.name}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-body text-ink">{ingredient.name}</span>
+                          <span
+                            data-testid={isLinked ? 'linked-dot' : 'unlinked-dot'}
+                            title={isLinked ? 'Linked to inventory' : 'Not linked to inventory'}
+                            aria-label={isLinked ? 'Linked to inventory' : 'Not linked to inventory'}
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 9999,
+                              flexShrink: 0,
+                              backgroundColor: isLinked ? '#16a34a' : '#9ca3af',
+                            }}
+                          />
+                          {isLinked ? null : (
+                            <SheetBadge>Unlinked</SheetBadge>
+                          )}
+                        </span>
                         <span className="shrink-0 text-body text-ink-muted">
                           {formatQuantity(ingredient.quantity, ingredient.unit)}
                         </span>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                   <p className="text-label font-medium text-ink-muted">
                     Ingredients {formatMoney(recipe.costing.ingredientsCost, currency)} · Labor{' '}
