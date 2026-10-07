@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Receipt, ReceiptStatus } from '../lib/api';
+import type { Receipt, ReceiptStatus, Recipe } from '../lib/api';
 import { renderWithRouter } from '../test/render';
 
 /**
@@ -186,5 +186,79 @@ describe('CatalogPage receipts tab', () => {
     const row = await screen.findByRole('link', { name: /Unnamed receipt/ });
 
     expect(row).toHaveAttribute('href', '/catalog/receipts/rc-pending');
+  });
+});
+
+describe('CatalogPage recipes tab incomplete cost', () => {
+  function makeRecipe(): Recipe {
+    return {
+      id: 'rp-1',
+      shopId: 'shop-1',
+      name: 'Brownies',
+      description: null,
+      imageUrl: null,
+      categoryId: null,
+      prepTimeMinutes: 20,
+      yieldQuantity: '4',
+      yieldUnit: 'servings',
+      targetMarginPct: null,
+      allergens: null,
+      instructions: null,
+      isActive: true,
+      status: 'unverified',
+      createdAt: '2026-02-10T09:00:00.000Z',
+      updatedAt: '2026-02-10T09:00:00.000Z',
+      costing: {
+        ingredientsCost: 1.2,
+        laborCost: 0.5,
+        batchCost: 1.7,
+        unitCost: 0.42,
+        yieldQuantity: 4,
+        retailPrice: 0,
+        appliedProfitMargin: 0,
+        inStock: false,
+        linkedCount: 2,
+        totalCount: 4,
+        ingredients: [
+          {
+            name: 'Sugar',
+            quantity: 100,
+            unit: 'g',
+            averageUnitCost: 0.01,
+            lineCost: 1,
+            currentQuantity: 500,
+            inventoryItemId: 'inv-1',
+            rawName: 'Sugar',
+            linked: true,
+          },
+          {
+            name: 'Beet sugar',
+            quantity: 50,
+            unit: 'g',
+            averageUnitCost: 0,
+            lineCost: 0,
+            currentQuantity: 0,
+            inventoryItemId: null,
+            rawName: 'Beet sugar',
+            linked: false,
+          },
+        ],
+      },
+    };
+  }
+
+  it('shows No price yet and the linked count instead of a fake $0 price', async () => {
+    api.apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith('/recipes')) return { recipes: [makeRecipe()] };
+      if (path.startsWith('/inventory')) return { items: [] };
+      return { receipts: [] };
+    });
+
+    renderWithRouter(<CatalogPage />, { route: '/catalog' });
+
+    expect(await screen.findByText('No price yet')).toBeInTheDocument();
+    expect(
+      await screen.findByText('2 of 4 ingredients linked — cost incomplete'),
+    ).toBeInTheDocument();
   });
 });

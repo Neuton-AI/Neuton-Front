@@ -148,6 +148,18 @@ export function RecipeDetailPage() {
                       >
                         <span className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-body text-ink">{ingredient.name}</span>
+                          <span
+                            data-testid={isLinked ? 'linked-dot' : 'unlinked-dot'}
+                            title={isLinked ? 'Linked to inventory' : 'Not linked to inventory'}
+                            aria-label={isLinked ? 'Linked to inventory' : 'Not linked to inventory'}
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 9999,
+                              flexShrink: 0,
+                              backgroundColor: isLinked ? '#16a34a' : '#9ca3af',
+                            }}
+                          />
                           {isLinked ? null : (
                             <SheetBadge>Unlinked</SheetBadge>
                           )}
