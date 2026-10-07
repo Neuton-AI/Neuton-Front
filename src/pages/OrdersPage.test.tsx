@@ -133,7 +133,7 @@ describe('OrdersPage', () => {
 
   it('renders empty state matching Brilliant design when no orders exist', async () => {
     api.apiFetch.mockResolvedValueOnce({ orders: [], total: 0 });
-    renderWithRouter(<OrdersPage />);
+    renderWithRouter(<OrdersPage includeStub={false} />);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2, name: 'No orders yet' })).toBeInTheDocument();

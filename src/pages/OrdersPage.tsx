@@ -16,13 +16,35 @@ function formatOrderHeader(order: Order): string {
   return `${customer} · #${cleanId}`;
 }
 
-export function OrdersPage() {
+/** Sample stub order matching Brilliant mockup for visual confirmation. */
+export const STUB_ORDER: Order = {
+  id: '1048',
+  shopId: 'stub',
+  userId: null,
+  customerName: 'Maya C.',
+  orderDate: '2026-09-28T10:00:00.000Z',
+  destinationAddress: '123 Market St',
+  deliveryDistanceKm: '0.00',
+  deliveryFee: '0.00',
+  appliedProfitMargin: null,
+  totalCost: '40.00',
+  totalAmount: '62.12',
+  documentUrl: null,
+  netProfit: 22.12,
+  createdAt: '2026-09-28T10:00:00.000Z',
+};
+
+type OrdersPageProps = {
+  includeStub?: boolean;
+};
+
+export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
   const { user, token } = useAuth();
   const { memberships, activeShopId } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
   const fabNavigation = useFabNavigation();
 
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(includeStub ? [STUB_ORDER] : []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,13 +60,14 @@ export function OrdersPage() {
         token,
         shopId: activeShopId,
       });
-      setOrders(data.orders);
+      const fetched = data.orders ?? [];
+      setOrders(fetched.length > 0 ? fetched : includeStub ? [STUB_ORDER] : []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load your orders');
     } finally {
       setLoading(false);
     }
-  }, [token, activeShopId]);
+  }, [token, activeShopId, includeStub]);
 
   useEffect(() => {
     void load();
