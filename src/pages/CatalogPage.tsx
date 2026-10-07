@@ -256,15 +256,8 @@ export function CatalogPage() {
                   key={item.id}
                   className="flex aspect-square flex-col gap-2 rounded-card bg-surface-card p-3"
                 >
-                  <div className="flex h-14 shrink-0 items-center justify-between">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-input bg-surface-canvas">
-                      <IconBox className="h-[19px] w-[19px] text-ink-muted-soft" />
-                    </div>
-                    {item.isLowStock ? (
-                      <span className="rounded-pill bg-brand-amber px-2 py-[3px] text-label font-medium text-ink">
-                        Low
-                      </span>
-                    ) : null}
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-input bg-surface-canvas">
+                    <IconBox className="h-[19px] w-[19px] text-ink-muted-soft" />
                   </div>
                   <div className="h-[18px] shrink-0" aria-hidden="true" />
                   <p className="truncate text-label font-medium text-ink-muted">
