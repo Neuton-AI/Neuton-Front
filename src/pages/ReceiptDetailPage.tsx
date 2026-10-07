@@ -2,8 +2,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
+import { Button } from '../components/ui';
 import { IconReceipt } from '../components/icons';
-import { apiFetch, type ReceiptDetail } from '../lib/api';
+import {
+  apiFetch,
+  type ReceiptDetail,
+  type VerifyReceiptBody,
+  type VerifyReceiptOutcome,
+} from '../lib/api';
 import { getReceiptStatusLabel, getReceiptStatusTone } from '../lib/receiptStatus';
 import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/format';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
@@ -18,11 +24,19 @@ export function ReceiptDetailPage() {
   const [receipt, setReceipt] = useState<ReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  /** Kept apart from `error`: a failed verify belongs next to its button, not
+   *  in the load-error slot whose retry only refetches the receipt. */
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=receipts');
   const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
+  // Verification is an owner/admin action server-side, so a member would only
+  // ever earn a 403 from a button they could see.
+  const role = memberships.find((row) => row.shopId === activeShopId)?.role;
+  const canVerify = role === 'owner' || role === 'admin';
 
   useEffect(() => {
     if (!token || !activeShopId || !id) return;
@@ -55,6 +69,39 @@ export function ReceiptDetailPage() {
     const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
     return () => clearTimeout(timer);
   }, [receipt?.status, reloadKey]);
+
+  /**
+   * Accepts every extracted line as the reviewer read it and lets the server do
+   * the rest — inventory rows, weighted-average cost, and the analytics totals
+   * all key off the `verified` status written in that one transaction. The sheet
+   * flips to verified immediately so the button cannot be pressed twice while
+   * the refetch is still in flight, then the refetch brings back the matched
+   * lines and timestamps.
+   */
+  const verify = async () => {
+    if (!token || !activeShopId || !id || verifying || !receipt) return;
+
+    setVerifying(true);
+    setVerifyError(null);
+    const body: VerifyReceiptBody = {
+      items: receipt.items.map((item) => ({ id: item.id, accepted: true })),
+    };
+
+    try {
+      const outcome = await apiFetch<VerifyReceiptOutcome>(
+        `/catalog/receipt/${id}/verify`,
+        { method: 'POST', token, shopId: activeShopId, body },
+      );
+      setReceipt((prev) => (prev ? { ...prev, status: outcome.status } : prev));
+      setReloadKey((n) => n + 1);
+    } catch (cause) {
+      setVerifyError(
+        cause instanceof Error ? cause.message : 'Could not verify the receipt.',
+      );
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const failureMessage = receipt?.status === 'failed' ? (receipt.errorMessage ?? null) : null;
   // A receipt can be denominated in a currency other than the shop's, so every
@@ -104,6 +151,23 @@ export function ReceiptDetailPage() {
               ) : null}
             </div>
 
+            {/* The only state that hands control back to a person, so it owns
+                both the explanation and the action that clears it. */}
+            {receipt.status === 'unverified' ? (
+              <div className="flex flex-col gap-2.5">
+                <InlineNotice>
+                  Extracted, not reviewed. These numbers have not been added to
+                  inventory yet.
+                </InlineNotice>
+                {verifyError ? <InlineNotice tone="error">{verifyError}</InlineNotice> : null}
+                {canVerify && receipt.items.length > 0 ? (
+                  <Button size="md" block loading={verifying} onClick={() => void verify()}>
+                    Verify receipt
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+
             {failureMessage ? <InlineNotice tone="error">{failureMessage}</InlineNotice> : null}
 
             <SheetSection title="Expense tags">
@@ -122,12 +186,6 @@ export function ReceiptDetailPage() {
             </SheetSection>
 
             <SheetSection title="Line items">
-              {receipt.status === 'unverified' ? (
-                <InlineNotice>
-                  Extracted, not reviewed. These numbers have not been added to
-                  inventory yet.
-                </InlineNotice>
-              ) : null}
               {receipt.items.length === 0 ? (
                 <p className="text-body text-ink-muted">
                   {receipt.status === 'pending' || receipt.status === 'processing'

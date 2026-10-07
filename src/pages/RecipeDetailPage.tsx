@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
+import { Button } from '../components/ui';
 import { IconBox, IconChefHat } from '../components/icons';
 import { apiFetch, type Recipe } from '../lib/api';
 import { formatMoney, formatQuantity } from '../lib/format';
@@ -18,11 +19,19 @@ export function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  /** Kept apart from `error`: a failed verify belongs next to its button, not
+   *  in the load-error slot whose retry only refetches the recipe. */
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=recipes');
   const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
+  // Verification is an owner/admin action server-side, so a member would only
+  // ever earn a 403 from a button they could see.
+  const role = memberships.find((row) => row.shopId === activeShopId)?.role;
+  const canVerify = role === 'owner' || role === 'admin';
 
   useEffect(() => {
     if (!token || !activeShopId || !id) return;
@@ -53,6 +62,35 @@ export function RecipeDetailPage() {
     const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
     return () => clearTimeout(timer);
   }, [recipe?.status, reloadKey]);
+
+  /**
+   * Publishing an extracted recipe: the server flips `unverified → verified`,
+   * which is what makes it orderable (GET /recipes/orderable only returns
+   * verified recipes). Ingredients are sent as an empty object because the
+   * endpoint's body is an object even though every field is optional.
+   */
+  const verify = async () => {
+    if (!token || !activeShopId || !id || verifying) return;
+
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      const data = await apiFetch<{ recipe: Recipe }>(`/catalog/recipe/${id}/verify`, {
+        method: 'POST',
+        token,
+        shopId: activeShopId,
+        body: {},
+      });
+      // Flip locally first so the button disappears at once and cannot be
+      // pressed again while the refetch is still in flight.
+      setRecipe((prev) => (prev ? { ...prev, status: data.recipe.status ?? 'verified' } : prev));
+      setReloadKey((n) => n + 1);
+    } catch (cause) {
+      setVerifyError(cause instanceof Error ? cause.message : 'Could not verify the recipe.');
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const steps = (recipe?.instructions ?? '')
     .split(/\r?\n+|(?:\d+[.)]\s+)/)
@@ -125,6 +163,23 @@ export function RecipeDetailPage() {
               </InlineNotice>
             ) : recipe.status === 'failed' ? (
               <InlineNotice tone="error">Extraction failed. Please try uploading again.</InlineNotice>
+            ) : null}
+
+            {/* The one state that hands control back to a person, so it owns
+                both the explanation and the action that clears it. */}
+            {recipe.status === 'unverified' ? (
+              <div className="flex flex-col gap-2.5">
+                <InlineNotice>
+                  Extracted, not reviewed. Verify it to publish the recipe for
+                  orders.
+                </InlineNotice>
+                {verifyError ? <InlineNotice tone="error">{verifyError}</InlineNotice> : null}
+                {canVerify ? (
+                  <Button size="md" block loading={verifying} onClick={() => void verify()}>
+                    Verify recipe
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
 
             <SheetSection title="Ingredients">
