@@ -133,6 +133,13 @@ export function CatalogPage() {
 
   const currency = shop?.currency ?? 'USD';
 
+  /** The inventory grid only replaces the row stack once it has tiles to place. */
+  const showInventoryGrid =
+    tab === 'inventory' &&
+    !errors.inventory &&
+    loadingTab !== 'inventory' &&
+    inventory.length > 0;
+
   return (
     <div className="shell">
       <div className="flex-1 pb-32 pt-[max(var(--safe-top)+44px,44px)]">
@@ -164,7 +171,13 @@ export function CatalogPage() {
           ))}
         </div>
 
-        <div className="mt-4 space-y-2.5 px-4">
+        <div
+          className={
+            showInventoryGrid
+              ? 'mt-4 grid grid-cols-2 gap-x-5 gap-y-3 px-4'
+              : 'mt-4 space-y-2.5 px-4'
+          }
+        >
           {errors[tab] ? (
             <ErrorState message={errors[tab] as string} onRetry={() => void loadTab(tab, { force: true })} />
           ) : null}
@@ -239,28 +252,20 @@ export function CatalogPage() {
               />
             ) : (
               inventory.map((item) => (
-                <div key={item.id} className="flex flex-col gap-2 rounded-card bg-surface-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="min-w-0 flex-1 font-display text-[22px] leading-tight text-ink">
-                      {item.name}
-                    </h2>
-                    {item.isLowStock ? (
-                      <span className="shrink-0 rounded-pill bg-semantic-warning/15 px-2 py-0.5 text-label font-medium text-ink">
-                        Low
-                      </span>
-                    ) : null}
+                <div
+                  key={item.id}
+                  className="flex aspect-square flex-col gap-2 rounded-card bg-surface-card p-3"
+                >
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-input bg-surface-canvas">
+                    <IconBox className="h-[19px] w-[19px] text-ink-muted-soft" />
                   </div>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-label text-ink-muted">
-                      {formatQuantity(item.currentQuantity, item.unit)} on hand
-                    </p>
-                    <p className="font-display text-[20px] text-ink">
-                      {formatMoney(item.averageUnitCost, currency)}
-                      <span className="ml-1 font-sans text-label text-ink-muted">
-                        avg / {item.unit}
-                      </span>
-                    </p>
-                  </div>
+                  <div className="h-[18px] shrink-0" aria-hidden="true" />
+                  <p className="truncate text-label font-medium text-ink-muted">
+                    {item.name}
+                  </p>
+                  <p className="truncate text-[22px] font-medium leading-[1.3] text-ink">
+                    {formatQuantity(item.currentQuantity, item.unit)}
+                  </p>
                 </div>
               ))
             )
