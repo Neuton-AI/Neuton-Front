@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation, type MediaKind } from '../components/Fab';
@@ -9,12 +8,13 @@ import {
 } from '../components/feedback';
 import { PageHeader } from '../components/PageHeader';
 import { IconBox, IconChefHat, IconPlus, IconReceipt } from '../components/icons';
-import { apiFetch, type InventoryItem, type Receipt, type Recipe } from '../lib/api';
+import type { Receipt, Recipe } from '../lib/api';
 import {
   getReceiptStatusLabel,
   RECEIPT_STATUS_PILL_STYLES,
 } from '../lib/receiptStatus';
 import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/format';
+import { useInventory, useReceipts, useRecipes } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 type Tab = 'recipes' | 'inventory' | 'receipts';
@@ -45,90 +45,48 @@ export function CatalogPage() {
 
   const fabNavigation = useFabNavigation(TAB_TO_KIND[tab]);
 
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  // Each tab is its own query, enabled only while visible: `/recipes` costs
+  // every recipe against live inventory, so fetching all three on mount is both
+  // wasteful and the reason one 404 could discard a successful receipts response.
+  const recipesQuery = useRecipes(token, activeShopId, tab === 'recipes');
+  const inventoryQuery = useInventory(token, activeShopId, tab === 'inventory');
+  const receiptsQuery = useReceipts(token, activeShopId, tab === 'receipts');
+
+  const recipes = recipesQuery.data?.recipes ?? [];
+  const inventory = inventoryQuery.data?.items ?? [];
+  const receipts = receiptsQuery.data?.receipts ?? [];
+
   /** Errors are per tab: one failing list must not blank the others. */
-  const [errors, setErrors] = useState<Partial<Record<Tab, string>>>({});
-  const [loadingTab, setLoadingTab] = useState<Tab | null>(null);
-  const loadedTabs = useRef<Partial<Record<Tab, boolean>>>({});
-  /** In-flight requests, so a concurrent mount joins instead of double-fetching. */
-  const inFlight = useRef<Partial<Record<Tab, Promise<void>>>>({});
+  const errors: Partial<Record<Tab, string>> = {};
+  for (const [which, query] of [
+    ['recipes', recipesQuery],
+    ['inventory', inventoryQuery],
+    ['receipts', receiptsQuery],
+  ] as const) {
+    if (query.error) {
+      errors[which] =
+        query.error instanceof Error ? query.error.message : 'Could not load this list';
+    }
+  }
 
-  /**
-   * Loads only the visible tab. `/recipes` costs every recipe against live
-   * inventory, so fetching all three on mount was both wasteful and the reason
-   * one 404 could discard a successful receipts response.
-   */
-  const loadTab = useCallback(
-    async (which: Tab, { force = false }: { force?: boolean } = {}) => {
-      if (!token || !activeShopId) return;
-      if (loadedTabs.current[which] && !force) return;
-      // Join a request already in flight instead of issuing a duplicate.
-      const existing = inFlight.current[which];
-      if (existing && !force) return existing;
+  const loadingTab: Tab | null =
+    tab === 'recipes'
+      ? recipesQuery.isLoading
+        ? 'recipes'
+        : null
+      : tab === 'inventory'
+        ? inventoryQuery.isLoading
+          ? 'inventory'
+          : null
+        : receiptsQuery.isLoading
+          ? 'receipts'
+          : null;
 
-      setLoadingTab(which);
-      setErrors((prev) => ({ ...prev, [which]: undefined }));
-
-      const request = (async () => {
-        try {
-          if (which === 'recipes') {
-            const data = await apiFetch<{ recipes: Recipe[] }>('/recipes?includeUnverified=true', {
-              token,
-              shopId: activeShopId,
-            });
-            setRecipes(data.recipes);
-          } else if (which === 'inventory') {
-            const data = await apiFetch<{ items: InventoryItem[] }>('/inventory', {
-              token,
-              shopId: activeShopId,
-            });
-            setInventory(data.items);
-          } else {
-            const data = await apiFetch<{ receipts: Receipt[] }>('/receipts?limit=50', {
-              token,
-              shopId: activeShopId,
-            });
-            setReceipts(data.receipts);
-          }
-          loadedTabs.current[which] = true;
-        } catch (cause) {
-          setErrors((prev) => ({
-            ...prev,
-            [which]:
-              cause instanceof Error ? cause.message : 'Could not load this list',
-          }));
-        } finally {
-          setLoadingTab((prev) => (prev === which ? null : prev));
-        }
-      })();
-
-      inFlight.current[which] = request;
-      try {
-        await request;
-      } finally {
-        delete inFlight.current[which];
-      }
-    },
-    [token, activeShopId],
-  );
-
-  // Quiet 3s poll while any recipe is pending/processing (no skeleton flash).
-  useEffect(() => {
-    if (tab !== 'recipes') return;
-    const hasPending = recipes.some((r) => r.status === 'pending' || r.status === 'processing');
-    if (!hasPending) return;
-
-    const interval = setInterval(() => {
-      void loadTab('recipes', { force: true });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [recipes, tab, loadTab]);
-
-  useEffect(() => {
-    void loadTab(tab);
-  }, [tab, loadTab]);
+  const refetchTab = (which: Tab) => {
+    const query =
+      which === 'recipes' ? recipesQuery : which === 'inventory' ? inventoryQuery : receiptsQuery;
+    void query.refetch();
+  };
 
   const currency = shop?.currency ?? 'USD';
 
@@ -178,7 +136,7 @@ export function CatalogPage() {
           }
         >
           {errors[tab] ? (
-            <ErrorState message={errors[tab] as string} onRetry={() => void loadTab(tab, { force: true })} />
+            <ErrorState message={errors[tab] as string} onRetry={() => refetchTab(tab)} />
           ) : null}
 
           {loadingTab === tab ? (

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { apiFetch, type ShopMembership } from './api';
+import { type ShopMembership } from './api';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -104,18 +104,6 @@ export function useShopMemberships(userId: string | undefined): MembershipState 
   }, []);
 
   return { memberships, activeShopId, loading, error, setActiveShopId, reload: load };
-}
-
-export function useAuthedApi(token: string | null | undefined, shopId: string | null) {
-  return useCallback(
-    <T,>(path: string, init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown }) =>
-      apiFetch<T>(path, {
-        ...init,
-        token,
-        shopId,
-      }),
-    [token, shopId],
-  );
 }
 
 export function useCurrentShop(memberships: ShopMembership[], activeShopId: string | null) {

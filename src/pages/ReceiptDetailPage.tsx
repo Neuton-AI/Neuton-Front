@@ -1,17 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { Button } from '../components/ui';
 import { IconReceipt } from '../components/icons';
-import {
-  apiFetch,
-  type ReceiptDetail,
-  type VerifyReceiptBody,
-  type VerifyReceiptOutcome,
-} from '../lib/api';
+import type { VerifyReceiptBody } from '../lib/api';
 import { getReceiptStatusLabel, getReceiptStatusTone } from '../lib/receiptStatus';
 import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/format';
+import { useDeleteReceipt, useReceipt, useSignedDownloadUrl, useVerifyReceipt } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 /** Renders the OpenPencil "Modal / Receipt Detail" sheet from GET /receipts/:id. */
@@ -21,59 +17,35 @@ export function ReceiptDetailPage() {
   const { memberships, activeShopId } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const [receipt, setReceipt] = useState<ReceiptDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(false);
+  const receiptQuery = useReceipt(token, activeShopId, id);
+  const receipt = receiptQuery.data?.receipt ?? null;
+  const verifyMutation = useVerifyReceipt(token, activeShopId);
+  const deleteMutation = useDeleteReceipt(token, activeShopId);
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the receipt. */
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   /** Same slot pattern as verify: a failed delete (e.g. a 409 race with a
    *  verification landing mid-click) belongs next to its button. */
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+
+  const loading = receiptQuery.isLoading && !receipt;
+  const error = receiptQuery.error
+    ? receiptQuery.error instanceof Error
+      ? receiptQuery.error.message
+      : 'Could not load the receipt.'
+    : null;
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=receipts');
   const navigate = useNavigate();
-  const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
   // Verification is an owner/admin action server-side, so a member would only
   // ever earn a 403 from a button they could see.
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
   const canVerify = role === 'owner' || role === 'admin';
 
-  useEffect(() => {
-    if (!token || !activeShopId || !id) return;
-    const controller = new AbortController();
-
-    setLoading(true);
-    setError(null);
-    apiFetch<{ receipt: ReceiptDetail }>(`/receipts/${id}`, {
-      token,
-      shopId: activeShopId,
-      signal: controller.signal,
-    })
-      .then((data) => setReceipt(data.receipt))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : 'Could not load the receipt.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [loadKey, id]);
-
-  // Only a receipt the worker is still chewing on gains lines asynchronously, so
-  // only that one polls. `unverified` is terminal for the worker — it hands over
-  // to a human and stops — so polling it would just spin until someone reviews.
-  useEffect(() => {
-    if (receipt?.status !== 'processing') return;
-    const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
-    return () => clearTimeout(timer);
-  }, [receipt?.status, reloadKey]);
+  // Polling while the worker is still chewing is baked into the query hook:
+  // only `processing` keeps a quiet 3s refetch. `unverified` is terminal for
+  // the worker — it hands over to a human and stops — so it never polls.
 
   /**
    * Accepts every extracted line as the reviewer read it and lets the server do
@@ -84,27 +56,16 @@ export function ReceiptDetailPage() {
    * lines and timestamps.
    */
   const verify = async () => {
-    if (!token || !activeShopId || !id || verifying || !receipt) return;
+    if (!token || !activeShopId || !id || verifyMutation.isPending || !receipt) return;
 
-    setVerifying(true);
     setVerifyError(null);
     const body: VerifyReceiptBody = {
       items: receipt.items.map((item) => ({ id: item.id, accepted: true })),
     };
-
     try {
-      const outcome = await apiFetch<VerifyReceiptOutcome>(
-        `/catalog/receipt/${id}/verify`,
-        { method: 'POST', token, shopId: activeShopId, body },
-      );
-      setReceipt((prev) => (prev ? { ...prev, status: outcome.status } : prev));
-      setReloadKey((n) => n + 1);
+      await verifyMutation.mutateAsync({ id, body });
     } catch (cause) {
-      setVerifyError(
-        cause instanceof Error ? cause.message : 'Could not verify the receipt.',
-      );
-    } finally {
-      setVerifying(false);
+      setVerifyError(cause instanceof Error ? cause.message : 'Could not verify the receipt.');
     }
   };
 
@@ -124,30 +85,24 @@ export function ReceiptDetailPage() {
    * click still surfaces as a 409 next to the button instead of navigating.
    */
   const remove = async () => {
-    if (!token || !activeShopId || !id || deleting || !receipt || isVerified) return;
+    if (!token || !activeShopId || !id || deleteMutation.isPending || !receipt || isVerified) return;
     if (!window.confirm('Delete this receipt? Its lines and scan will be removed. This cannot be undone.')) {
       return;
     }
 
-    setDeleting(true);
     setDeleteError(null);
     try {
-      await apiFetch<{ ok: true }>(`/receipts/${id}`, {
-        method: 'DELETE',
-        token,
-        shopId: activeShopId,
-      });
+      await deleteMutation.mutateAsync({ id });
       navigate('/catalog?tab=receipts', { replace: true });
     } catch (cause) {
       setDeleteError(cause instanceof Error ? cause.message : 'Could not delete the receipt.');
-      setDeleting(false);
     }
   };
 
   return (
     <Sheet open onClose={close} label="Receipt details">
       <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
-        {error ? <ErrorState message={error} onRetry={() => setReloadKey((n) => n + 1)} /> : null}
+        {error ? <ErrorState message={error} onRetry={() => void receiptQuery.refetch()} /> : null}
 
         {loading && !receipt ? (
           <>
@@ -197,7 +152,7 @@ export function ReceiptDetailPage() {
                 </InlineNotice>
                 {verifyError ? <InlineNotice tone="error">{verifyError}</InlineNotice> : null}
                 {canVerify && receipt.items.length > 0 ? (
-                  <Button size="md" block loading={verifying} onClick={() => void verify()}>
+                  <Button size="md" block loading={verifyMutation.isPending} onClick={() => void verify()}>
                     Verify receipt
                   </Button>
                 ) : null}
@@ -293,7 +248,7 @@ export function ReceiptDetailPage() {
                   variant="danger"
                   size="md"
                   block
-                  loading={deleting}
+                  loading={deleteMutation.isPending}
                   disabled={isVerified}
                   title={isVerified ? 'Verified receipts cannot be deleted' : undefined}
                   onClick={() => void remove()}
@@ -328,28 +283,9 @@ function SignedScan({
   contentType: string | null;
   filename: string | null;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!token || !shopId) return;
-    const controller = new AbortController();
-
-    apiFetch<{ url: string; expiresIn: number }>('/uploads/download-url', {
-      method: 'POST',
-      token,
-      shopId,
-      signal: controller.signal,
-      body: { path: storagePath },
-    })
-      .then((data) => setUrl(data.url))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setFailed(true);
-      });
-
-    return () => controller.abort();
-  }, [token, shopId, storagePath]);
+  const signedQuery = useSignedDownloadUrl(token, shopId, storagePath);
+  const failed = signedQuery.error != null;
+  const url = signedQuery.data?.url ?? null;
 
   if (failed) {
     return (

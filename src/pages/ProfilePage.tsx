@@ -4,8 +4,8 @@ import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { IconLogout, IconStore } from '../components/icons';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Field, Input } from '../components/ui';
-import { apiFetch, type Shop } from '../lib/api';
 import { toNumber } from '../lib/format';
+import { useCreateShop, useShopSettings, useUpdateShop } from '../lib/queries';
 import { supabase, useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 type Tab = 'me' | 'shop';
@@ -16,30 +16,26 @@ export function ProfilePage() {
   const activeShop = useCurrentShop(memberships, activeShopId);
   const [tab, setTab] = useState<Tab>('me');
   const [notice, setNotice] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   const signOut = async () => {
     await supabase?.auth.signOut();
     window.location.assign('/signin');
   };
 
+  const createShopMutation = useCreateShop(token);
+
   const createShop = async (name: string) => {
-    if (!token || creating || name.trim().length < 2) return;
-    setCreating(true);
+    if (!token || createShopMutation.isPending || name.trim().length < 2) return;
     setNotice(null);
     try {
-      const { shop } = await apiFetch<{ shop: Shop }>('/shops', {
-        method: 'POST',
-        token,
-        body: { name: name.trim() },
-      });
+      const { shop } = await createShopMutation.mutateAsync(name.trim());
+      // Memberships are an external hook, not a query we invalidate, so the
+      // new membership has to be pulled in by hand before switching to it.
       await reload();
       setActiveShopId(shop.id);
       setNotice(`${shop.name} is ready.`);
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Could not create the shop.');
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -75,7 +71,7 @@ export function ProfilePage() {
               email={user?.email ?? '—'}
               memberships={memberships}
               activeShopId={activeShopId}
-              creating={creating}
+              creating={createShopMutation.isPending}
               onSelectShop={(shopId, name) => {
                 setActiveShopId(shopId);
                 setNotice(`Switched to ${name}.`);
@@ -198,11 +194,9 @@ function ShopTab({
   onSaved: () => void;
   onNotice: (message: string) => void;
 }) {
-  const [shop, setShop] = useState<Shop | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [saving, setSaving] = useState(false);
+  const shopQuery = useShopSettings(token, shopId);
+  const updateShop = useUpdateShop(token, shopId);
+  const shop = shopQuery.data?.shop ?? null;
   const [form, setForm] = useState({
     storeAddress: '',
     targetProfitMargin: '',
@@ -212,65 +206,37 @@ function ShopTab({
   });
 
   const canEdit = role === 'owner' || role === 'admin';
-  const loadKey = `${token ?? ''}:${shopId ?? ''}:${reloadKey}`;
 
+  // The query starts empty, so the form is seeded once the row lands. Seeding
+  // keys off the row's id (never the row object) so a successful save — which
+  // swaps in the updated row — cannot clobber text the user is still typing.
   useEffect(() => {
-    if (!token || !shopId) return;
-    const controller = new AbortController();
-
-    setLoading(true);
-    setError(null);
-    apiFetch<{ shop: Shop }>('/shop', {
-      token,
-      shopId,
-      signal: controller.signal,
-    })
-      .then(({ shop: loaded }) => {
-        setShop(loaded);
-        setForm({
-          storeAddress: loaded.storeAddress ?? '',
-          targetProfitMargin: toNumber(loaded.targetProfitMargin).toString(),
-          hourlyLaborCost: toNumber(loaded.hourlyLaborCost).toFixed(2),
-          deliveryBaseFee: toNumber(loaded.deliveryBaseFee).toFixed(2),
-          deliveryRatePerKm: toNumber(loaded.deliveryRatePerKm).toFixed(2),
-        });
-      })
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : 'Could not load shop settings.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [loadKey, shopId]);
+    if (!shop) return;
+    setForm({
+      storeAddress: shop.storeAddress ?? '',
+      targetProfitMargin: toNumber(shop.targetProfitMargin).toString(),
+      hourlyLaborCost: toNumber(shop.hourlyLaborCost).toFixed(2),
+      deliveryBaseFee: toNumber(shop.deliveryBaseFee).toFixed(2),
+      deliveryRatePerKm: toNumber(shop.deliveryRatePerKm).toFixed(2),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop?.id]);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!token || !shopId || saving) return;
+    if (!token || !shopId || updateShop.isPending) return;
 
-    setSaving(true);
-    setError(null);
     try {
-      const { shop: updated } = await apiFetch<{ shop: Shop }>('/shop', {
-        method: 'PATCH',
-        token,
-        shopId,
-        body: {
-          storeAddress: form.storeAddress.trim() || null,
-          targetProfitMargin: Number(form.targetProfitMargin),
-          hourlyLaborCost: Number(form.hourlyLaborCost),
-          deliveryBaseFee: Number(form.deliveryBaseFee),
-          deliveryRatePerKm: Number(form.deliveryRatePerKm),
-        },
+      await updateShop.mutateAsync({
+        storeAddress: form.storeAddress.trim() || null,
+        targetProfitMargin: Number(form.targetProfitMargin),
+        hourlyLaborCost: Number(form.hourlyLaborCost),
+        deliveryBaseFee: Number(form.deliveryBaseFee),
+        deliveryRatePerKm: Number(form.deliveryRatePerKm),
       });
-      setShop(updated);
       onSaved();
     } catch (cause) {
       onNotice(cause instanceof Error ? cause.message : 'Could not save shop settings.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -278,11 +244,20 @@ function ShopTab({
     return <p className="text-body text-ink-muted">Create a shop to configure its settings.</p>;
   }
 
-  if (error && !shop) {
-    return <ErrorState message={error} onRetry={() => setReloadKey((n) => n + 1)} />;
+  if (shopQuery.error && !shop) {
+    return (
+      <ErrorState
+        message={
+          shopQuery.error instanceof Error
+            ? shopQuery.error.message
+            : 'Could not load shop settings.'
+        }
+        onRetry={() => void shopQuery.refetch()}
+      />
+    );
   }
 
-  if (loading && !shop) {
+  if (shopQuery.isLoading && !shop) {
     return (
       <div className="flex flex-col gap-3">
         <Skeleton className="h-[87px]" />
@@ -298,7 +273,16 @@ function ShopTab({
 
   return (
     <form onSubmit={save} className="flex flex-col gap-3">
-      {error ? <ErrorState message={error} onRetry={() => setReloadKey((n) => n + 1)} /> : null}
+      {shopQuery.error ? (
+        <ErrorState
+          message={
+            shopQuery.error instanceof Error
+              ? shopQuery.error.message
+              : 'Could not load shop settings.'
+          }
+          onRetry={() => void shopQuery.refetch()}
+        />
+      ) : null}
 
       {!canEdit ? (
         <InlineNotice tone="info">
@@ -398,7 +382,7 @@ function ShopTab({
       </fieldset>
 
       {canEdit ? (
-        <Button type="submit" size="sm" radius="input" block loading={saving}>
+        <Button type="submit" size="sm" radius="input" block loading={updateShop.isPending}>
           Save changes
         </Button>
       ) : (

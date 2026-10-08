@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { IconPin } from '../components/icons';
-import { apiFetch, type OrderDetail } from '../lib/api';
-import { getOrderStatusLabel, getOrderStatusTone } from '../lib/orderStatus';
 import { formatDate, formatMoney, formatQuantity, toNumber } from '../lib/format';
+import { getOrderStatusLabel, getOrderStatusTone } from '../lib/orderStatus';
+import { useDeleteOrder, useMarkOrderDelivered, useOrder } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 /** Renders the OpenPencil "Modal / Order Detail" sheet from GET /orders/:id. */
@@ -18,56 +18,41 @@ export function OrderDetailPage() {
   const { memberships, activeShopId } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [markingDelivered, setMarkingDelivered] = useState(false);
-  /** Kept apart from `error`: a failed transition belongs next to its button,
-   *  not in the load-error slot whose retry only refetches the order. */
+  const orderQuery = useOrder(token, activeShopId, id);
+  const order = orderQuery.data?.order ?? null;
+  const markOrder = useMarkOrderDelivered(token, activeShopId);
+  const deleteOrder = useDeleteOrder(token, activeShopId);
+  /** A failed delete belongs in the load-error slot whose retry refetches. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  /** Kept apart from the load error: a failed transition belongs next to its
+   *  button, not in the slot whose retry only refetches the order. */
   const [markError, setMarkError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+
+  const loading = orderQuery.isLoading && !order;
+  const error = orderQuery.error
+    ? orderQuery.error instanceof Error
+      ? orderQuery.error.message
+      : 'Could not load the order.'
+    : actionError;
+  const retry = () => {
+    setActionError(null);
+    void orderQuery.refetch();
+  };
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/orders');
-  const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
   const justSaved = (location.state as { fresh?: boolean } | null)?.fresh === true;
 
-  useEffect(() => {
-    if (!token || !activeShopId || !id) return;
-    const controller = new AbortController();
-
-    setLoading(true);
-    setError(null);
-    apiFetch<{ order: OrderDetail }>(`/orders/${id}`, {
-      token,
-      shopId: activeShopId,
-      signal: controller.signal,
-    })
-      .then((data) => setOrder(data.order))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : 'Could not load the order.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [loadKey, id]);
-
   const remove = async () => {
-    if (!token || !activeShopId || !id || deleting) return;
+    if (!token || !activeShopId || !id || deleteOrder.isPending) return;
     if (!window.confirm('Delete this order? This cannot be undone.')) return;
 
-    setDeleting(true);
-    setError(null);
+    setActionError(null);
     try {
-      await apiFetch<undefined>(`/orders/${id}`, { method: 'DELETE', token, shopId: activeShopId });
+      await deleteOrder.mutateAsync({ id });
       navigate('/orders', { replace: true });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not delete the order.');
-      setDeleting(false);
+      setActionError(cause instanceof Error ? cause.message : 'Could not delete the order.');
     }
   };
 
@@ -80,23 +65,13 @@ export function OrderDetailPage() {
    * twice while the refetch is still in flight.
    */
   const markDelivered = async () => {
-    if (!token || !activeShopId || !id || markingDelivered || !order) return;
+    if (!token || !activeShopId || !id || markOrder.isPending || !order) return;
 
-    setMarkingDelivered(true);
     setMarkError(null);
     try {
-      const data = await apiFetch<{ order: OrderDetail }>(`/orders/${id}/status`, {
-        method: 'PATCH',
-        token,
-        shopId: activeShopId,
-        body: { status: 'delivered' },
-      });
-      setOrder((prev) => (prev ? { ...prev, status: data.order.status } : prev));
-      setReloadKey((n) => n + 1);
+      await markOrder.mutateAsync({ id });
     } catch (cause) {
       setMarkError(cause instanceof Error ? cause.message : 'Could not mark the order delivered.');
-    } finally {
-      setMarkingDelivered(false);
     }
   };
 
@@ -109,7 +84,7 @@ export function OrderDetailPage() {
   return (
     <Sheet open onClose={close} label="Order details">
       <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
-        {error ? <ErrorState message={error} onRetry={() => setReloadKey((n) => n + 1)} /> : null}
+        {error ? <ErrorState message={error} onRetry={retry} /> : null}
 
         {loading && !order ? (
           <>
@@ -237,13 +212,13 @@ export function OrderDetailPage() {
                   Still being prepared. Mark it delivered once the customer has it.
                 </InlineNotice>
                 {markError ? <InlineNotice tone="error">{markError}</InlineNotice> : null}
-                <Button size="md" block loading={markingDelivered} onClick={markDelivered}>
+                <Button size="md" block loading={markOrder.isPending} onClick={markDelivered}>
                   Mark as delivered
                 </Button>
               </div>
             ) : null}
 
-            <Button variant="danger" size="md" block loading={deleting} onClick={remove}>
+            <Button variant="danger" size="md" block loading={deleteOrder.isPending} onClick={remove}>
               Delete order
             </Button>
           </>

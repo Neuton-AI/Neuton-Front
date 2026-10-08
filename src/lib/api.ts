@@ -249,6 +249,17 @@ export type Recipe = {
  */
 export type OrderStatus = 'processing' | 'delivered';
 
+/** One sellable recipe as returned by GET /recipes/orderable. */
+export type OrderableRecipe = {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  yieldQuantity: string;
+  yieldUnit: string;
+  unitCost: number;
+  retailPrice: number;
+};
+
 export type Order = {
   id: string;
   shopId: string;
