@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { Button } from '../components/ui';
@@ -28,10 +28,15 @@ export function ReceiptDetailPage() {
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the receipt. */
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  /** Same slot pattern as verify: a failed delete (e.g. a 409 race with a
+   *  verification landing mid-click) belongs next to its button. */
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=receipts');
+  const navigate = useNavigate();
   const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
   // Verification is an owner/admin action server-side, so a member would only
   // ever earn a 403 from a button they could see.
@@ -107,6 +112,37 @@ export function ReceiptDetailPage() {
   // A receipt can be denominated in a currency other than the shop's, so every
   // figure on this sheet has to follow the receipt, not the shop.
   const receiptCurrency = receipt?.currency ?? currency;
+  // Status-split delete (DELETE /receipts/:id): pending/processing/unverified/
+  // failed hard-delete the row + lines + R2 object, while verified is a 409 —
+  // it already moved stock and counts as spend, with no reversal ledger. The
+  // verified flag is the trusted disable signal, never inferred client-side.
+  const isVerified = receipt?.status === 'verified';
+
+  /**
+   * Deletes an unverified receipt outright. Verified receipts never reach here
+   * (the button is disabled), but a verification landing between render and
+   * click still surfaces as a 409 next to the button instead of navigating.
+   */
+  const remove = async () => {
+    if (!token || !activeShopId || !id || deleting || !receipt || isVerified) return;
+    if (!window.confirm('Delete this receipt? Its lines and scan will be removed. This cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await apiFetch<{ ok: true }>(`/receipts/${id}`, {
+        method: 'DELETE',
+        token,
+        shopId: activeShopId,
+      });
+      navigate('/catalog?tab=receipts', { replace: true });
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : 'Could not delete the receipt.');
+      setDeleting(false);
+    }
+  };
 
   return (
     <Sheet open onClose={close} label="Receipt details">
@@ -239,6 +275,33 @@ export function ReceiptDetailPage() {
                 )}
               </div>
             </SheetSection>
+
+            {/* Delete is owner/admin-only server-side (mutationGuards), so
+                members never see a button that would only earn them a 403.
+                Verified is the disable signal: it already moved stock and
+                counts as spend, so the backend answers 409 and the button
+                stays disabled with the reason beside it. */}
+            {canVerify ? (
+              <div className="flex flex-col gap-2.5">
+                {isVerified ? (
+                  <InlineNotice>
+                    Verified receipts already moved stock and count as spend — they cannot be deleted.
+                  </InlineNotice>
+                ) : null}
+                {deleteError ? <InlineNotice tone="error">{deleteError}</InlineNotice> : null}
+                <Button
+                  variant="danger"
+                  size="md"
+                  block
+                  loading={deleting}
+                  disabled={isVerified}
+                  title={isVerified ? 'Verified receipts cannot be deleted' : undefined}
+                  onClick={() => void remove()}
+                >
+                  Delete receipt
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : !error ? (
           <Skeleton className="h-[88px]" />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { Button } from '../components/ui';
@@ -23,10 +23,14 @@ export function RecipeDetailPage() {
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the recipe. */
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  /** Same slot pattern as verify: a failed delete belongs next to its button. */
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=recipes');
+  const navigate = useNavigate();
   const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
   // Verification is an owner/admin action server-side, so a member would only
   // ever earn a 403 from a button they could see.
@@ -96,6 +100,38 @@ export function RecipeDetailPage() {
     .split(/\r?\n+|(?:\d+[.)]\s+)/)
     .map((step) => step.replace(/^\s*\d+[.)]\s*/, '').trim())
     .filter(Boolean);
+
+  /**
+   * Try-hard → fallback-soft lives server-side (DELETE /recipes/:id returns
+   * `{ mode: 'hard' | 'soft' }`): unreferenced recipes are removed outright
+   * with their ingredients + R2 object, while a recipe order lines still point
+   * at (FK 23503) is deactivated instead. Either way it leaves this list, so
+   * success navigates back. No status gate here — every status is deletable.
+   */
+  const remove = async () => {
+    if (!token || !activeShopId || !id || deleting) return;
+    if (
+      !window.confirm(
+        'Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.',
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await apiFetch<{ ok: true; mode: 'hard' | 'soft' }>(`/recipes/${id}`, {
+        method: 'DELETE',
+        token,
+        shopId: activeShopId,
+      });
+      navigate('/catalog?tab=recipes', { replace: true });
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : 'Could not delete the recipe.');
+      setDeleting(false);
+    }
+  };
 
   const total = recipe?.costing.totalCount ?? recipe?.costing.ingredients.length ?? 0;
   const linked = recipe?.costing.linkedCount
@@ -272,6 +308,19 @@ export function RecipeDetailPage() {
                 </ol>
               )}
             </SheetSection>
+
+            {/* Delete is owner/admin-only server-side (mutationGuards), so
+                members never see a button that would only earn them a 403.
+                No status gate: the backend try-hard → fallback-soft path
+                accepts every status. */}
+            {canVerify ? (
+              <div className="flex flex-col gap-2.5">
+                {deleteError ? <InlineNotice tone="error">{deleteError}</InlineNotice> : null}
+                <Button variant="danger" size="md" block loading={deleting} onClick={() => void remove()}>
+                  Delete recipe
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : !error ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center">

@@ -196,3 +196,55 @@ describe('RecipeDetailPage verification', () => {
     expect(screen.getByRole('button', { name: 'Verify recipe' })).toBeEnabled();
   });
 });
+
+describe('RecipeDetailPage delete', () => {
+  it('offers the delete action to owners on every status (no status gate)', async () => {
+    mockApi();
+    renderDetail();
+
+    // Verified recipes are deletable too — the backend try-hard →
+    // fallback-soft path decides hard vs soft, not the UI.
+    expect(await screen.findByRole('button', { name: 'Delete recipe' })).toBeEnabled();
+  });
+
+  it('hides the delete action from members, who would only get a 403', async () => {
+    state.role = 'member';
+    mockApi();
+    renderDetail();
+
+    await screen.findByText('Tomato Soup');
+    expect(screen.queryByRole('button', { name: 'Delete recipe' })).toBeNull();
+  });
+
+  it('calls DELETE /recipes/:id after confirmation', async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockApi();
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete recipe' }));
+
+    await waitFor(() =>
+      expect(api.apiFetch).toHaveBeenCalledWith(
+        '/recipes/rp-1',
+        expect.objectContaining({ method: 'DELETE', shopId: 'shop-1' }),
+      ),
+    );
+    confirm.mockRestore();
+  });
+
+  it('explains a failed delete inline without navigating away', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.apiFetch.mockImplementation(async (_path: string, init?: { method?: string }) => {
+      if (init?.method === 'DELETE') throw new Error('Could not delete the recipe.');
+      return { recipe: makeRecipe('verified') };
+    });
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete recipe' }));
+
+    expect(await screen.findByText('Could not delete the recipe.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete recipe' })).toBeEnabled();
+  });
+});
