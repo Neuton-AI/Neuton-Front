@@ -63,6 +63,7 @@ const { OrderDetailPage } = await import('./OrderDetailPage');
 function makeOrderDetail(status: OrderStatus): OrderDetail {
   return {
     id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    orderNumber: 42,
     shopId: 'shop-1',
     userId: 'u1',
     customerName: 'Maya C.',
@@ -118,6 +119,7 @@ function renderDetail() {
   return renderWithRouter(
     <Routes>
       <Route path="/orders/:id" element={<OrderDetailPage />} />
+      <Route path="/orders" element={null} />
     </Routes>,
     { route: '/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' },
   );
@@ -195,5 +197,45 @@ describe('OrderDetailPage delivery', () => {
 
     expect(await screen.findByText('Order is already delivered')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mark as delivered' })).toBeInTheDocument();
+  });
+});
+
+describe('OrderDetailPage cancellation', () => {
+  it('shows the invoice number as the headline handle', async () => {
+    api.apiFetch.mockResolvedValue({ order: makeOrderDetail('processing') });
+    renderDetail();
+
+    expect(await screen.findByText(/· #42/)).toBeInTheDocument();
+  });
+
+  it('offers to cancel the order as a void, not a deletion', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.apiFetch.mockResolvedValue({ order: makeOrderDetail('processing') });
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Cancel order' }));
+
+    await waitFor(() =>
+      expect(api.apiFetch).toHaveBeenCalledWith(
+        '/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        expect.objectContaining({ method: 'DELETE', shopId: 'shop-1' }),
+      ),
+    );
+    expect(window.confirm).toHaveBeenCalledWith(
+      'Cancel this order? It stays on your records as cancelled.',
+    );
+  });
+
+  it('shows a cancelled order as a frozen void with no actions', async () => {
+    api.apiFetch.mockResolvedValue({ order: makeOrderDetail('cancelled') });
+    renderDetail();
+
+    expect(await screen.findByText('Cancelled')).toBeInTheDocument();
+    expect(
+      screen.getByText(/This order was cancelled\. It stays on your records as a void/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mark as delivered' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancel order' })).toBeNull();
   });
 });

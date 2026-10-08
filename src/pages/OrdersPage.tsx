@@ -13,14 +13,15 @@ import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 function formatOrderHeader(order: Order): string {
   const customer = order.customerName?.trim() || 'Unnamed customer';
-  if (!order.id) return customer;
-  const cleanId = order.id.replace(/-/g, '').slice(0, 4);
-  return `${customer} · #${cleanId}`;
+  // The invoice number is the shop-facing handle: sequential, per shop,
+  // shorter than the UUID and the thing invoices print (N-105).
+  return `${customer} · #${order.orderNumber}`;
 }
 
 /** Sample stub order matching Brilliant mockup for visual confirmation. */
 export const STUB_ORDER: Order = {
   id: '1048',
+  orderNumber: 1048,
   shopId: 'stub',
   userId: null,
   customerName: 'Maya C.',
@@ -43,6 +44,7 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'processing', label: 'Processing' },
   { key: 'delivered', label: 'Delivered' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 /** Compact status pill for the order row, next to the date line. */
@@ -50,7 +52,11 @@ function OrderStatusPill({ status }: { status: OrderStatus }) {
   return (
     <span
       className={`inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-[11px] font-medium leading-tight ${
-        status === 'delivered' ? 'bg-brand-teal/25 text-ink' : 'bg-brand-amber/20 text-ink'
+        status === 'cancelled'
+          ? 'bg-semantic-error/15 text-ink'
+          : status === 'delivered'
+            ? 'bg-brand-teal/25 text-ink'
+            : 'bg-brand-amber/20 text-ink'
       }`}
     >
       {getOrderStatusLabel(status)}
