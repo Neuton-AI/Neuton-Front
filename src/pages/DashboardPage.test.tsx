@@ -43,7 +43,11 @@ const GRAPH = [
   { date: '2026-03-03', revenue: 25, expenses: 5, netProfit: 20 },
 ];
 
-function summary(period: DashboardPeriod, graph: DashboardSummary['graph'] = GRAPH): DashboardSummary {
+function summary(
+  period: DashboardPeriod,
+  graph: DashboardSummary['graph'] = GRAPH,
+  trend: DashboardSummary['trend'] = { revenuePercent: 12, profitPercent: 8, expensesPercent: -4 },
+): DashboardSummary {
   return {
     period,
     range: { from: '2026-03-01', to: '2026-03-03' },
@@ -56,7 +60,7 @@ function summary(period: DashboardPeriod, graph: DashboardSummary['graph'] = GRA
       orderCount: 3,
       profitMarginPercent: 72,
     },
-    trend: { revenuePercent: 12, profitPercent: 8, expensesPercent: -4 },
+    trend,
     graph,
     topItem: {
       recipeId: 'r1',
@@ -83,12 +87,15 @@ function plottedHeights(chart: Element): number[] {
   return numbers.filter((_, index) => index % 2 === 1);
 }
 
-function stubDashboard(graph: DashboardSummary['graph'] = GRAPH) {
+function stubDashboard(
+  graph: DashboardSummary['graph'] = GRAPH,
+  trend?: DashboardSummary['trend'],
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
       const period = (new URL(url).searchParams.get('period') ?? '30d') as DashboardPeriod;
-      return { ok: true, status: 200, text: async () => JSON.stringify(summary(period, graph)) };
+      return { ok: true, status: 200, text: async () => JSON.stringify(summary(period, graph, trend)) };
     }),
   );
 }
@@ -171,5 +178,36 @@ describe('DashboardPage profit chart', () => {
 
     expect(await screen.findByText('No orders in this period yet')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /net profit/i })).toBeNull();
+  });
+});
+
+describe('DashboardPage net profit trend badge', () => {
+  // N-76 regression: the pill rendered `++100.0%` because `formatPercent`
+  // already prefixes positive values with `+` and the page added another one.
+  it('renders a single plus sign for a positive trend', async () => {
+    stubDashboard(GRAPH, { revenuePercent: 12, profitPercent: 100, expensesPercent: -4 });
+    renderWithRouter(<DashboardPage />);
+
+    const badge = await within(screen.getByRole('region', { name: 'Net profit' })).findByText('+100.0%');
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent).not.toContain('++');
+  });
+
+  it('renders a negative trend with a single minus sign', async () => {
+    stubDashboard(GRAPH, { revenuePercent: 12, profitPercent: -15.5, expensesPercent: -4 });
+    renderWithRouter(<DashboardPage />);
+
+    expect(
+      await within(screen.getByRole('region', { name: 'Net profit' })).findByText('-15.5%'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a neutral trend without any sign', async () => {
+    stubDashboard(GRAPH, { revenuePercent: 12, profitPercent: 0, expensesPercent: -4 });
+    renderWithRouter(<DashboardPage />);
+
+    expect(
+      await within(screen.getByRole('region', { name: 'Net profit' })).findByText('0.0%'),
+    ).toBeInTheDocument();
   });
 });
