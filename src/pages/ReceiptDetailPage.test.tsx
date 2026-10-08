@@ -220,3 +220,70 @@ describe('ReceiptDetailPage verification', () => {
     expect(screen.getByRole('button', { name: 'Verify receipt' })).toBeEnabled();
   });
 });
+
+describe('ReceiptDetailPage delete', () => {
+  it('enables delete on an unverified receipt', async () => {
+    mockApi();
+    renderDetail();
+
+    expect(await screen.findByRole('button', { name: 'Delete receipt' })).toBeEnabled();
+  });
+
+  it('disables delete on a verified receipt and explains why', async () => {
+    const current = mockApi();
+    current.status = 'verified';
+    renderDetail();
+
+    const button = await screen.findByRole('button', { name: 'Delete receipt' });
+    expect(button).toBeDisabled();
+    expect(
+      screen.getByText(/already moved stock and count as spend/i),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the delete action from members, who would only get a 403', async () => {
+    state.role = 'member';
+    mockApi();
+    renderDetail();
+
+    await screen.findByText('Corner Market');
+    expect(screen.queryByRole('button', { name: 'Delete receipt' })).toBeNull();
+  });
+
+  it('calls DELETE /receipts/:id after confirmation', async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockApi();
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete receipt' }));
+
+    await waitFor(() =>
+      expect(api.apiFetch).toHaveBeenCalledWith(
+        '/receipts/rc-1',
+        expect.objectContaining({ method: 'DELETE', shopId: 'shop-1' }),
+      ),
+    );
+    confirm.mockRestore();
+  });
+
+  it('explains a failed delete inline (e.g. a 409 race with verify)', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.apiFetch.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path.startsWith('/uploads/')) {
+        return { url: 'https://cdn.test/rc-1.png', expiresIn: 60 };
+      }
+      if (init?.method === 'DELETE') {
+        throw new Error('A verified receipt already moved stock and counted as spend; it cannot be deleted');
+      }
+      return { receipt: makeReceiptDetail('unverified') };
+    });
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete receipt' }));
+
+    expect(await screen.findByText(/already moved stock/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete receipt' })).toBeEnabled();
+  });
+});
