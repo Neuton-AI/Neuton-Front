@@ -126,7 +126,6 @@ export function DashboardPage() {
             </div>
             {trend ? (
               <span className="shrink-0 rounded-full bg-[#5DB8A6] px-2.5 py-1 text-[13px] font-medium leading-[18px] text-[#141413]">
-                {trend.profitPercent > 0 ? '+' : ''}
                 {formatPercent(trend.profitPercent)}
               </span>
             ) : null}
