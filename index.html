@@ -25,10 +25,7 @@
 
     try {
       initializeFaro({
-        url:
-          import.meta.env.VITE_FARO_COLLECTOR_URL ||
-          'https://faro-collector-prod-eu-central-0.grafana.net/collect',
-        apiKey: import.meta.env.VITE_FARO_TOKEN || 'efe785c1f73ea7ac7c59c50695d1ff5c',
+        url: import.meta.env.VITE_FARO_COLLECTOR_URL + '/' + import.meta.env.VITE_FARO_TOKEN,
         app: {
           name: 'Neuton-Front',
           environment: import.meta.env.MODE,
