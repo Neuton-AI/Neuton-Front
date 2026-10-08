@@ -1,4 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Order } from '../lib/api';
 import { renderWithRouter } from '../test/render';
@@ -62,6 +63,7 @@ const sampleOrders: Order[] = [
     totalCost: '40.00',
     totalAmount: '62.12',
     documentUrl: null,
+    status: 'processing',
     netProfit: 22.12,
     createdAt: '2026-09-28T10:00:00.000Z',
   },
@@ -78,7 +80,8 @@ const sampleOrders: Order[] = [
     totalCost: '80.00',
     totalAmount: '128.00',
     documentUrl: null,
-    netProfit: 48.00,
+    status: 'delivered',
+    netProfit: 48.0,
     createdAt: '2026-09-27T14:30:00.000Z',
   },
 ];
@@ -146,5 +149,46 @@ describe('OrdersPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Tap Add New Order below')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Add New Order' })).toBeInTheDocument();
+  });
+
+  it('shows a status badge per row', async () => {
+    const { within } = await import('@testing-library/react');
+    api.apiFetch.mockResolvedValueOnce({ orders: sampleOrders, total: 2 });
+    renderWithRouter(<OrdersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Maya C\. · #1048/)).toBeInTheDocument();
+    });
+
+    // The filter tabs reuse the same words, so scope the badge query to the rows.
+    const mayaRow = screen.getByText(/Maya C\. · #1048/).closest('a')!;
+    const danielRow = screen.getByText(/Daniel G\. · #1047/).closest('a')!;
+    expect(within(mayaRow).getByText('Processing')).toBeInTheDocument();
+    expect(within(danielRow).getByText('Delivered')).toBeInTheDocument();
+  });
+
+  it('filters by status through the server query, defaulting to all', async () => {
+    const user = userEvent.setup();
+    api.apiFetch.mockResolvedValue({ orders: sampleOrders, total: 2 });
+    renderWithRouter(<OrdersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Maya C\. · #1048/)).toBeInTheDocument();
+    });
+
+    // Default shows all without a status param.
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      '/orders?limit=100',
+      expect.objectContaining({ shopId: 'shop-1' }),
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Delivered' }));
+
+    await waitFor(() => {
+      expect(api.apiFetch).toHaveBeenCalledWith(
+        '/orders?limit=100&status=delivered',
+        expect.objectContaining({ shopId: 'shop-1' }),
+      );
+    });
   });
 });

@@ -241,7 +241,14 @@ export type Recipe = {
   costing: RecipeCosting;
 };
 
-/** Orders have no lifecycle column in the schema yet; they are simply dated. */
+/**
+ * The order lifecycle as the shop sees it: every order starts as
+ * `processing` and moves to `delivered` only after explicit human
+ * verification via PATCH /orders/:id/status. Matches the backend
+ * ORDER_STATUSES enum in Neuton-Back.
+ */
+export type OrderStatus = 'processing' | 'delivered';
+
 export type Order = {
   id: string;
   shopId: string;
@@ -255,6 +262,7 @@ export type Order = {
   totalCost: string;
   totalAmount: string;
   documentUrl: string | null;
+  status: OrderStatus;
   netProfit: number;
   createdAt: string;
 };

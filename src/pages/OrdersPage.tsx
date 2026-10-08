@@ -5,8 +5,9 @@ import { Fab, useFabNavigation } from '../components/Fab';
 import { ErrorState } from '../components/feedback';
 import { PageHeader } from '../components/PageHeader';
 import { IconBag } from '../components/icons';
-import { apiFetch, type Order } from '../lib/api';
+import { apiFetch, type Order, type OrderStatus } from '../lib/api';
 import { formatDate, formatMoney } from '../lib/format';
+import { getOrderStatusLabel } from '../lib/orderStatus';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 function formatOrderHeader(order: Order): string {
@@ -30,9 +31,31 @@ export const STUB_ORDER: Order = {
   totalCost: '40.00',
   totalAmount: '62.12',
   documentUrl: null,
+  status: 'processing',
   netProfit: 22.12,
   createdAt: '2026-09-28T10:00:00.000Z',
 };
+
+type StatusFilter = 'all' | OrderStatus;
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'delivered', label: 'Delivered' },
+];
+
+/** Compact status pill for the order row, next to the date line. */
+function OrderStatusPill({ status }: { status: OrderStatus }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-[11px] font-medium leading-tight ${
+        status === 'delivered' ? 'bg-brand-teal/25 text-ink' : 'bg-brand-amber/20 text-ink'
+      }`}
+    >
+      {getOrderStatusLabel(status)}
+    </span>
+  );
+}
 
 type OrdersPageProps = {
   includeStub?: boolean;
@@ -47,6 +70,7 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
   const [orders, setOrders] = useState<Order[]>(includeStub ? [STUB_ORDER] : []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const load = useCallback(async () => {
     if (!token || !activeShopId) {
@@ -56,7 +80,9 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ orders: Order[]; total: number }>('/orders?limit=100', {
+      const query =
+        statusFilter === 'all' ? '/orders?limit=100' : `/orders?limit=100&status=${statusFilter}`;
+      const data = await apiFetch<{ orders: Order[]; total: number }>(query, {
         token,
         shopId: activeShopId,
       });
@@ -67,7 +93,7 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
     } finally {
       setLoading(false);
     }
-  }, [token, activeShopId, includeStub]);
+  }, [token, activeShopId, includeStub, statusFilter]);
 
   useEffect(() => {
     void load();
@@ -84,6 +110,29 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
       <div className="flex-1 pb-44 pt-[max(var(--safe-top)+44px,44px)]">
         <div className="px-4">
           <PageHeader eyebrow="YOUR SALES" title="Orders" />
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Order status filter"
+          className="no-scrollbar mt-4 flex gap-1.5 overflow-x-auto px-4"
+        >
+          {STATUS_FILTERS.map(({ key, label }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={statusFilter === key}
+              type="button"
+              onClick={() => setStatusFilter(key)}
+              className={`pressable flex shrink-0 items-center gap-1.5 rounded-pill px-3.5 py-2 text-label font-medium transition-colors duration-200 ${
+                statusFilter === key
+                  ? 'bg-surface-dark text-ink-on-dark'
+                  : 'bg-surface-card text-ink-muted'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         <div className="mt-4 px-4">
@@ -137,8 +186,9 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
                     <h2 className="truncate text-[16px] font-medium leading-snug text-ink">
                       {formatOrderHeader(order)}
                     </h2>
-                    <p className="truncate text-[13px] leading-snug text-ink-muted">
-                      {formatDate(order.orderDate)}
+                    <p className="flex items-center gap-1.5 truncate text-[13px] leading-snug text-ink-muted">
+                      <span className="truncate">{formatDate(order.orderDate)}</span>
+                      <OrderStatusPill status={order.status} />
                     </p>
                   </div>
                   <span className="shrink-0 text-[18px] font-medium leading-snug text-ink">

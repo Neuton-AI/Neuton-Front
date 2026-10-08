@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Sheet, SheetSection, useSheetClose } from '../components/Sheet';
+import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { Button } from '../components/ui';
-import { ErrorState, Skeleton } from '../components/feedback';
+import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { IconPin } from '../components/icons';
 import { apiFetch, type OrderDetail } from '../lib/api';
+import { getOrderStatusLabel, getOrderStatusTone } from '../lib/orderStatus';
 import { formatDate, formatMoney, formatQuantity, toNumber } from '../lib/format';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
@@ -21,6 +22,10 @@ export function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [markingDelivered, setMarkingDelivered] = useState(false);
+  /** Kept apart from `error`: a failed transition belongs next to its button,
+   *  not in the load-error slot whose retry only refetches the order. */
+  const [markError, setMarkError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const currency = shop?.currency ?? 'USD';
@@ -66,6 +71,35 @@ export function OrderDetailPage() {
     }
   };
 
+  /**
+   * Human verification gate: `processing` → `delivered`. Any shop member may
+   * do this — the server enforces membership, not role — so there is no role
+   * gate here. The transition response carries the order row without its
+   * items, so only the status is taken from it; the refetch brings back the
+   * full detail. The sheet flips immediately so the button cannot be pressed
+   * twice while the refetch is still in flight.
+   */
+  const markDelivered = async () => {
+    if (!token || !activeShopId || !id || markingDelivered || !order) return;
+
+    setMarkingDelivered(true);
+    setMarkError(null);
+    try {
+      const data = await apiFetch<{ order: OrderDetail }>(`/orders/${id}/status`, {
+        method: 'PATCH',
+        token,
+        shopId: activeShopId,
+        body: { status: 'delivered' },
+      });
+      setOrder((prev) => (prev ? { ...prev, status: data.order.status } : prev));
+      setReloadKey((n) => n + 1);
+    } catch (cause) {
+      setMarkError(cause instanceof Error ? cause.message : 'Could not mark the order delivered.');
+    } finally {
+      setMarkingDelivered(false);
+    }
+  };
+
   const marginPercent =
     order && toNumber(order.totalAmount) > 0
       ? (order.netProfit / toNumber(order.totalAmount)) * 100
@@ -99,6 +133,11 @@ export function OrderDetailPage() {
               <p className="text-label font-medium text-ink-muted">
                 {formatDate(order.orderDate)} · #{order.id.slice(0, 8)}
               </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <SheetBadge tone={getOrderStatusTone(order.status)}>
+                  {getOrderStatusLabel(order.status)}
+                </SheetBadge>
+              </div>
             </div>
 
             <div className="flex gap-3">
@@ -190,6 +229,18 @@ export function OrderDetailPage() {
               >
                 View attached document
               </a>
+            ) : null}
+
+            {order.status === 'processing' ? (
+              <div className="flex flex-col gap-2.5">
+                <InlineNotice>
+                  Still being prepared. Mark it delivered once the customer has it.
+                </InlineNotice>
+                {markError ? <InlineNotice tone="error">{markError}</InlineNotice> : null}
+                <Button size="md" block loading={markingDelivered} onClick={markDelivered}>
+                  Mark as delivered
+                </Button>
+              </div>
             ) : null}
 
             <Button variant="danger" size="md" block loading={deleting} onClick={remove}>
