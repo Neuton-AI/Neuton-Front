@@ -244,10 +244,13 @@ export type Recipe = {
 /**
  * The order lifecycle as the shop sees it: every order starts as
  * `processing` and moves to `delivered` only after explicit human
- * verification via PATCH /orders/:id/status. Matches the backend
- * ORDER_STATUSES enum in Neuton-Back.
+ * verification via PATCH /orders/:id/status. `cancelled` is what
+ * DELETE /orders/:id writes instead of removing the row — invoicing
+ * needs the issued number to stay assigned as a visible void — and
+ * it is terminal. Matches the backend ORDER_STATUSES enum in
+ * Neuton-Back.
  */
-export type OrderStatus = 'processing' | 'delivered';
+export type OrderStatus = 'processing' | 'delivered' | 'cancelled';
 
 /** One sellable recipe as returned by GET /recipes/orderable. */
 export type OrderableRecipe = {
@@ -262,6 +265,12 @@ export type OrderableRecipe = {
 
 export type Order = {
   id: string;
+  /**
+   * Per-shop sequential invoice number, issued by the server at creation:
+   * unique per shop, never reused, so an order that was cancelled keeps the
+   * number it was printed with instead of leaving a hole.
+   */
+  orderNumber: number;
   shopId: string;
   userId: string | null;
   customerName: string | null;

@@ -52,6 +52,7 @@ const { OrdersPage } = await import('./OrdersPage');
 const sampleOrders: Order[] = [
   {
     id: '1048-abcd-1234',
+    orderNumber: 1048,
     shopId: 'shop-1',
     userId: 'u1',
     customerName: 'Maya C.',
@@ -69,6 +70,7 @@ const sampleOrders: Order[] = [
   },
   {
     id: '1047-efgh-5678',
+    orderNumber: 1047,
     shopId: 'shop-1',
     userId: 'u1',
     customerName: 'Daniel G.',
@@ -83,6 +85,24 @@ const sampleOrders: Order[] = [
     status: 'delivered',
     netProfit: 48.0,
     createdAt: '2026-09-27T14:30:00.000Z',
+  },
+  {
+    id: '1046-ijkl-9012',
+    orderNumber: 1046,
+    shopId: 'shop-1',
+    userId: 'u1',
+    customerName: 'Noa R.',
+    orderDate: '2026-09-26T09:00:00.000Z',
+    destinationAddress: '789 Pine St',
+    deliveryDistanceKm: '1.00',
+    deliveryFee: '3.00',
+    appliedProfitMargin: '30.00',
+    totalCost: '20.00',
+    totalAmount: '30.00',
+    documentUrl: null,
+    status: 'cancelled',
+    netProfit: 7.0,
+    createdAt: '2026-09-26T09:00:00.000Z',
   },
 ];
 
@@ -163,8 +183,10 @@ describe('OrdersPage', () => {
     // The filter tabs reuse the same words, so scope the badge query to the rows.
     const mayaRow = screen.getByText(/Maya C\. · #1048/).closest('a')!;
     const danielRow = screen.getByText(/Daniel G\. · #1047/).closest('a')!;
+    const noaRow = screen.getByText(/Noa R\. · #1046/).closest('a')!;
     expect(within(mayaRow).getByText('Processing')).toBeInTheDocument();
     expect(within(danielRow).getByText('Delivered')).toBeInTheDocument();
+    expect(within(noaRow).getByText('Cancelled')).toBeInTheDocument();
   });
 
   it('filters by status through the server query, defaulting to all', async () => {
@@ -187,6 +209,25 @@ describe('OrdersPage', () => {
     await waitFor(() => {
       expect(api.apiFetch).toHaveBeenCalledWith(
         '/orders?limit=100&status=delivered',
+        expect.objectContaining({ shopId: 'shop-1' }),
+      );
+    });
+  });
+
+  it('offers a Cancelled filter that queries the voided orders', async () => {
+    const user = userEvent.setup();
+    api.apiFetch.mockResolvedValue({ orders: sampleOrders, total: 2 });
+    renderWithRouter(<OrdersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Maya C\. · #1048/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'Cancelled' }));
+
+    await waitFor(() => {
+      expect(api.apiFetch).toHaveBeenCalledWith(
+        '/orders?limit=100&status=cancelled',
         expect.objectContaining({ shopId: 'shop-1' }),
       );
     });

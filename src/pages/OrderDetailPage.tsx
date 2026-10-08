@@ -45,7 +45,7 @@ export function OrderDetailPage() {
 
   const remove = async () => {
     if (!token || !activeShopId || !id || deleteOrder.isPending) return;
-    if (!window.confirm('Delete this order? This cannot be undone.')) return;
+    if (!window.confirm('Cancel this order? It stays on your records as cancelled.')) return;
 
     setActionError(null);
     try {
@@ -106,7 +106,7 @@ export function OrderDetailPage() {
                 {order.customerName ?? 'Unnamed customer'}
               </h1>
               <p className="text-label font-medium text-ink-muted">
-                {formatDate(order.orderDate)} · #{order.id.slice(0, 8)}
+                {formatDate(order.orderDate)} · #{order.orderNumber}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <SheetBadge tone={getOrderStatusTone(order.status)}>
@@ -216,11 +216,18 @@ export function OrderDetailPage() {
                   Mark as delivered
                 </Button>
               </div>
+            ) : order.status === 'cancelled' ? (
+              <InlineNotice tone="error">
+                This order was cancelled. It stays on your records as a void, and its number is
+                never reused.
+              </InlineNotice>
             ) : null}
 
-            <Button variant="danger" size="md" block loading={deleteOrder.isPending} onClick={remove}>
-              Delete order
-            </Button>
+            {order.status !== 'cancelled' ? (
+              <Button variant="danger" size="md" block loading={deleteOrder.isPending} onClick={remove}>
+                Cancel order
+              </Button>
+            ) : null}
           </>
         ) : !error ? (
           <Skeleton className="h-[88px]" />
