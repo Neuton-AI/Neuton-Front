@@ -181,6 +181,29 @@ describe('ReceiptDetailPage verification', () => {
     expect(screen.queryByRole('button', { name: 'Verify receipt' })).toBeNull();
   });
 
+  it('renders a dash, not $0.00, for a line whose total could not be read', async () => {
+    const detail = makeReceiptDetail('unverified');
+    detail.items = [
+      {
+        ...detail.items[0]!,
+        unitPrice: null,
+        totalPrice: null,
+      },
+    ];
+    api.apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith('/uploads/')) {
+        return { url: 'https://cdn.test/rc-1.png', expiresIn: 60 };
+      }
+      return { receipt: detail };
+    });
+    renderDetail();
+
+    await screen.findByText('Flour');
+    // A missing total must read as unknown, never as a free item.
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('$0.00')).toBeNull();
+  });
+
   it('keeps the button in place and explains a failed verify', async () => {
     const user = userEvent.setup();
     api.apiFetch.mockImplementation(async (path: string) => {
