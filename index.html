@@ -1,54 +1,56 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#FAF9F5" />
-    <title>Neuton</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module">
-      import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
-      import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
-      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
-      // OTEL matches string entries exactly, so a prefix needs a RegExp.
-      const apiOriginPattern = new RegExp('^' + apiBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#FAF9F5" />
+  <title>Neuton</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+    rel="stylesheet" />
+</head>
 
-      try {
-        initializeFaro({
-          url:
-            import.meta.env.VITE_FARO_COLLECTOR_URL ||
-            'https://faro-collector-prod-eu-central-0.grafana.net/collect',
-          apiKey: import.meta.env.VITE_FARO_TOKEN || 'efe785c1f73ea7ac7c59c50695d1ff5c',
-          app: {
-            name: 'neuton-web',
-            environment: import.meta.env.MODE,
-            version: import.meta.env.VITE_APP_VERSION || 'dev',
-          },
-          instrumentations: [
-            ...getWebInstrumentations(),
-            new TracingInstrumentation({
-              instrumentationOptions: {
-                // Cross-origin API calls only carry a W3C traceparent when the
-                // URL is listed here; the backend turns it into the traceId
-                // that ties browser requests to API/worker/Gemini log lines.
-                propagateTraceHeaderCorsUrls: [apiOriginPattern],
-              },
-            }),
-          ],
-        });
-      } catch (err) {
-        console.error('[faro] failed to initialize', err);
-      }
-    </script>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
+    import { TracingInstrumentation } from '@grafana/faro-web-tracing';
+
+    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
+    // OTEL matches string entries exactly, so a prefix needs a RegExp.
+    const apiOriginPattern = new RegExp('^' + apiBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+    try {
+      initializeFaro({
+        url:
+          import.meta.env.VITE_FARO_COLLECTOR_URL ||
+          'https://faro-collector-prod-eu-central-0.grafana.net/collect',
+        apiKey: import.meta.env.VITE_FARO_TOKEN || 'efe785c1f73ea7ac7c59c50695d1ff5c',
+        app: {
+          name: 'Neuton-Front',
+          environment: import.meta.env.MODE,
+          version: import.meta.env.VITE_APP_VERSION || 'dev',
+        },
+        instrumentations: [
+          ...getWebInstrumentations(),
+          new TracingInstrumentation({
+            instrumentationOptions: {
+              // Cross-origin API calls only carry a W3C traceparent when the
+              // URL is listed here; the backend turns it into the traceId
+              // that ties browser requests to API/worker/Gemini log lines.
+              propagateTraceHeaderCorsUrls: [apiOriginPattern],
+            },
+          }),
+        ],
+      });
+    } catch (err) {
+      console.error('[faro] failed to initialize', err);
+    }
+  </script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
