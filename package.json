@@ -16,6 +16,8 @@
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@grafana/faro-web-sdk": "^2.12.1",
+    "@grafana/faro-web-tracing": "^2.12.1",
     "@supabase/supabase-js": "^2.47.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -3,7 +3,14 @@
  *
  * Auth is a Supabase JWT; the active shop travels in `x-shop-id` because the
  * API resolves shop membership server-side from that header.
+ *
+ * The Faro trace id travels as `x-trace-id` so a browser session, the API log
+ * lines and any worker jobs it triggers share one correlation id. Faro is
+ * optional: before it initializes (or if it fails) the backend simply starts a
+ * fresh trace of its own.
  */
+
+import { faro } from '@grafana/faro-web-sdk';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 
@@ -65,6 +72,8 @@ export async function apiFetch<T>(
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   if (shopId) headers['x-shop-id'] = shopId;
+  const traceId = faro.api.getTraceContext()?.trace_id;
+  if (traceId) headers['x-trace-id'] = traceId;
 
   let response: Response;
   try {
