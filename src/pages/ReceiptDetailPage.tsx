@@ -209,7 +209,9 @@ export function ReceiptDetailPage() {
                         </span>
                       </div>
                       <span className="shrink-0 text-[16px] font-medium text-ink">
-                        {formatMoney(item.totalPrice, receiptCurrency)}
+                        {item.totalPrice === null || item.totalPrice === undefined
+                          ? '—'
+                          : formatMoney(item.totalPrice, receiptCurrency)}
                       </span>
                     </li>
                   ))}
