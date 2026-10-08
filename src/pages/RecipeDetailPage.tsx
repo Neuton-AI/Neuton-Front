@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
 import { Button } from '../components/ui';
 import { IconBox, IconChefHat } from '../components/icons';
-import { apiFetch, type Recipe } from '../lib/api';
 import { formatMoney, formatQuantity } from '../lib/format';
 import { getReceiptStatusLabel, RECEIPT_STATUS_PILL_STYLES } from '../lib/receiptStatus';
+import { useDeleteRecipe, useRecipe, useVerifyRecipe } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 /** Renders the OpenPencil "Modal / Recipe Detail" sheet from GET /recipes/:id. */
@@ -16,56 +16,33 @@ export function RecipeDetailPage() {
   const { memberships, activeShopId } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(false);
+  const recipeQuery = useRecipe(token, activeShopId, id);
+  const recipe = recipeQuery.data?.recipe ?? null;
+  const verifyMutation = useVerifyRecipe(token, activeShopId);
+  const deleteMutation = useDeleteRecipe(token, activeShopId);
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the recipe. */
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   /** Same slot pattern as verify: a failed delete belongs next to its button. */
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+
+  const loading = recipeQuery.isLoading && !recipe;
+  const error = recipeQuery.error
+    ? recipeQuery.error instanceof Error
+      ? recipeQuery.error.message
+      : 'Could not load the recipe.'
+    : null;
 
   const currency = shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=recipes');
   const navigate = useNavigate();
-  const loadKey = `${token ?? ''}:${activeShopId ?? ''}:${reloadKey}`;
   // Verification is an owner/admin action server-side, so a member would only
   // ever earn a 403 from a button they could see.
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
   const canVerify = role === 'owner' || role === 'admin';
 
-  useEffect(() => {
-    if (!token || !activeShopId || !id) return;
-    const controller = new AbortController();
-
-    setLoading(true);
-    setError(null);
-    apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, {
-      token,
-      shopId: activeShopId,
-      signal: controller.signal,
-    })
-      .then((data) => setRecipe(data.recipe))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : 'Could not load the recipe.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [loadKey, id]);
-
-  // Poll every 3s while the worker is still extracting (pending/processing).
-  useEffect(() => {
-    if (!recipe || (recipe.status !== 'pending' && recipe.status !== 'processing')) return;
-    const timer = setTimeout(() => setReloadKey((n) => n + 1), 3000);
-    return () => clearTimeout(timer);
-  }, [recipe?.status, reloadKey]);
+  // Polling while the worker is extracting is baked into the query hook:
+  // it keeps a quiet 3s refetch while status is pending/processing.
 
   /**
    * Publishing an extracted recipe: the server flips `unverified → verified`,
@@ -74,25 +51,13 @@ export function RecipeDetailPage() {
    * endpoint's body is an object even though every field is optional.
    */
   const verify = async () => {
-    if (!token || !activeShopId || !id || verifying) return;
+    if (!token || !activeShopId || !id || verifyMutation.isPending) return;
 
-    setVerifying(true);
     setVerifyError(null);
     try {
-      const data = await apiFetch<{ recipe: Recipe }>(`/catalog/recipe/${id}/verify`, {
-        method: 'POST',
-        token,
-        shopId: activeShopId,
-        body: {},
-      });
-      // Flip locally first so the button disappears at once and cannot be
-      // pressed again while the refetch is still in flight.
-      setRecipe((prev) => (prev ? { ...prev, status: data.recipe.status ?? 'verified' } : prev));
-      setReloadKey((n) => n + 1);
+      await verifyMutation.mutateAsync({ id });
     } catch (cause) {
       setVerifyError(cause instanceof Error ? cause.message : 'Could not verify the recipe.');
-    } finally {
-      setVerifying(false);
     }
   };
 
@@ -109,7 +74,7 @@ export function RecipeDetailPage() {
    * success navigates back. No status gate here — every status is deletable.
    */
   const remove = async () => {
-    if (!token || !activeShopId || !id || deleting) return;
+    if (!token || !activeShopId || !id || deleteMutation.isPending) return;
     if (
       !window.confirm(
         'Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.',
@@ -118,18 +83,12 @@ export function RecipeDetailPage() {
       return;
     }
 
-    setDeleting(true);
     setDeleteError(null);
     try {
-      await apiFetch<{ ok: true; mode: 'hard' | 'soft' }>(`/recipes/${id}`, {
-        method: 'DELETE',
-        token,
-        shopId: activeShopId,
-      });
+      await deleteMutation.mutateAsync({ id });
       navigate('/catalog?tab=recipes', { replace: true });
     } catch (cause) {
       setDeleteError(cause instanceof Error ? cause.message : 'Could not delete the recipe.');
-      setDeleting(false);
     }
   };
 
@@ -145,8 +104,8 @@ export function RecipeDetailPage() {
     <Sheet open onClose={close} label="Recipe details">
       <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
         {error ? (
-          <ErrorState message={error} onRetry={() => setReloadKey((n) => n + 1)} />
-        ) : null}
+            <ErrorState message={error} onRetry={() => void recipeQuery.refetch()} />
+          ) : null}
 
         {loading && !recipe ? (
           <>
@@ -211,7 +170,7 @@ export function RecipeDetailPage() {
                 </InlineNotice>
                 {verifyError ? <InlineNotice tone="error">{verifyError}</InlineNotice> : null}
                 {canVerify ? (
-                  <Button size="md" block loading={verifying} onClick={() => void verify()}>
+                  <Button size="md" block loading={verifyMutation.isPending} onClick={() => void verify()}>
                     Verify recipe
                   </Button>
                 ) : null}
@@ -316,7 +275,7 @@ export function RecipeDetailPage() {
             {canVerify ? (
               <div className="flex flex-col gap-2.5">
                 {deleteError ? <InlineNotice tone="error">{deleteError}</InlineNotice> : null}
-                <Button variant="danger" size="md" block loading={deleting} onClick={() => void remove()}>
+                <Button variant="danger" size="md" block loading={deleteMutation.isPending} onClick={() => void remove()}>
                   Delete recipe
                 </Button>
               </div>

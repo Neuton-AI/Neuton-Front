@@ -1,21 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Field, Input, Textarea } from '../components/ui';
 import { EmptyState, FullPageLoader, InlineNotice, Skeleton } from '../components/feedback';
-import { apiFetch, type Order, type OrderQuote } from '../lib/api';
+import type { OrderableRecipe } from '../lib/api';
 import { formatMoney, formatQuantity, toNumber } from '../lib/format';
+import { useCreateOrder, useDebouncedValue, useOrderableRecipes, useOrderQuote } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
-
-type OrderableRecipe = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  yieldQuantity: string;
-  yieldUnit: string;
-  unitCost: number;
-  retailPrice: number;
-};
 
 type DraftLine = { recipe: OrderableRecipe; quantity: number };
 
@@ -32,14 +23,8 @@ export function NewOrderPage() {
   const shop = useCurrentShop(memberships, activeShopId);
   const navigate = useNavigate();
 
-  const [recipes, setRecipes] = useState<OrderableRecipe[]>([]);
   const [lines, setLines] = useState<DraftLine[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [quote, setQuote] = useState<OrderQuote | null>(null);
-  const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [quoting, setQuoting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [customerName, setCustomerName] = useState('');
   const [orderDate, setOrderDate] = useState(today);
@@ -47,7 +32,15 @@ export function NewOrderPage() {
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState('0');
 
   const currency = shop?.currency ?? 'USD';
-  const loadKey = `${token ?? ''}:${activeShopId ?? ''}`;
+
+  const recipesQuery = useOrderableRecipes(token, activeShopId);
+  const recipes = recipesQuery.data?.recipes ?? [];
+  const loading = recipesQuery.isLoading;
+  const itemsError = recipesQuery.error
+    ? recipesQuery.error instanceof Error
+      ? recipesQuery.error.message
+      : 'Could not load recipes.'
+    : submitError;
 
   const items = useMemo(
     () => lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
@@ -55,70 +48,31 @@ export function NewOrderPage() {
   );
   const itemsKey = JSON.stringify(items);
 
-  useEffect(() => {
-    if (!token || !activeShopId) return;
-    const controller = new AbortController();
-
-    setLoading(true);
-    setError(null);
-    apiFetch<{ recipes: OrderableRecipe[] }>('/recipes/orderable', {
-      token,
-      shopId: activeShopId,
-      signal: controller.signal,
-    })
-      .then((data) => setRecipes(data.recipes))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : 'Could not load recipes.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [loadKey]);
-
   /**
    * Pricing comes from POST /orders/quote rather than being recomputed here, so
    * the running total always reflects live stock cost and the shop's margin.
+   * The inputs are debounced so a burst of +/− clicks or a typed distance fires
+   * one request, and the query key changes only once the debounce settles.
    */
-  useEffect(() => {
-    if (!token || !activeShopId || lines.length === 0) {
-      setQuote(null);
-      setQuoteError(null);
-      return;
-    }
+  const debouncedItemsKey = useDebouncedValue(itemsKey, 250);
+  const debouncedDistanceKm = useDebouncedValue(deliveryDistanceKm, 250);
+  const quoteQuery = useOrderQuote(token, activeShopId, {
+    items: (JSON.parse(debouncedItemsKey) as { recipeId: string; quantity: number }[]),
+    distanceKm: toNumber(debouncedDistanceKm),
+    enabled: lines.length > 0,
+  });
+  const quote = lines.length > 0 ? quoteQuery.data ?? null : null;
+  const quoteError =
+    lines.length === 0
+      ? null
+      : quoteQuery.error
+        ? quoteQuery.error instanceof Error
+          ? quoteQuery.error.message
+          : 'Could not price this order.'
+        : null;
+  const quoting = quoteQuery.isFetching;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      setQuoting(true);
-      apiFetch<OrderQuote>('/orders/quote', {
-        method: 'POST',
-        token,
-        shopId: activeShopId,
-        signal: controller.signal,
-        body: {
-          deliveryDistanceKm: toNumber(deliveryDistanceKm),
-          items: JSON.parse(itemsKey) as { recipeId: string; quantity: number }[],
-        },
-      })
-        .then(setQuote)
-        .catch((cause: unknown) => {
-          if (cause instanceof DOMException && cause.name === 'AbortError') return;
-          setQuote(null);
-          setQuoteError(cause instanceof Error ? cause.message : 'Could not price this order.');
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setQuoting(false);
-        });
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-      setQuoteError(null);
-    };
-  }, [itemsKey, deliveryDistanceKm, loadKey]);
+  const createOrder = useCreateOrder(token, activeShopId);
 
   const quantityOf = (recipeId: string) =>
     lines.find((line) => line.recipe.id === recipeId)?.quantity ?? 0;
@@ -136,29 +90,22 @@ export function NewOrderPage() {
     });
   };
 
-  const submit = async (event: React.FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!token || !activeShopId || lines.length === 0 || saving) return;
+    if (!token || !activeShopId || lines.length === 0 || createOrder.isPending) return;
 
-    setSaving(true);
-    setError(null);
+    setSubmitError(null);
     try {
-      const result = await apiFetch<{ order: Order; totals: { netProfit: number } }>('/orders', {
-        method: 'POST',
-        token,
-        shopId: activeShopId,
-        body: {
-          customerName: customerName.trim() || null,
-          orderDate: new Date(`${orderDate}T12:00:00`).toISOString(),
-          destinationAddress: destinationAddress.trim() || null,
-          deliveryDistanceKm: toNumber(deliveryDistanceKm),
-          items: lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
-        },
+      const result = await createOrder.mutateAsync({
+        customerName: customerName.trim() || null,
+        orderDate: new Date(`${orderDate}T12:00:00`).toISOString(),
+        destinationAddress: destinationAddress.trim() || null,
+        deliveryDistanceKm: toNumber(deliveryDistanceKm),
+        items: lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
       });
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save the order.');
-      setSaving(false);
+      setSubmitError(cause instanceof Error ? cause.message : 'Could not save the order.');
     }
   };
 
@@ -218,7 +165,7 @@ export function NewOrderPage() {
 
         <section className="flex flex-col gap-3">
           <h2 className="text-eyebrow font-medium uppercase text-ink-muted">Items</h2>
-          {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
+          {itemsError ? <InlineNotice tone="error">{itemsError}</InlineNotice> : null}
 
           {loading ? (
             <div className="flex flex-col gap-2">
@@ -308,7 +255,7 @@ export function NewOrderPage() {
           variant="primary"
           size="lg"
           block
-          loading={saving}
+          loading={createOrder.isPending}
           disabled={lines.length === 0 || quoting || quote === null}
         >
           {lines.length === 0

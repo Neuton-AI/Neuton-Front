@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation } from '../components/Fab';
 import { ErrorState } from '../components/feedback';
 import { PageHeader } from '../components/PageHeader';
 import { IconBag } from '../components/icons';
-import { apiFetch, type Order, type OrderStatus } from '../lib/api';
+import type { Order, OrderStatus } from '../lib/api';
 import { formatDate, formatMoney } from '../lib/format';
 import { getOrderStatusLabel } from '../lib/orderStatus';
+import { useOrders } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
 function formatOrderHeader(order: Order): string {
@@ -67,43 +68,19 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
   const shop = useCurrentShop(memberships, activeShopId);
   const fabNavigation = useFabNavigation();
 
-  const [orders, setOrders] = useState<Order[]>(includeStub ? [STUB_ORDER] : []);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
-  const load = useCallback(async () => {
-    if (!token || !activeShopId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const query =
-        statusFilter === 'all' ? '/orders?limit=100' : `/orders?limit=100&status=${statusFilter}`;
-      const data = await apiFetch<{ orders: Order[]; total: number }>(query, {
-        token,
-        shopId: activeShopId,
-      });
-      const fetched = data.orders ?? [];
-      setOrders(fetched.length > 0 ? fetched : includeStub ? [STUB_ORDER] : []);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load your orders');
-    } finally {
-      setLoading(false);
-    }
-  }, [token, activeShopId, includeStub, statusFilter]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, isLoading, error, refetch } = useOrders(token, activeShopId, statusFilter);
+  const loading = isLoading;
+  const message = error instanceof Error ? error.message : 'Could not load your orders';
 
   const currency = shop?.currency ?? 'USD';
 
   const visibleOrders = useMemo(() => {
+    const fetched = data?.orders ?? [];
+    const orders = fetched.length > 0 ? fetched : includeStub ? [STUB_ORDER] : [];
     return [...orders].sort((a, b) => Date.parse(b.orderDate) - Date.parse(a.orderDate));
-  }, [orders]);
+  }, [data, includeStub]);
 
   return (
     <div className="shell">
@@ -136,7 +113,7 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
         </div>
 
         <div className="mt-4 px-4">
-          {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+          {error ? <ErrorState message={message} onRetry={() => void refetch()} /> : null}
 
           {loading ? (
             <div className="flex flex-col gap-3">

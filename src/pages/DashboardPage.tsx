@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation } from '../components/Fab';
 import { FullPageLoader, ErrorState } from '../components/feedback';
 import { IconStore } from '../components/icons';
 import { StatCard } from '../components/StatCard';
-import { apiFetch, type DashboardPeriod, type DashboardSummary } from '../lib/api';
+import type { DashboardPeriod } from '../lib/api';
 import { formatMoney, formatPercent, toNumber } from '../lib/format';
+import { useDashboardSummary } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 import { useChartSeries, type ChartPoint } from '../lib/usePeriodSeries';
 
@@ -31,39 +32,11 @@ export function DashboardPage() {
   const navigate = useNavigate();
 
   const [period, setPeriod] = useState<DashboardPeriod>('30d');
-  const [data, setData] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [profitability, setProfitability] = useState<'average' | 'median'>('average');
 
-  const [reloadKey, setReloadKey] = useState(0);
+  const { data, isLoading, error, refetch } = useDashboardSummary(token, activeShopId, period);
 
   const series = useChartSeries(data?.graph ?? [], period);
-
-  useEffect(() => {
-    if (!token || !activeShopId) {
-      setLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    apiFetch<DashboardSummary>(`/analytics/dashboard?period=${period}`, {
-      token,
-      shopId: activeShopId,
-      signal: controller.signal,
-    })
-      .then(setData)
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : 'Could not load your dashboard');
-      })
-      .finally(() => setLoading(false));
-
-    return () => controller.abort();
-  }, [token, activeShopId, period, reloadKey]);
 
   if (authLoading || shopsLoading) return <FullPageLoader label="Opening shop" />;
   if (shopsError) return <ErrorState message={shopsError} />;
@@ -132,7 +105,10 @@ export function DashboardPage() {
         </header>
 
         {error ? (
-          <ErrorState message={error} onRetry={() => setReloadKey((key) => key + 1)} />
+          <ErrorState
+            message={error instanceof Error ? error.message : 'Could not load your dashboard'}
+            onRetry={() => void refetch()}
+          />
         ) : null}
 
         <section
@@ -145,7 +121,7 @@ export function DashboardPage() {
                 Net profit
               </p>
               <p className="font-['Cormorant_Garamond',serif] text-[36px] leading-[43.6px] tracking-[-0.5px] text-[#FAF9F5]">
-                {loading && !data ? '—' : formatMoney(summary?.netProfit, currency)}
+                {isLoading && !data ? '—' : formatMoney(summary?.netProfit, currency)}
               </p>
             </div>
             {trend ? (
