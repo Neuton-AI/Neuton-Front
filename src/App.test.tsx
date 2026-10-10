@@ -46,6 +46,7 @@ vi.mock('./pages/DashboardPage', () => ({ DashboardPage: () => <h1>Dashboard</h1
 vi.mock('./pages/CatalogPage', () => ({ CatalogPage: () => <h1>Catalog</h1> }));
 vi.mock('./pages/OrdersPage', () => ({ OrdersPage: () => <h1>Orders</h1> }));
 vi.mock('./pages/NewOrderPage', () => ({ NewOrderPage: () => <h1>New order</h1> }));
+vi.mock('./pages/NotFoundPage', () => ({ NotFoundPage: () => <h1>Page not found</h1> }));
 vi.mock('./pages/OrderDetailPage', () => ({ OrderDetailPage: () => <h1>Order detail</h1> }));
 vi.mock('./pages/ProfilePage', () => ({ ProfilePage: () => <h1>Profile</h1> }));
 vi.mock('./pages/CapturePage', () => ({ CapturePage: () => <h1>Capture</h1> }));
@@ -153,11 +154,14 @@ describe('routing', () => {
     expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
   });
 
-  it('redirects an unknown private route to the dashboard', async () => {
+  it('shows the not-found page for an unknown private route without redirecting', async () => {
+    // Silently redirecting masked broken deep links, so the URL must stay put
+    // and the NotFound screen must be the one that renders.
     renderApp('/nope/does-not-exist');
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard'));
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/nope/does-not-exist');
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).toBeNull();
   });
 
   it('sends the root path to the dashboard when signed in', async () => {

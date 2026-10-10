@@ -16,6 +16,9 @@ const DashboardPage = lazy(() =>
 const NewOrderPage = lazy(() =>
   import('./pages/NewOrderPage').then((m) => ({ default: m.NewOrderPage })),
 );
+const NotFoundPage = lazy(() =>
+  import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })),
+);
 const OrderDetailPage = lazy(() =>
   import('./pages/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage })),
 );
@@ -54,7 +57,7 @@ export function App() {
                 <Route path="catalog/receipts/:id" element={<ReceiptDetailPage />} />
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="capture" element={<CapturePage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </RequireAuth>
