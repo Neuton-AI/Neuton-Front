@@ -128,14 +128,31 @@ describe('AuthPage sign in', () => {
 
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard'));
   });
+
+  it('shows forgot password link', () => {
+    renderAuth('/signin');
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password');
+  });
+
+  it('shows Google and Apple buttons', () => {
+    renderAuth('/signin');
+    expect(screen.getByRole('button', { name: 'Google' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apple' })).toBeInTheDocument();
+  });
+
+  it('has segment control with Sign In active', () => {
+    renderAuth('/signin');
+    expect(screen.getByRole('tab', { name: 'Sign In', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Create Account', selected: false })).toBeInTheDocument();
+  });
 });
 
 describe('AuthPage sign up', () => {
-  it('adds the shop name field and sends it as signup metadata', async () => {
+  it('adds the full name field and sends it as signup metadata', async () => {
     const user = userEvent.setup();
     renderWithRouter(<AuthPage mode="signup" />, { route: '/signup' });
 
-    await user.type(screen.getByLabelText('Shop name'), 'testShop');
+    await user.type(screen.getByLabelText('Full name'), 'Test User');
     await user.type(screen.getByLabelText('Email'), 'testtest@gmail.com');
     await user.type(screen.getByLabelText('Password'), 'testTest');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
@@ -144,7 +161,7 @@ describe('AuthPage sign up', () => {
       expect(auth.signUp).toHaveBeenCalledWith({
         email: 'testtest@gmail.com',
         password: 'testTest',
-        options: { data: { shopName: 'testShop' } },
+        options: { data: { fullName: 'Test User' } },
       }),
     );
   });
@@ -154,7 +171,7 @@ describe('AuthPage sign up', () => {
     auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
     renderWithRouter(<AuthPage mode="signup" />, { route: '/signup' });
 
-    await user.type(screen.getByLabelText('Shop name'), 'testShop');
+    await user.type(screen.getByLabelText('Full name'), 'Test User');
     await user.type(screen.getByLabelText('Email'), 'testtest@gmail.com');
     await user.type(screen.getByLabelText('Password'), 'testTest');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
@@ -167,20 +184,39 @@ describe('AuthPage sign up', () => {
   it('swaps the copy between sign in and sign up', () => {
     const { unmount } = renderAuth('/signin');
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Shop name')).toBeNull();
+    expect(screen.queryByLabelText('Full name')).toBeNull();
     unmount();
 
     renderAuth('/signup', 'signup');
-    expect(screen.getByRole('heading', { name: 'Start cooking' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Shop name')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Create your account' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Full name')).toBeInTheDocument();
   });
 
-  it('links each mode to the other', () => {
+  it('switches segment when clicking footer button', async () => {
     renderWithRouter(<AuthPage mode="signin" />, { route: '/signin' });
 
-    expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
-      'href',
-      '/signup',
-    );
+    // Initially Sign In is active
+    expect(screen.getByRole('tab', { name: 'Sign In', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Create Account', selected: false })).toBeInTheDocument();
+
+    // Click the footer button to switch to signup
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Create an account' }));
+
+    // Now Create Account should be active
+    expect(screen.getByRole('tab', { name: 'Create Account', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Sign In', selected: false })).toBeInTheDocument();
+  });
+
+  it('shows Google and Apple buttons', () => {
+    renderAuth('/signup', 'signup');
+    expect(screen.getByRole('button', { name: 'Google' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apple' })).toBeInTheDocument();
+  });
+
+  it('has segment control with Create Account active', () => {
+    renderAuth('/signup', 'signup');
+    expect(screen.getByRole('tab', { name: 'Create Account', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Sign In', selected: false })).toBeInTheDocument();
   });
 });
