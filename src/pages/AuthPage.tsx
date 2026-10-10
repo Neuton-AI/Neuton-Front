@@ -90,7 +90,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
             : 'Track costs, price your menu and know your real profit.'}
         </p>
 
-        <div className="mt-6 flex h-[33px] rounded-[10px] bg-surface-soft" role="tablist" aria-label="Authentication mode">
+        <div className="mt-6 flex h-[40px] rounded-[10px] bg-surface-soft" role="tablist" aria-label="Authentication mode">
           <button
             type="button"
             role="tab"
@@ -213,7 +213,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
             size="lg"
             radius="input"
             block
-            className="h-12 flex-1 flex items-center justify-center gap-2 bg-surface-card text-ink border border-hairline hover:bg-surface-soft"
+            className="h-12 flex-1 flex items-center justify-center gap-2 bg-surface-canvas text-ink border border-hairline hover:bg-surface-soft"
           >
             <IconGoogle className="h-5 w-5" strokeWidth={0} />
             <span className="text-body font-medium">Google</span>
@@ -224,23 +224,12 @@ export function AuthPage({ mode }: { mode: Mode }) {
             size="lg"
             radius="input"
             block
-            className="h-12 flex-1 flex items-center justify-center gap-2 bg-surface-card text-ink border border-hairline hover:bg-surface-soft"
+            className="h-12 flex-1 flex items-center justify-center gap-2 bg-surface-canvas text-ink border border-hairline hover:bg-surface-soft"
           >
             <IconApple className="h-5 w-5" strokeWidth={0} />
             <span className="text-body font-medium">Apple</span>
           </Button>
         </div>
-
-        <p className="mt-6 text-center text-body text-ink-muted">
-          {isSignIn ? 'New here? ' : 'Already have an account? '}
-          <button
-            type="button"
-            onClick={() => setSegment(isSignIn ? 'signup' : 'signin')}
-            className="font-medium text-brand-primary-active underline underline-offset-2 hover:text-brand-primary cursor-pointer bg-transparent border-none p-0"
-          >
-            {isSignIn ? 'Create an account' : 'Sign in'}
-          </button>
-        </p>
       </div>
     </div>
   );

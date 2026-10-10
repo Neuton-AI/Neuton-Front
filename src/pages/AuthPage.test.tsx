@@ -192,22 +192,6 @@ describe('AuthPage sign up', () => {
     expect(screen.getByLabelText('Full name')).toBeInTheDocument();
   });
 
-  it('switches segment when clicking footer button', async () => {
-    renderWithRouter(<AuthPage mode="signin" />, { route: '/signin' });
-
-    // Initially Sign In is active
-    expect(screen.getByRole('tab', { name: 'Sign In', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Create Account', selected: false })).toBeInTheDocument();
-
-    // Click the footer button to switch to signup
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Create an account' }));
-
-    // Now Create Account should be active
-    expect(screen.getByRole('tab', { name: 'Create Account', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Sign In', selected: false })).toBeInTheDocument();
-  });
-
   it('shows Google and Apple buttons', () => {
     renderAuth('/signup', 'signup');
     expect(screen.getByRole('button', { name: 'Google' })).toBeInTheDocument();
