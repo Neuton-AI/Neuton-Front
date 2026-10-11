@@ -2,6 +2,7 @@ import { Suspense, lazy, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { FullPageLoader } from './components/feedback';
 import { AuthPage } from './pages/AuthPage';
+import { LandingPage } from './pages/LandingPage';
 import { useAuth } from './lib/supabase';
 
 const CapturePage = lazy(() =>
@@ -39,6 +40,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<RootRedirect />} />
+      <Route path="/landing" element={<LandingPage />} />
       <Route path="/signin" element={<AuthPage mode="signin" />} />
       <Route path="/signup" element={<AuthPage mode="signup" />} />
 
@@ -70,7 +72,8 @@ export function App() {
 function RootRedirect() {
   const { session, loading } = useAuth();
   if (loading) return <FullPageLoader />;
-  return <Navigate to={session ? '/dashboard' : '/signin'} replace />;
+  if (session) return <Navigate to="/dashboard" replace />;
+  return <LandingPage />;
 }
 
 function RequireAuth({ children }: { children: ReactElement }) {
