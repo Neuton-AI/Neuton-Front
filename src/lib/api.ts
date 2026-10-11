@@ -197,8 +197,9 @@ export type RecipeIngredient = {
   averageUnitCost: number;
   lineCost: number;
   currentQuantity: number;
-  /** Null when the line has no SKU yet — the trusted unlinked signal (never infer from cost). */
+  /** Inventory or supermarket price ID determines linking; never infer it from cost. */
   inventoryItemId?: string | null;
+  generalPriceId?: string | null;
   rawName?: string;
   linked?: boolean;
 };

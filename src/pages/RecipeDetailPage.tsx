@@ -95,7 +95,7 @@ export function RecipeDetailPage() {
   const total = recipe?.costing.totalCount ?? recipe?.costing.ingredients.length ?? 0;
   const linked = recipe?.costing.linkedCount
     ?? recipe?.costing.ingredients.filter(
-      (i) => i.linked ?? (i.inventoryItemId != null),
+      (i) => i.linked ?? (i.inventoryItemId != null || i.generalPriceId != null),
     ).length
     ?? 0;
   const incomplete = (recipe != null) && linked < total;
@@ -190,7 +190,7 @@ export function RecipeDetailPage() {
                 <>
                   <ul className="flex flex-col">
                     {recipe.costing.ingredients.map((ingredient) => {
-                      const isLinked = ingredient.linked ?? (ingredient.inventoryItemId != null);
+                      const isLinked = ingredient.linked ?? (ingredient.inventoryItemId != null || ingredient.generalPriceId != null);
                       return (
                       <li
                         key={ingredient.rawName ?? ingredient.name}

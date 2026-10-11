@@ -131,6 +131,17 @@ function renderDetail() {
 }
 
 describe('RecipeDetailPage verification', () => {
+  it('recognizes a supermarket price link when the server omits linked counters and flags', async () => {
+    const recipe = makeRecipe('unverified');
+    recipe.costing.ingredients[0]!.inventoryItemId = null;
+    recipe.costing.ingredients[0]!.generalPriceId = 'price-1';
+    api.apiFetch.mockResolvedValue({ recipe });
+    renderDetail();
+    expect(await screen.findByTestId('linked-dot')).toBeInTheDocument();
+    expect(screen.queryByTestId('unlinked-dot')).toBeNull();
+    expect(screen.queryByText('Unlinked')).toBeNull();
+  });
+
   it('offers the verify action on an unverified recipe', async () => {
     mockApi();
     renderDetail();
