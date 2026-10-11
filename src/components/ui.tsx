@@ -6,15 +6,16 @@ import { Spinner } from './feedback';
 /* Button                                                                      */
 /* -------------------------------------------------------------------------- */
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
 type ButtonSize = 'sm' | 'md' | 'lg';
-type ButtonRadius = 'pill' | 'input';
+type ButtonRadius = 'pill' | 'input' | 'card';
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-brand-primary text-ink-on-primary shadow-[0_6px_18px_rgba(204,120,92,0.28)]',
   secondary: 'bg-surface-dark text-ink-on-dark',
   ghost: 'bg-surface-cream-strong text-ink',
   danger: 'border border-semantic-error/40 bg-semantic-error/10 text-ink',
+  outline: 'border border-hairline bg-surface-canvas text-ink hover:bg-surface-soft hover:border-ink/20',
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
@@ -27,6 +28,7 @@ const BUTTON_SIZES: Record<ButtonSize, string> = {
 const BUTTON_RADII: Record<ButtonRadius, string> = {
   pill: 'rounded-pill',
   input: 'rounded-input',
+  card: 'rounded-card',
 };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

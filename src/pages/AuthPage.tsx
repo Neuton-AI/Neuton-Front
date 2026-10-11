@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Button, Input } from '../components/ui';
-import { IconGoogle, IconApple } from '../components/icons';
 
 type Mode = 'signin' | 'signup';
 
@@ -209,25 +208,23 @@ export function AuthPage({ mode }: { mode: Mode }) {
         <div className="mt-4 flex gap-3">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="lg"
-            radius="input"
+            radius="card"
             block
-            className="h-12 flex-1 flex items-center justify-center gap-2 bg-surface-canvas text-ink border border-hairline hover:bg-surface-soft"
+            className="h-[54px] flex-1 text-[16px] font-bold text-ink"
           >
-            <IconGoogle className="h-5 w-5" strokeWidth={0} />
-            <span className="text-body font-medium">Google</span>
+            Google
           </Button>
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="lg"
-            radius="input"
+            radius="card"
             block
-            className="h-12 flex-1 flex items-center justify-center gap-2 bg-surface-canvas text-ink border border-hairline hover:bg-surface-soft"
+            className="h-[54px] flex-1 text-[16px] font-bold text-ink"
           >
-            <IconApple className="h-5 w-5" strokeWidth={0} />
-            <span className="text-body font-medium">Apple</span>
+            Apple
           </Button>
         </div>
       </div>
