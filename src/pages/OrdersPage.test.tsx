@@ -186,7 +186,7 @@ describe('OrdersPage', () => {
     const noaRow = screen.getByText(/Noa R\. · #1046/).closest('a')!;
     expect(within(mayaRow).getByText('Processing')).toBeInTheDocument();
     expect(within(danielRow).getByText('Delivered')).toBeInTheDocument();
-    expect(within(noaRow).getByText('Cancelled')).toBeInTheDocument();
+    expect(within(noaRow).getByText('Deleted')).toBeInTheDocument();
   });
 
   it('filters by status through the server query, defaulting to all', async () => {
@@ -214,7 +214,7 @@ describe('OrdersPage', () => {
     });
   });
 
-  it('offers a Cancelled filter that queries the voided orders', async () => {
+  it('offers a Deleted filter that queries the voided orders', async () => {
     const user = userEvent.setup();
     api.apiFetch.mockResolvedValue({ orders: sampleOrders, total: 2 });
     renderWithRouter(<OrdersPage />);
@@ -223,7 +223,7 @@ describe('OrdersPage', () => {
       expect(screen.getByText(/Maya C\. · #1048/)).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('tab', { name: 'Cancelled' }));
+    await user.click(screen.getByRole('tab', { name: 'Deleted' }));
 
     await waitFor(() => {
       expect(api.apiFetch).toHaveBeenCalledWith(

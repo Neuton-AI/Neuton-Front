@@ -111,13 +111,15 @@ export function SheetBadge({
   tone = 'card',
 }: {
   children: ReactNode;
-  tone?: 'card' | 'success' | 'danger' | 'teal';
+  tone?: 'card' | 'success' | 'danger' | 'teal' | 'deleted';
 }) {
   const tones = {
     card: 'bg-surface-card text-ink',
     success: 'bg-semantic-success text-ink',
     danger: 'bg-semantic-error text-ink-on-primary',
     teal: 'bg-brand-teal text-ink',
+    // The design's "DELETED" pill: grey, spaced, and set in caps.
+    deleted: 'bg-deleted-badge text-ink-muted uppercase tracking-[0.66px]',
   } as const;
   return (
     <span className={`inline-flex items-center rounded-pill px-3 py-1 text-label font-medium ${tones[tone]}`}>

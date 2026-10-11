@@ -208,13 +208,13 @@ describe('OrderDetailPage cancellation', () => {
     expect(await screen.findByText(/· #42/)).toBeInTheDocument();
   });
 
-  it('offers to cancel the order as a void, not a deletion', async () => {
+  it('offers to delete the order while keeping its number reserved', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     api.apiFetch.mockResolvedValue({ order: makeOrderDetail('processing') });
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Cancel order' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete order' }));
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
@@ -223,19 +223,19 @@ describe('OrderDetailPage cancellation', () => {
       ),
     );
     expect(window.confirm).toHaveBeenCalledWith(
-      'Cancel this order? It stays on your records as cancelled.',
+      'Delete this order? It stays on your records so its number is never reused.',
     );
   });
 
-  it('shows a cancelled order as a frozen void with no actions', async () => {
+  it('shows a deleted order as a frozen void with no actions', async () => {
     api.apiFetch.mockResolvedValue({ order: makeOrderDetail('cancelled') });
     renderDetail();
 
-    expect(await screen.findByText('Cancelled')).toBeInTheDocument();
+    expect(await screen.findByText('Deleted')).toBeInTheDocument();
     expect(
-      screen.getByText(/This order was cancelled\. It stays on your records as a void/),
+      screen.getByText(/This order was deleted\. It stays on your records so its number is never reused/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mark as delivered' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Cancel order' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete order' })).toBeNull();
   });
 });

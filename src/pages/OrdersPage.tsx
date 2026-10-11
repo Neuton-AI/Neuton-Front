@@ -44,19 +44,27 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'processing', label: 'Processing' },
   { key: 'delivered', label: 'Delivered' },
-  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'cancelled', label: 'Deleted' },
 ];
 
-/** Compact status pill for the order row, next to the date line. */
+/**
+ * Compact status pill for the order row. The design gives a deleted order its
+ * own treatment — a grey, letter-spaced, upper-cased "DELETED" tag — rather
+ * than the warm tones of the live states.
+ */
 function OrderStatusPill({ status }: { status: OrderStatus }) {
+  if (status === 'cancelled') {
+    return (
+      <span className="inline-flex shrink-0 items-center rounded-pill bg-deleted-badge px-2.5 py-1 text-[11px] font-semibold uppercase leading-tight tracking-[0.66px] text-ink-muted">
+        {getOrderStatusLabel(status)}
+      </span>
+    );
+  }
+
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-[11px] font-medium leading-tight ${
-        status === 'cancelled'
-          ? 'bg-semantic-error/15 text-ink'
-          : status === 'delivered'
-            ? 'bg-brand-teal/25 text-ink'
-            : 'bg-brand-amber/20 text-ink'
+      className={`inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-[11px] font-medium leading-tight text-ink ${
+        status === 'delivered' ? 'bg-brand-teal/25' : 'bg-brand-amber/20'
       }`}
     >
       {getOrderStatusLabel(status)}
@@ -156,29 +164,56 @@ export function OrdersPage({ includeStub = true }: OrdersPageProps = {}) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {visibleOrders.map((order) => (
-                <Link
-                  key={order.id}
-                  to={`/orders/${order.id}`}
-                  className="pressable flex items-center gap-3 rounded-card border border-hairline bg-surface-canvas p-3.5 transition-colors hover:border-brand-primary/30"
-                >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-surface-card text-ink-muted">
-                    <IconBag className="h-5 w-5" />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <h2 className="truncate text-[16px] font-medium leading-snug text-ink">
-                      {formatOrderHeader(order)}
-                    </h2>
-                    <p className="flex items-center gap-1.5 truncate text-[13px] leading-snug text-ink-muted">
-                      <span className="truncate">{formatDate(order.orderDate)}</span>
-                      <OrderStatusPill status={order.status} />
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[18px] font-medium leading-snug text-ink">
-                    {formatMoney(order.totalAmount, currency)}
-                  </span>
-                </Link>
-              ))}
+              {visibleOrders.map((order) => {
+                // A deleted order keeps its place in the list but reads as inert:
+                // grey surface, dimmed, and struck through.
+                const isDeleted = order.status === 'cancelled';
+                return (
+                  <Link
+                    key={order.id}
+                    to={`/orders/${order.id}`}
+                    className={`pressable flex items-center gap-3 rounded-card border p-3.5 transition-colors ${
+                      isDeleted
+                        ? 'border-deleted-border bg-deleted-surface opacity-[0.72]'
+                        : 'border-hairline bg-surface-canvas hover:border-brand-primary/30'
+                    }`}
+                  >
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink-muted ${
+                        isDeleted ? 'bg-deleted-badge opacity-70' : 'bg-surface-card'
+                      }`}
+                    >
+                      <IconBag className="h-5 w-5" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <h2
+                        className={`truncate text-[16px] font-medium leading-snug ${
+                          isDeleted ? 'text-ink-muted line-through' : 'text-ink'
+                        }`}
+                      >
+                        {formatOrderHeader(order)}
+                      </h2>
+                      <p
+                        className={`flex items-center gap-1.5 truncate text-[13px] leading-snug ${
+                          isDeleted ? 'text-ink-muted-soft' : 'text-ink-muted'
+                        }`}
+                      >
+                        <span className={`truncate ${isDeleted ? 'line-through' : ''}`}>
+                          {formatDate(order.orderDate)}
+                        </span>
+                        <OrderStatusPill status={order.status} />
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 text-[18px] font-medium leading-snug ${
+                        isDeleted ? 'text-ink-muted-soft line-through' : 'text-ink'
+                      }`}
+                    >
+                      {formatMoney(order.totalAmount, currency)}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
