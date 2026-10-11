@@ -170,12 +170,28 @@ describe('routing', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard'));
   });
 
-  it('sends the root path to sign-in when signed out', async () => {
+  it('renders the landing page on the root path when signed out', async () => {
     authState.session = null;
 
     renderApp('/');
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/signin'));
+    expect(screen.getByTestId('where')).toHaveTextContent('/');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Just upload. Neuton takes care of the numbers.',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the landing page on /landing', async () => {
+    renderApp('/landing');
+
+    expect(screen.getByTestId('where')).toHaveTextContent('/landing');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Just upload. Neuton takes care of the numbers.',
+      }),
+    ).toBeInTheDocument();
   });
 });
 
