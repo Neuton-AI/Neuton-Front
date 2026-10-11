@@ -95,7 +95,7 @@ export function CapturePage() {
     setError(null);
 
     if (!ACCEPTED.includes(picked.type)) {
-      setError('Use a JPEG, PNG, WebP, HEIC or PDF file.');
+      setError('Use a JPG, PNG, WebP, HEIC, or PDF file.');
       return;
     }
     if (picked.size > MAX_BYTES) {
@@ -256,7 +256,7 @@ export function CapturePage() {
         <IconUpload className="h-[22px] w-[22px] text-[#A09D96]" />
         <span className="text-sm font-medium text-[#FAF9F5]">Drop a file here or browse</span>
         <span className="text-center text-[13px] font-medium leading-[18px] text-[#A09D96]">
-          Receipt, recipe or product image &middot; JPG, PNG, PDF
+          Receipt, recipe, product, or order &middot; JPG, PNG, WebP, HEIC, PDF
         </span>
       </button>
 
