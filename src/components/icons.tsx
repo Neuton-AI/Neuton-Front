@@ -159,6 +159,16 @@ export function IconTrash({ className, strokeWidth }: IconProps) {
   );
 }
 
+export function IconWarning({ className, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <svg {...base(className, strokeWidth)}>
+      <path d="M10 3.5 17.5 16.5H2.5L10 3.5Z" />
+      <path d="M10 8.5v3" />
+      <path d="M10 14h.01" />
+    </svg>
+  );
+}
+
 export function IconEdit({ className, strokeWidth }: IconProps) {
   return (
     <svg {...base(className, strokeWidth)}>
