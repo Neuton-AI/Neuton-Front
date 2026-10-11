@@ -86,7 +86,15 @@ export function useShopMemberships(userId: string | undefined): MembershipState 
 
       const stored = localStorage.getItem(ACTIVE_SHOP_KEY);
       const stillValid = stored && rows.some((row) => row.shopId === stored);
-      setActiveShopIdState(stillValid ? stored : (rows[0]?.shopId ?? null));
+      const nextShopId = stillValid ? stored : (rows[0]?.shopId ?? null);
+      // The stored id can outlive the membership it points at; keep the key in
+      // sync with what the hook actually selects so it never goes stale.
+      if (nextShopId) {
+        localStorage.setItem(ACTIVE_SHOP_KEY, nextShopId);
+      } else {
+        localStorage.removeItem(ACTIVE_SHOP_KEY);
+      }
+      setActiveShopIdState(nextShopId);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load your shops');
     } finally {
