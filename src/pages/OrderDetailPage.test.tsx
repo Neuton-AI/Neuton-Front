@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -208,13 +208,24 @@ describe('OrderDetailPage cancellation', () => {
     expect(await screen.findByText(/· #42/)).toBeInTheDocument();
   });
 
-  it('offers to delete the order while keeping its number reserved', async () => {
+  it('asks for confirmation in an app dialog before deleting', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     api.apiFetch.mockResolvedValue({ order: makeOrderDetail('processing') });
     renderDetail();
 
     await user.click(await screen.findByRole('button', { name: 'Delete order' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this order?' });
+    expect(
+      within(dialog).getByText('It stays on your records so its number is never reused.'),
+    ).toBeInTheDocument();
+    // Nothing is sent until the dialog is confirmed.
+    expect(api.apiFetch).not.toHaveBeenCalledWith(
+      '/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete order' }));
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
@@ -222,9 +233,38 @@ describe('OrderDetailPage cancellation', () => {
         expect.objectContaining({ method: 'DELETE', shopId: 'shop-1' }),
       ),
     );
-    expect(window.confirm).toHaveBeenCalledWith(
-      'Delete this order? It stays on your records so its number is never reused.',
+  });
+
+  it('closes the confirmation without deleting when cancelled', async () => {
+    const user = userEvent.setup();
+    api.apiFetch.mockResolvedValue({ order: makeOrderDetail('processing') });
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete order' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this order?' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Delete this order?' })).toBeNull();
+    expect(api.apiFetch).not.toHaveBeenCalledWith(
+      '/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      expect.objectContaining({ method: 'DELETE' }),
     );
+  });
+
+  it('dismisses the confirmation with Escape but keeps the order sheet open', async () => {
+    const user = userEvent.setup();
+    api.apiFetch.mockResolvedValue({ order: makeOrderDetail('processing') });
+    renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete order' }));
+    await screen.findByRole('dialog', { name: 'Delete this order?' });
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog', { name: 'Delete this order?' })).toBeNull();
+    // The Sheet behind it must not also answer the same Escape.
+    expect(screen.getByRole('dialog', { name: 'Order details' })).toBeInTheDocument();
   });
 
   it('shows a deleted order as a frozen void with no actions', async () => {

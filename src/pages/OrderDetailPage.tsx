@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { ErrorState, InlineNotice, Skeleton } from '../components/feedback';
@@ -27,6 +28,8 @@ export function OrderDetailPage() {
   /** Kept apart from the load error: a failed transition belongs next to its
    *  button, not in the slot whose retry only refetches the order. */
   const [markError, setMarkError] = useState<string | null>(null);
+  /** The delete confirmation is an in-app dialog, not a native confirm. */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const loading = orderQuery.isLoading && !order;
   const error = orderQuery.error
@@ -45,10 +48,7 @@ export function OrderDetailPage() {
 
   const remove = async () => {
     if (!token || !activeShopId || !id || deleteOrder.isPending) return;
-    if (
-      !window.confirm('Delete this order? It stays on your records so its number is never reused.')
-    )
-      return;
+    setConfirmingDelete(false);
 
     setActionError(null);
     try {
@@ -226,7 +226,13 @@ export function OrderDetailPage() {
             ) : null}
 
             {order.status !== 'cancelled' ? (
-              <Button variant="danger" size="md" block loading={deleteOrder.isPending} onClick={remove}>
+              <Button
+                variant="danger"
+                size="md"
+                block
+                loading={deleteOrder.isPending}
+                onClick={() => setConfirmingDelete(true)}
+              >
                 Delete order
               </Button>
             ) : null}
@@ -235,6 +241,15 @@ export function OrderDetailPage() {
           <Skeleton className="h-[88px]" />
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this order?"
+        description="It stays on your records so its number is never reused."
+        confirmLabel="Delete order"
+        onConfirm={remove}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </Sheet>
   );
 }
