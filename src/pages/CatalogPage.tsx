@@ -17,12 +17,12 @@ import { formatDate, formatMoney, formatQuantity, relativeTime } from '../lib/fo
 import { useInventory, useReceipts, useRecipes } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
-type Tab = 'recipes' | 'inventory' | 'receipts';
+type Tab = 'recipes' | 'receipts' | 'inventory';
 
-const TABS: { key: Tab; label: string; Icon: typeof IconChefHat }[] = [
-  { key: 'recipes', label: 'Recipes', Icon: IconChefHat },
-  { key: 'inventory', label: 'Inventory', Icon: IconBox },
-  { key: 'receipts', label: 'Receipts', Icon: IconReceipt },
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'recipes', label: 'Recipes' },
+  { key: 'receipts', label: 'Receipts' },
+  { key: 'inventory', label: 'Inventory' },
 ];
 
 const TAB_TO_KIND: Record<Tab, MediaKind> = {
@@ -104,28 +104,29 @@ export function CatalogPage() {
           <PageHeader eyebrow={shop?.name} title="Catalog" />
         </div>
 
-        <div
-          role="tablist"
-          aria-label="Catalog section"
-          className="no-scrollbar mt-4 flex gap-1.5 overflow-x-auto px-4"
-        >
-          {TABS.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={tab === key}
-              type="button"
-              onClick={() => setSearchParams(key === 'recipes' ? {} : { tab: key })}
-              className={`pressable flex shrink-0 items-center gap-1.5 rounded-pill px-3.5 py-2 text-label font-medium transition-colors duration-200 ${
-                tab === key
-                  ? 'bg-surface-dark text-ink-on-dark'
-                  : 'bg-surface-card text-ink-muted'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
+        <div className="no-scrollbar mt-4 overflow-x-auto px-4">
+          <div
+            role="tablist"
+            aria-label="Catalog section"
+            className="flex gap-1 rounded-card border border-hairline bg-surface-soft p-1"
+          >
+            {TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={tab === key}
+                type="button"
+                onClick={() => setSearchParams(key === 'recipes' ? {} : { tab: key })}
+                className={`pressable flex shrink-0 items-center rounded-input px-3.5 py-2 text-label font-medium transition-colors duration-200 ${
+                  tab === key
+                    ? 'bg-surface-card text-ink'
+                    : 'text-ink-muted'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div
