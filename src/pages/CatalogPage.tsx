@@ -186,7 +186,7 @@ export function CatalogPage() {
               </div>
             )
           ) : tab === 'recipes' ? (
-            recipes.length === 0 ? (
+            errors.recipes ? null : recipes.length === 0 ? (
               <EmptyState
                 icon={<IconChefHat className="h-9 w-9" />}
                 title="No recipes yet"
@@ -247,7 +247,7 @@ export function CatalogPage() {
               })
             )
           ) : tab === 'inventory' ? (
-            inventory.length === 0 ? (
+            errors.inventory ? null : inventory.length === 0 ? (
               <EmptyState
                 icon={<IconBox className="h-9 w-9" />}
                 title="Inventory is empty"
@@ -281,7 +281,7 @@ export function CatalogPage() {
                 </div>
               ))
             )
-          ) : receipts.length === 0 ? (
+          ) : errors.receipts ? null : receipts.length === 0 ? (
             <EmptyState
               icon={<IconReceipt className="h-9 w-9" />}
               title="No receipts yet"
