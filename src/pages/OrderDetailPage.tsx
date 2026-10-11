@@ -45,7 +45,10 @@ export function OrderDetailPage() {
 
   const remove = async () => {
     if (!token || !activeShopId || !id || deleteOrder.isPending) return;
-    if (!window.confirm('Cancel this order? It stays on your records as cancelled.')) return;
+    if (
+      !window.confirm('Delete this order? It stays on your records so its number is never reused.')
+    )
+      return;
 
     setActionError(null);
     try {
@@ -218,14 +221,13 @@ export function OrderDetailPage() {
               </div>
             ) : order.status === 'cancelled' ? (
               <InlineNotice tone="error">
-                This order was cancelled. It stays on your records as a void, and its number is
-                never reused.
+                This order was deleted. It stays on your records so its number is never reused.
               </InlineNotice>
             ) : null}
 
             {order.status !== 'cancelled' ? (
               <Button variant="danger" size="md" block loading={deleteOrder.isPending} onClick={remove}>
-                Cancel order
+                Delete order
               </Button>
             ) : null}
           </>

@@ -39,6 +39,13 @@ export default {
           warning: '#D4A017',
           error: '#C64545',
         },
+        // Deleted orders read as inert: the design drains their hue to a cool
+        // grey and dims the whole row, so these sit apart from the warm palette.
+        deleted: {
+          surface: '#F3F4F6',
+          border: '#C9C7C1',
+          badge: '#E5E1D8',
+        },
       },
       fontFamily: {
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
