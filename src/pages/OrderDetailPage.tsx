@@ -79,7 +79,7 @@ export function OrderDetailPage() {
   };
 
   const marginPercent =
-    order && toNumber(order.totalAmount) > 0
+    order && order.netProfit !== null && toNumber(order.totalAmount) > 0
       ? (order.netProfit / toNumber(order.totalAmount)) * 100
       : 0;
   const baseFee = toNumber(shop?.deliveryBaseFee);
@@ -194,7 +194,7 @@ export function OrderDetailPage() {
             <SheetSection title="Cost">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-label text-ink-muted">Production cost</span>
-                <span className="text-body text-ink">{formatMoney(order.totalCost, currency)}</span>
+                <span className="text-body text-ink">{order.totalCost === null ? 'Incomplete — profit unknown' : formatMoney(order.totalCost, currency)}</span>
               </div>
             </SheetSection>
 

@@ -1,3 +1,4 @@
+import { InventoryReconciliationEditor } from '../components/MeasurementEditors';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BottomNav } from '../components/BottomNav';
 import { Fab, useFabNavigation, type MediaKind } from '../components/Fab';
@@ -177,7 +178,7 @@ export function CatalogPage() {
                 aria-hidden="true"
               >
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className="flex aspect-square flex-col gap-2 rounded-card bg-surface-card p-3 animate-pulse">
+                  <div key={i} className="flex min-h-48 flex-col gap-2 rounded-card bg-surface-card p-3 animate-pulse">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-input bg-surface-canvas" />
                     <div className="h-[18px] shrink-0" />
                     <div className="h-3 w-[80px] max-w-full rounded-[6px] bg-surface-canvas" />
@@ -209,7 +210,7 @@ export function CatalogPage() {
                   ?? recipe.costing.ingredients.filter(
                     (i) => i.linked ?? (i.inventoryItemId != null),
                   ).length;
-                const incomplete = linked < total;
+                const incomplete = recipe.costing.complete === false || linked < total;
                 return (
                 <Link
                   key={recipe.id}
@@ -267,7 +268,7 @@ export function CatalogPage() {
               inventory.map((item) => (
                 <div
                   key={item.id}
-                  className="flex aspect-square flex-col gap-2 rounded-card bg-surface-card p-3"
+                  className="flex min-h-48 flex-col gap-2 rounded-card bg-surface-card p-3"
                 >
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-input bg-surface-canvas">
                     <IconBox className="h-[19px] w-[19px] text-ink-muted-soft" />
@@ -279,6 +280,8 @@ export function CatalogPage() {
                   <p className="truncate text-[22px] font-medium leading-[1.3] text-ink">
                     {formatQuantity(item.currentQuantity, item.unit)}
                   </p>
+                  {item.measurementStatus && item.measurementStatus !== 'ready' ? <p className="text-label text-ink-muted">Opening balance needs reconciliation</p> : null}
+                  {memberships.some(m => m.shopId === activeShopId && (m.role === 'owner' || m.role === 'admin')) ? <InventoryReconciliationEditor item={item} token={token} shopId={activeShopId} onSaved={() => inventoryQuery.refetch()} /> : null}
                 </div>
               ))
             )

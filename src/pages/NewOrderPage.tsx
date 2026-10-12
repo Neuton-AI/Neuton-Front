@@ -8,7 +8,7 @@ import { formatMoney, formatQuantity, toNumber } from '../lib/format';
 import { useCreateOrder, useDebouncedValue, useOrderableRecipes, useOrderQuote } from '../lib/queries';
 import { useAuth, useCurrentShop, useShopMemberships } from '../lib/supabase';
 
-type DraftLine = { recipe: OrderableRecipe; quantity: number };
+type DraftLine = { recipe: OrderableRecipe; quantity: number; unitPrice?: number };
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -43,7 +43,7 @@ export function NewOrderPage() {
     : submitError;
 
   const items = useMemo(
-    () => lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
+    () => lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity, ...(line.unitPrice !== undefined ? { unitPrice: line.unitPrice } : {}) })),
     [lines],
   );
   const itemsKey = JSON.stringify(items);
@@ -57,7 +57,7 @@ export function NewOrderPage() {
   const debouncedItemsKey = useDebouncedValue(itemsKey, 250);
   const debouncedDistanceKm = useDebouncedValue(deliveryDistanceKm, 250);
   const quoteQuery = useOrderQuote(token, activeShopId, {
-    items: (JSON.parse(debouncedItemsKey) as { recipeId: string; quantity: number }[]),
+    items: (JSON.parse(debouncedItemsKey) as { recipeId: string; quantity: number; unitPrice?: number }[]),
     distanceKm: toNumber(debouncedDistanceKm),
     enabled: lines.length > 0,
   });
@@ -101,7 +101,7 @@ export function NewOrderPage() {
         orderDate: new Date(`${orderDate}T12:00:00`).toISOString(),
         destinationAddress: destinationAddress.trim() || null,
         deliveryDistanceKm: toNumber(deliveryDistanceKm),
-        items: lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
+        items: lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity, ...(line.unitPrice !== undefined ? { unitPrice: line.unitPrice } : {}) })),
       });
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
@@ -193,7 +193,8 @@ export function NewOrderPage() {
                       <p className="truncate text-body font-medium text-ink">{recipe.name}</p>
                       <p className="text-label text-ink-muted">
                         {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)} ·{' '}
-                        {formatMoney(recipe.retailPrice, currency)}
+                        {recipe.retailPrice === null ? 'Cost incomplete · enter selling price' : formatMoney(recipe.retailPrice, currency)}
+                        {quantity > 0 ? <label className="flex flex-col">Manual selling price<input aria-label={`Selling price for ${recipe.name}`} className="rounded-input border border-hairline p-2" type="number" min="0" step="0.01" required={recipe.retailPrice === null} value={lines.find(l => l.recipe.id === recipe.id)?.unitPrice ?? ''} onChange={e => setLines(current => current.map(l => l.recipe.id === recipe.id ? { ...l, unitPrice: e.target.value === '' ? undefined : Number(e.target.value) } : l))} /></label> : null}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
@@ -230,14 +231,15 @@ export function NewOrderPage() {
             <>
               <Row
                 label="Items"
-                value={formatMoney(quote.totalAmount - quote.deliveryFee, currency)}
+                value={formatMoney(quote.totalAmount === null ? null : quote.totalAmount - quote.deliveryFee, currency)}
               />
               <Row label="Delivery" value={formatMoney(quote.deliveryFee, currency)} />
               <div className="h-px bg-hairline" />
               <Row label="Total" value={formatMoney(quote.totalAmount, currency)} emphasis />
+              {quote.totalCost === null ? <InlineNotice>Production cost incomplete. This order can be saved with a manual selling price; profit is unknown.</InlineNotice> : null}
               <Row label="Net profit" value={formatMoney(quote.netProfit, currency)} />
               <p className="text-label text-ink-muted">
-                Margin {quote.profitMarginPercent.toFixed(1)}% · cost{' '}
+                Margin {(quote.profitMarginPercent?.toFixed(1) ?? '—')}% · cost{' '}
                 {formatMoney(quote.totalCost, currency)}
               </p>
             </>

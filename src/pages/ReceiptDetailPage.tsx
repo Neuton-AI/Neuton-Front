@@ -1,3 +1,4 @@
+import { ReceiptMeasurementEditor } from '../components/MeasurementEditors';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
@@ -192,6 +193,10 @@ export function ReceiptDetailPage() {
                     >
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-body text-ink">{item.rawName}</span>
+                        {item.rawSku ? <span className="text-label text-ink-muted">Product code {item.rawSku}</span> : null}
+                        {item.applicationStatus ? <span className="text-label text-ink-muted">{item.applicationStatus === 'pending' ? 'Awaiting measurements; stock not added' : item.applicationStatus.replaceAll('_', ' ')}{item.measurementReason ? ' · ' + item.measurementReason.replaceAll('_', ' ') : ''}</span> : null}
+                        {item.normalizedQuantity != null ? <span className="text-label text-ink-muted">{formatQuantity(item.normalizedQuantity, item.normalizedUnit)} · {item.normalizedRate} {receiptCurrency}/{item.normalizedUnit}</span> : null}
+                        {canVerify && (receipt.status === 'unverified' || item.applicationStatus === 'pending' && item.reviewStatus === 'accepted') ? <ReceiptMeasurementEditor item={item} receipt={receipt} token={token} shopId={activeShopId} onSaved={() => receiptQuery.refetch()} /> : null}
                         <span className="text-label font-medium text-ink-muted">
                           {formatQuantity(item.quantity)} ×{' '}
                           {item.unitPrice === null || item.unitPrice === undefined

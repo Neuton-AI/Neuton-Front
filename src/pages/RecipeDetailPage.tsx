@@ -1,3 +1,4 @@
+import { RecipeMeasurementEditor } from '../components/MeasurementEditors';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
@@ -98,7 +99,7 @@ export function RecipeDetailPage() {
       (i) => i.linked ?? (i.inventoryItemId != null || i.generalPriceId != null),
     ).length
     ?? 0;
-  const incomplete = (recipe != null) && linked < total;
+  const incomplete = recipe != null && (recipe.costing.complete === false || linked < total);
 
   return (
     <Sheet open onClose={close} label="Recipe details">
@@ -180,8 +181,8 @@ export function RecipeDetailPage() {
             <SheetSection title="Ingredients">
               {incomplete ? (
                 <InlineNotice>
-                  {linked} of {total} ingredients linked — cost incomplete. Selling price
-                  on hold until all ingredients are linked.
+                  {linked} of {total} ingredients linked; {recipe.costing.costableCount ?? linked} costable — cost incomplete. Selling price
+                  on hold until measurements and prices are resolved.
                 </InlineNotice>
               ) : null}
               {recipe.costing.ingredients.length === 0 ? (
@@ -189,11 +190,11 @@ export function RecipeDetailPage() {
               ) : (
                 <>
                   <ul className="flex flex-col">
-                    {recipe.costing.ingredients.map((ingredient) => {
+                    {recipe.costing.ingredients.map((ingredient, index) => {
                       const isLinked = ingredient.linked ?? (ingredient.inventoryItemId != null || ingredient.generalPriceId != null);
                       return (
                       <li
-                        key={ingredient.rawName ?? ingredient.name}
+                        key={ingredient.id ?? index}
                         className="flex items-center justify-between gap-2 py-1.5"
                       >
                         <span className="flex min-w-0 items-center gap-2">
@@ -214,6 +215,12 @@ export function RecipeDetailPage() {
                             <SheetBadge>Unlinked</SheetBadge>
                           )}
                         </span>
+                        <div className="flex flex-col text-label text-ink-muted">
+                          <span>{ingredient.measurementState ?? (isLinked ? 'ready' : 'unresolved')} · {ingredient.lineCost === null ? 'Cost unknown' : formatMoney(ingredient.lineCost, currency)}</span>
+                          {ingredient.explanation ? <span>{ingredient.explanation.replaceAll('_', ' ')}</span> : null}
+                          {ingredient.normalizedQuantity != null ? <span>Resolved: {formatQuantity(ingredient.normalizedQuantity, ingredient.normalizedUnit)} · {ingredient.priceBasis === 'replacement_estimate' ? 'Replacement estimate' : 'Inventory average'}</span> : null}
+                          {canVerify && ingredient.id ? <RecipeMeasurementEditor ingredient={ingredient} recipeId={id} token={token} shopId={activeShopId} onSaved={() => recipeQuery.refetch()} /> : null}
+                        </div>
                         <span className="shrink-0 text-body text-ink-muted">
                           {formatQuantity(ingredient.quantity, ingredient.unit)}
                         </span>
