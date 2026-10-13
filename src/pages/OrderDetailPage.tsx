@@ -81,7 +81,7 @@ export function OrderDetailPage() {
   const marginPercent =
     order && order.netProfit !== null && toNumber(order.totalAmount) > 0
       ? (order.netProfit / toNumber(order.totalAmount)) * 100
-      : 0;
+      : null;
   const baseFee = toNumber(shop?.deliveryBaseFee);
 
   return (
@@ -133,7 +133,7 @@ export function OrderDetailPage() {
                   Profit margin
                 </p>
                 <p className="font-display text-card-value text-ink-on-dark">
-                  {marginPercent.toFixed(0)}%
+                  {marginPercent === null ? '—' : `${marginPercent.toFixed(0)}%`}
                 </p>
                 <p className="text-label font-medium text-ink-on-dark-soft">
                   Profit {formatMoney(order.netProfit, currency)}
