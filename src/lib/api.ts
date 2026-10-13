@@ -290,6 +290,7 @@ export type OrderStatus = 'processing' | 'delivered' | 'cancelled';
 
 /** One sellable recipe as returned by GET /recipes/orderable. */
 export type OrderableRecipe = {
+  currency?: string;
   costingStatus?: MeasurementState;
   id: string;
   name: string;

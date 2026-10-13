@@ -193,7 +193,7 @@ export function NewOrderPage() {
                       <p className="truncate text-body font-medium text-ink">{recipe.name}</p>
                       <p className="text-label text-ink-muted">
                         {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)} ·{' '}
-                        {recipe.retailPrice === null ? 'Cost incomplete · enter selling price' : formatMoney(recipe.retailPrice, currency)}
+                        {recipe.retailPrice === null ? 'Cost incomplete · enter selling price' : formatMoney(recipe.retailPrice, recipe.currency ?? currency)}
                         {quantity > 0 ? <label className="flex flex-col">Manual selling price<input aria-label={`Selling price for ${recipe.name}`} className="rounded-input border border-hairline p-2" type="number" min="0" step="0.01" required={recipe.retailPrice === null} value={lines.find(l => l.recipe.id === recipe.id)?.unitPrice ?? ''} onChange={e => setLines(current => current.map(l => l.recipe.id === recipe.id ? { ...l, unitPrice: e.target.value === '' ? undefined : Number(e.target.value) } : l))} /></label> : null}
                       </p>
                     </div>
