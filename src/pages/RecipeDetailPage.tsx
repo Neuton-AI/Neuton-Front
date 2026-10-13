@@ -1,4 +1,4 @@
-import { RecipeMeasurementEditor } from '../components/MeasurementEditors';
+import { RecipeMeasurementEditor, RecipeYieldEditor } from '../components/MeasurementEditors';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Sheet, SheetBadge, SheetSection, useSheetClose } from '../components/Sheet';
@@ -34,7 +34,7 @@ export function RecipeDetailPage() {
       : 'Could not load the recipe.'
     : null;
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = recipe?.costing.currency ?? shop?.currency ?? 'USD';
   const close = useSheetClose('/catalog?tab=recipes');
   const navigate = useNavigate();
   // Verification is an owner/admin action server-side, so a member would only
@@ -130,6 +130,8 @@ export function RecipeDetailPage() {
               )}
             </div>
 
+            {canVerify ? <RecipeYieldEditor recipe={recipe} token={token} shopId={activeShopId} onSaved={() => recipeQuery.refetch()} /> : null}
+
             <div className="flex flex-col gap-0.5">
               <h1 className="font-display text-card-value text-ink">{recipe.name}</h1>
               <p className="text-body text-ink-muted">
@@ -195,14 +197,14 @@ export function RecipeDetailPage() {
                       return (
                       <li
                         key={ingredient.id ?? index}
-                        className="flex items-center justify-between gap-2 py-1.5"
+                        className="flex flex-wrap items-center justify-between gap-2 py-2"
                       >
                         <span className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-body text-ink">{ingredient.name}</span>
                           <span
                             data-testid={isLinked ? 'linked-dot' : 'unlinked-dot'}
-                            title={isLinked ? 'Linked to inventory' : 'Not linked to inventory'}
-                            aria-label={isLinked ? 'Linked to inventory' : 'Not linked to inventory'}
+                            title={isLinked ? 'Product matched' : 'Product not matched'}
+                            aria-label={isLinked ? 'Product matched' : 'Product not matched'}
                             style={{
                               width: 8,
                               height: 8,
@@ -215,21 +217,24 @@ export function RecipeDetailPage() {
                             <SheetBadge>Unlinked</SheetBadge>
                           )}
                         </span>
-                        <div className="flex flex-col text-label text-ink-muted">
-                          <span>{ingredient.measurementState ?? (isLinked ? 'ready' : 'unresolved')} · {ingredient.lineCost === null ? 'Cost unknown' : formatMoney(ingredient.lineCost, currency)}</span>
-                          {ingredient.explanation ? <span>{ingredient.explanation.replaceAll('_', ' ')}</span> : null}
-                          {ingredient.normalizedQuantity != null ? <span>Resolved: {formatQuantity(ingredient.normalizedQuantity, ingredient.normalizedUnit)} · {ingredient.priceBasis === 'replacement_estimate' ? 'Replacement estimate' : 'Inventory average'}</span> : null}
-                          {canVerify && ingredient.id ? <RecipeMeasurementEditor ingredient={ingredient} recipeId={id} token={token} shopId={activeShopId} onSaved={() => recipeQuery.refetch()} /> : null}
-                        </div>
                         <span className="shrink-0 text-body text-ink-muted">
                           {formatQuantity(ingredient.quantity, ingredient.unit)}
                         </span>
+                        <div className="flex w-full flex-col break-words text-label text-ink-muted">
+                          <span>{ingredient.measurementState ?? (isLinked ? 'ready' : 'unresolved')} · {ingredient.lineCost === null ? 'Cost unknown' : formatMoney(ingredient.lineCost, currency)}</span>
+                          {ingredient.explanation ? <span>{ingredient.explanation.replaceAll('_', ' ')}</span> : null}
+                          {ingredient.normalizedQuantity != null ? <span>Resolved: {formatQuantity(ingredient.normalizedQuantity, ingredient.normalizedUnit)} · {ingredient.priceBasis === 'replacement_estimate' ? 'Replacement estimate' : 'Inventory average'}</span> : null}
+                          {ingredient.convention ? <span>Measurement convention: {ingredient.convention.toUpperCase()}</span> : null}
+                          {ingredient.alternateMeasurements?.length ? <span>Printed equivalents: {ingredient.alternateMeasurements.map(a => formatQuantity(a.quantity, a.unit)).join(', ')}</span> : null}
+                          {ingredient.measurementState === 'estimated' && ingredient.provenance?.length ? <span>Conversion basis: {ingredient.provenance.join(' · ')}</span> : null}
+                          {canVerify && ingredient.id ? <RecipeMeasurementEditor ingredient={ingredient} recipeId={id} token={token} shopId={activeShopId} onSaved={() => recipeQuery.refetch()} /> : null}
+                        </div>
                       </li>
                       );
                     })}
                   </ul>
                   <p className="text-label font-medium text-ink-muted">
-                    Ingredients {formatMoney(recipe.costing.ingredientsCost, currency)} · Labor{' '}
+                    {incomplete ? 'Known ingredient subtotal' : 'Ingredients'} {formatMoney(recipe.costing.ingredientsCost, currency)} · Labor{' '}
                     {formatMoney(recipe.costing.laborCost, currency)}
                   </p>
                 </>

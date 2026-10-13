@@ -255,6 +255,9 @@ function ProfitChart({ points, currency }: { points: ChartPoint[]; currency: str
     );
   }
 
+  if (points.some(point => point.netProfit === null)) {
+    return <div className="flex h-full items-center justify-center"><p className="text-label text-ink-on-dark-soft">Profit chart pending complete production costs</p></div>;
+  }
   const values = points.map((point) => toNumber(point.netProfit));
   const max = Math.max(...values, 0);
   const min = Math.min(...values, 0);

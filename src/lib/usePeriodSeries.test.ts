@@ -57,10 +57,15 @@ describe('bucketSeries', () => {
     expect(series.at(-1)?.netProfit).toBe(0.3);
   });
 
-  it('treats a missing netProfit as zero rather than NaN', () => {
+  it('preserves a missing netProfit as unknown', () => {
     const series = bucketSeries([{ date: '2026-01-15' } as ChartPoint], '12m');
 
-    expect(series.at(-1)?.netProfit).toBe(0);
+    expect(series.at(-1)?.netProfit).toBe(null);
+  });
+
+  it('keeps a bucket incomplete when one order has an unknown production cost', () => {
+    const series = bucketSeries([{ date: '2026-01-15', netProfit: 100 }, { date: '2026-01-20', netProfit: null }], '12m');
+    expect(series.at(-1)?.netProfit).toBeNull();
   });
 
   it(`labels every daily point with a real, consecutive date — ${PERIOD_AXIS}`, () => {

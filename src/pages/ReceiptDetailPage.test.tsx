@@ -131,6 +131,16 @@ function renderDetail() {
 }
 
 describe('ReceiptDetailPage verification', () => {
+  it('keeps an accepted pending purchase visible and offers deferred correction', async () => {
+    const receipt = makeReceiptDetail('verified');
+    Object.assign(receipt.items[0]!, { applicationStatus: 'pending', reviewStatus: 'accepted', measurementReason: 'missing_package_size' });
+    api.apiFetch.mockResolvedValue({ receipt });
+    renderDetail();
+    expect(await screen.findByText(/Awaiting measurements; stock not added/)).toBeInTheDocument();
+    expect(screen.getByText('Resolve purchase measurements')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verify receipt' })).toBeNull();
+  });
+
   it('offers the verify action on an unverified receipt', async () => {
     mockApi();
     renderDetail();
@@ -237,7 +247,7 @@ describe('ReceiptDetailPage delete', () => {
     const button = await screen.findByRole('button', { name: 'Delete receipt' });
     expect(button).toBeDisabled();
     expect(
-      screen.getByText(/already moved stock and count as spend/i),
+      screen.getByText(/Verified receipts count as spend/i),
     ).toBeInTheDocument();
   });
 

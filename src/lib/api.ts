@@ -148,6 +148,7 @@ export type ReceiptItem = {
   codeChain?: string | null;
   packageQuantity?: string | null;
   packageUnit?: string | null;
+  packagesPerPurchase?: string | null;
   normalizedQuantity?: string | null;
   normalizedUnit?: string | null;
   normalizedRate?: string | null;
@@ -215,15 +216,16 @@ export type RecipeIngredient = {
   priceBasis?: string;
   explanation?: string | null;
   provenance?: string[];
+  alternateMeasurements?: { quantity: number | null; unit: string | null }[];
   convention?: 'us' | 'metric' | 'imperial' | null;
   alternatives?: string[];
   selectedAlternative?: string | null;
   name: string;
-  quantity: number;
-  unit: string;
+  quantity: number | null;
+  unit: string | null;
   averageUnitCost: number | null;
   lineCost: number | null;
-  currentQuantity: number;
+  currentQuantity: number | string | null;
   /** Inventory or supermarket price ID determines linking; never infer it from cost. */
   inventoryItemId?: string | null;
   generalPriceId?: string | null;
@@ -233,6 +235,7 @@ export type RecipeIngredient = {
 
 /** Live cost breakdown computed from stock; never stored. */
 export type RecipeCosting = {
+  currency?: string;
   complete?: boolean;
   measurementState?: MeasurementState;
   costableCount?: number;
@@ -298,6 +301,7 @@ export type OrderableRecipe = {
 };
 
 export type Order = {
+  currency?: string | null;
   costingStatus?: string;
   id: string;
   /**
@@ -357,6 +361,7 @@ export type OrderQuoteItem = {
 };
 
 export type OrderQuote = {
+  currency?: string;
   items: OrderQuoteItem[];
   deliveryDistanceKm: number;
   baseFee: number;
@@ -397,19 +402,23 @@ export type DashboardSummary = {
   range: { from: string; to: string };
   summary: {
     revenue: number;
-    expenses: number;
+    expenses: number | null;
+    knownExpenses?: number;
+    incompleteExpenseCount?: number;
     deliveryFees: number;
-    productionCost: number;
+    productionCost: number | null;
+    knownProductionCost?: number;
+    incompleteOrderCount?: number;
     netProfit: number | null;
     orderCount: number;
     profitMarginPercent: number | null;
   };
   trend: {
     revenuePercent: number;
-    profitPercent: number;
-    expensesPercent: number;
+    profitPercent: number | null;
+    expensesPercent: number | null;
   };
-  graph: { date: string; revenue: number; expenses: number; netProfit: number }[];
+  graph: { date: string; revenue: number; expenses: number; netProfit: number | null }[];
   topItem: {
     recipeId: string;
     name: string;

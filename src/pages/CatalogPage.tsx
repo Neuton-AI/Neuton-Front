@@ -224,7 +224,7 @@ export function CatalogPage() {
                     <span className="shrink-0 rounded-pill bg-brand-teal px-2 py-0.5 text-label font-medium text-ink">
                       {incomplete
                         ? 'No price yet'
-                        : formatMoney(recipe.costing.retailPrice, currency)}
+                        : formatMoney(recipe.costing.retailPrice, recipe.costing.currency ?? currency)}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
@@ -233,7 +233,7 @@ export function CatalogPage() {
                       {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)}
                     </p>
                     <p className="shrink-0 text-label text-ink-muted">
-                      cost {formatMoney(recipe.costing.unitCost, currency)}
+                      cost {formatMoney(recipe.costing.unitCost, recipe.costing.currency ?? currency)}
                     </p>
                   </div>
                   {incomplete ? (

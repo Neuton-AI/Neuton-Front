@@ -31,7 +31,6 @@ export function NewOrderPage() {
   const [destinationAddress, setDestinationAddress] = useState('');
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState('0');
 
-  const currency = shop?.currency ?? 'USD';
 
   const recipesQuery = useOrderableRecipes(token, activeShopId);
   const recipes = recipesQuery.data?.recipes ?? [];
@@ -62,6 +61,7 @@ export function NewOrderPage() {
     enabled: lines.length > 0,
   });
   const quote = lines.length > 0 ? quoteQuery.data ?? null : null;
+  const currency = quote?.currency ?? shop?.currency ?? 'USD';
   const quoteError =
     lines.length === 0
       ? null

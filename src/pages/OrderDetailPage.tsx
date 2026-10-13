@@ -42,7 +42,7 @@ export function OrderDetailPage() {
     void orderQuery.refetch();
   };
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = order?.currency ?? shop?.currency ?? 'USD';
   const close = useSheetClose('/orders');
   const justSaved = (location.state as { fresh?: boolean } | null)?.fresh === true;
 

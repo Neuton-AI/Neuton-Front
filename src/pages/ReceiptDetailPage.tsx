@@ -28,6 +28,7 @@ export function ReceiptDetailPage() {
   /** Same slot pattern as verify: a failed delete (e.g. a 409 race with a
    *  verification landing mid-click) belongs next to its button. */
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [acceptedItems, setAcceptedItems] = useState<Record<string, boolean>>({});
 
   const loading = receiptQuery.isLoading && !receipt;
   const error = receiptQuery.error
@@ -61,7 +62,7 @@ export function ReceiptDetailPage() {
 
     setVerifyError(null);
     const body: VerifyReceiptBody = {
-      items: receipt.items.map((item) => ({ id: item.id, accepted: true })),
+      items: receipt.items.map((item) => ({ id: item.id, accepted: acceptedItems[item.id] !== false })),
     };
     try {
       await verifyMutation.mutateAsync({ id, body });
@@ -193,6 +194,7 @@ export function ReceiptDetailPage() {
                     >
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-body text-ink">{item.rawName}</span>
+                        {canVerify && receipt.status === 'unverified' ? <label className="text-label text-ink-muted"><input type="checkbox" checked={acceptedItems[item.id] !== false} onChange={event => setAcceptedItems(previous => ({ ...previous, [item.id]: event.target.checked }))} /> Add this purchase to inventory</label> : null}
                         {item.rawSku ? <span className="text-label text-ink-muted">Product code {item.rawSku}</span> : null}
                         {item.applicationStatus ? <span className="text-label text-ink-muted">{item.applicationStatus === 'pending' ? 'Awaiting measurements; stock not added' : item.applicationStatus.replaceAll('_', ' ')}{item.measurementReason ? ' · ' + item.measurementReason.replaceAll('_', ' ') : ''}</span> : null}
                         {item.normalizedQuantity != null ? <span className="text-label text-ink-muted">{formatQuantity(item.normalizedQuantity, item.normalizedUnit)} · {item.normalizedRate} {receiptCurrency}/{item.normalizedUnit}</span> : null}
@@ -245,7 +247,7 @@ export function ReceiptDetailPage() {
               <div className="flex flex-col gap-2.5">
                 {isVerified ? (
                   <InlineNotice>
-                    Verified receipts already moved stock and count as spend — they cannot be deleted.
+                    Verified receipts count as spend and may have applied stock. They cannot be deleted.
                   </InlineNotice>
                 ) : null}
                 {deleteError ? <InlineNotice tone="error">{deleteError}</InlineNotice> : null}
