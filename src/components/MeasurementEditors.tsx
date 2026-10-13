@@ -117,6 +117,7 @@ export function RecipeMeasurementEditor({ ingredient, recipeId, ...session }: Se
       <Amount title="Recipe quantity" value={quantity} onChange={setQuantity} required />
       <Label title="Recipe unit"><input className={control} value={unit} required onChange={e => setUnit(e.target.value)} /></Label>
       <Label title="Spoon / cup convention"><select className={control} value={convention} onChange={e => setConvention(e.target.value)}><option value="">Unknown</option><option value="us">US customary</option><option value="metric">Metric (250 ml cup)</option><option value="imperial">Imperial</option></select></Label>
+      <p className="text-label text-ink-muted">Teaspoons and tablespoons work like cups: choose the recipe's known convention. Recognized ingredients such as baking powder then get a sourced gram estimate. Other ingredients need a confirmed conversion below.</p>
       {ingredient.alternatives?.length ? <Label title="Choose ingredient alternative"><select className={control} value={alternative} onChange={e => setAlternative(e.target.value)}><option value="">Choose an alternative</option>{ingredient.alternatives.map(a => <option key={a}>{a}</option>)}</select></Label> : null}
       <Label title="Link to my inventory product"><select className={control} value={itemId} onChange={e => setItemId(e.target.value)}><option value="">Keep current link</option>{inventory.data?.items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}</select></Label>
       {ingredient.generalPriceId && !itemId ? <>
@@ -124,9 +125,9 @@ export function RecipeMeasurementEditor({ ingredient, recipeId, ...session }: Se
         <Label title="Catalog contents unit"><select className={control} value={packageUnit} onChange={e => setPackageUnit(e.target.value)}>{['g', 'kg', 'ml', 'l', 'each'].map(u => <option key={u}>{u}</option>)}</select></Label>
         <label><input type="checkbox" checked={saveProduct} onChange={e => setSaveProduct(e.target.checked)} /> Save contents for this product in my shop</label>
       </> : null}
-      <p>Optional confirmed conversion: how many target units equal one source unit.</p>
+      <p>Optional confirmed conversion. For spoons and cups, the selected convention first converts the recipe amount to mL. Enter the ingredient's weight per mL when costing against grams.</p>
       <div className="flex gap-2"><Label title="From"><select className={control} value={from} onChange={e => setFrom(e.target.value)}>{['ml', 'g', 'each'].map(u => <option key={u}>{u}</option>)}</select></Label><Label title="To"><select className={control} value={to} onChange={e => setTo(e.target.value)}>{['g', 'ml', 'each'].map(u => <option key={u}>{u}</option>)}</select></Label></div>
-      <Amount title="Confirmed conversion factor" value={factor} onChange={setFactor} />
+      <Amount title={from === 'ml' && to === 'g' ? 'Confirmed grams per mL' : 'Confirmed target units per source unit'} value={factor} onChange={setFactor} />
       <Label title="Save conversion for"><select className={control} value={scope} onChange={e => setScope(e.target.value)}><option value="recipe">This recipe line</option><option value="ingredient">This ingredient in my shop</option><option value="product">This inventory product</option></select></Label>
       {action.error ? <InlineNotice tone="error">{action.error}</InlineNotice> : null}
       <Button type="submit" loading={action.busy}>Save ingredient measurements</Button>
