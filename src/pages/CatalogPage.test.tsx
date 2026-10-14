@@ -78,7 +78,6 @@ function makeReceipt(status: ReceiptStatus, overrides: Partial<Receipt> = {}): R
     taxAmount: '3.20',
     currency: 'USD',
     status,
-    rawExtraction: null,
     errorMessage: null,
     processedAt: null,
     createdAt: '2026-02-10T09:00:00.000Z',

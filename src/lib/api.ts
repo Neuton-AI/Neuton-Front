@@ -134,7 +134,6 @@ export type Receipt = {
   taxAmount: string | null;
   currency: string | null;
   status: ReceiptStatus;
-  rawExtraction: unknown;
   errorMessage: string | null;
   processedAt: string | null;
   createdAt: string;
@@ -150,7 +149,7 @@ export type ReceiptItem = {
   quantity: string | null;
   unitPrice: string | null;
   totalPrice: string | null;
-  unit: string | null;
+  srcUnit: string | null;
   confidence: string | null;
   createdAt: string;
 };
