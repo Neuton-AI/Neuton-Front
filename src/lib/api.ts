@@ -124,7 +124,7 @@ export type Receipt = {
   id: string;
   shopId: string;
   uploadedBy: string | null;
-  storagePath: string;
+  storagePath: string | null;
   contentType: string | null;
   originalFilename: string | null;
   merchantName: string | null;
@@ -150,6 +150,10 @@ export type ReceiptItem = {
   unitPrice: string | null;
   totalPrice: string | null;
   srcUnit: string | null;
+  rawSrcUnit: string | null;
+  srcUnitAmount: string | null;
+  baseUnit: string | null;
+  baseUnitAmount: string | null;
   confidence: string | null;
   createdAt: string;
 };
