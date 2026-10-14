@@ -150,7 +150,7 @@ export type ReceiptItem = {
   quantity: string | null;
   unitPrice: string | null;
   totalPrice: string | null;
-  unit: string | null;
+  srcUnit: string | null;
   confidence: string | null;
   createdAt: string;
 };

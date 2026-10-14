@@ -89,7 +89,7 @@ function makeReceiptDetail(status: ReceiptStatus): ReceiptDetail {
         quantity: '2',
         unitPrice: '1.50',
         totalPrice: '3.00',
-        unit: 'kg',
+        srcUnit: 'kg',
         confidence: '0.92',
         createdAt: '2026-02-10T09:00:00.000Z',
       },
