@@ -85,6 +85,7 @@ function makeReceiptDetail(status: ReceiptStatus): ReceiptDetail {
         receiptId: 'rc-1',
         inventoryItemId: status === 'verified' ? 'inv-1' : null,
         rawName: 'Flour',
+        rawSku: null,
         quantity: '2',
         unitPrice: '1.50',
         totalPrice: '3.00',
@@ -105,7 +106,7 @@ function mockApi() {
   const current = { status: 'unverified' as ReceiptStatus };
 
   api.apiFetch.mockImplementation(async (path: string) => {
-    if (path.startsWith('/catalog/receipt/')) {
+    if (path.startsWith('/receipts/') && path.endsWith('/verify')) {
       current.status = 'verified';
       return { receiptId: 'rc-1', status: 'verified', accepted: 1, rejected: 0 };
     }
@@ -170,7 +171,7 @@ describe('ReceiptDetailPage verification', () => {
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
-        '/catalog/receipt/rc-1/verify',
+        '/receipts/rc-1/verify',
         expect.objectContaining({
           method: 'POST',
           shopId: 'shop-1',
@@ -210,7 +211,7 @@ describe('ReceiptDetailPage verification', () => {
   it('keeps the button in place and explains a failed verify', async () => {
     const user = userEvent.setup();
     api.apiFetch.mockImplementation(async (path: string) => {
-      if (path.startsWith('/catalog/receipt/')) {
+      if (path.startsWith('/receipts/') && path.endsWith('/verify')) {
         throw new Error('Receipt is already verified');
       }
       return { receipt: makeReceiptDetail('unverified') };

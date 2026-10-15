@@ -96,7 +96,7 @@ function mockApi() {
   const current = { status: 'processing' as OrderStatus };
 
   api.apiFetch.mockImplementation(async (path: string) => {
-    if (path.endsWith('/status')) {
+    if (path.endsWith('/verify')) {
       current.status = 'delivered';
       // Like the real PATCH response, the transition carries the order row
       // without its items — the sheet must keep rendering the lines it has.
@@ -167,11 +167,10 @@ describe('OrderDetailPage delivery', () => {
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
-        '/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status',
+        '/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/verify',
         expect.objectContaining({
-          method: 'PATCH',
+          method: 'POST',
           shopId: 'shop-1',
-          body: { status: 'delivered' },
         }),
       ),
     );
@@ -186,7 +185,7 @@ describe('OrderDetailPage delivery', () => {
   it('keeps the button in place and explains a failed transition', async () => {
     const user = userEvent.setup();
     api.apiFetch.mockImplementation(async (path: string) => {
-      if (path.endsWith('/status')) {
+      if (path.endsWith('/verify')) {
         throw new Error('Order is already delivered');
       }
       return { order: makeOrderDetail('processing') };

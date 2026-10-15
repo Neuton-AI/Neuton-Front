@@ -162,12 +162,12 @@ export type ReceiptItem = {
 /** GET /receipts/:id nests the extracted lines under the receipt. */
 export type ReceiptDetail = Receipt & { items: ReceiptItem[] };
 
-/** Body of POST /catalog/receipt/:id/verify: one verdict per extracted line. */
+/** Body of POST /receipts/:id/verify: one verdict per extracted line. */
 export type VerifyReceiptBody = {
   items: { id: string; accepted: boolean }[];
 };
 
-/** Response of POST /catalog/receipt/:id/verify. */
+/** Response of POST /receipts/:id/verify. */
 export type VerifyReceiptOutcome = {
   receiptId: string;
   status: 'verified';
@@ -249,7 +249,7 @@ export type Recipe = {
 /**
  * The order lifecycle as the shop sees it: every order starts as
  * `processing` and moves to `delivered` only after explicit human
- * verification via PATCH /orders/:id/status. `cancelled` is what
+ * verification via POST /orders/:id/verify. `cancelled` is what
  * DELETE /orders/:id writes instead of removing the row — invoicing
  * needs the issued number to stay assigned as a visible void — and
  * it is terminal. Matches the backend ORDER_STATUSES enum in

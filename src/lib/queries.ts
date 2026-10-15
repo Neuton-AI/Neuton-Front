@@ -313,11 +313,10 @@ export function useMarkOrderDelivered(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }) =>
-      apiFetch<{ order: OrderDetail }>(`/orders/${id}/status`, {
-        method: 'PATCH',
+      apiFetch<{ order: OrderDetail }>(`/orders/${id}/verify`, {
+        method: 'POST',
         token,
         shopId,
-        body: { status: 'delivered' },
       }),
     onSuccess: (data, { id }) => {
       const key = queryKeys.order(shopId, id);
@@ -355,7 +354,7 @@ export function useVerifyRecipe(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }) =>
-      apiFetch<{ recipe: Recipe }>(`/catalog/recipe/${id}/verify`, {
+      apiFetch<{ recipe: Recipe }>(`/recipes/${id}/verify`, {
         method: 'POST',
         token,
         shopId,
@@ -403,7 +402,7 @@ export function useVerifyReceipt(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }) =>
-      apiFetch<VerifyReceiptOutcome>(`/catalog/receipt/${id}/verify`, {
+      apiFetch<VerifyReceiptOutcome>(`/receipts/${id}/verify`, {
         method: 'POST',
         token,
         shopId,

@@ -9,7 +9,7 @@ import { renderWithRouter } from '../test/render';
  * An extracted recipe also rests at `unverified`, and while it sits there it is
  * invisible to GET /recipes/orderable - no order can contain it. These tests
  * pin that the detail sheet offers the publish step to owner/admin, sends a
- * valid body to the unified verify endpoint, and drops the action afterwards.
+ * valid body to the recipe verify endpoint, and drops the action afterwards.
  */
 
 const api = vi.hoisted(() => ({ apiFetch: vi.fn() }));
@@ -105,7 +105,7 @@ function mockApi() {
   const current = { status: 'unverified' as RecipeStatus };
 
   api.apiFetch.mockImplementation(async (path: string) => {
-    if (path.startsWith('/catalog/recipe/')) {
+    if (path.startsWith('/recipes/') && path.endsWith('/verify')) {
       current.status = 'verified';
       return { recipe: makeRecipe('verified') };
     }
@@ -177,7 +177,7 @@ describe('RecipeDetailPage verification', () => {
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
-        '/catalog/recipe/rp-1/verify',
+        '/recipes/rp-1/verify',
         expect.objectContaining({
           method: 'POST',
           shopId: 'shop-1',
@@ -194,7 +194,7 @@ describe('RecipeDetailPage verification', () => {
   it('keeps the button in place and explains a failed verify', async () => {
     const user = userEvent.setup();
     api.apiFetch.mockImplementation(async (path: string) => {
-      if (path.startsWith('/catalog/recipe/')) {
+      if (path.startsWith('/recipes/') && path.endsWith('/verify')) {
         throw new Error('Recipe is already verified');
       }
       return { recipe: makeRecipe('unverified') };
