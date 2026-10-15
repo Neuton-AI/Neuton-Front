@@ -146,6 +146,7 @@ export type ReceiptItem = {
   receiptId: string;
   inventoryItemId: string | null;
   rawName: string;
+  rawSku: string | null;
   quantity: string | null;
   unitPrice: string | null;
   totalPrice: string | null;
