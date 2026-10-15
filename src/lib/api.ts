@@ -183,6 +183,9 @@ export type InventoryItem = {
   sku: string | null;
   imageUrl: string | null;
   unit: string;
+  baseUnit: string;
+  baseUnitAmount: string;
+  baseUnitCost: string;
   currentQuantity: string;
   reorderLevel: string | null;
   lastUnitCost: string | null;
