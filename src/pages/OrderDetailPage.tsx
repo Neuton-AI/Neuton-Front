@@ -42,7 +42,7 @@ export function OrderDetailPage() {
     void orderQuery.refetch();
   };
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = order?.currency ?? shop?.currency ?? 'USD';
   const close = useSheetClose('/orders');
   const justSaved = (location.state as { fresh?: boolean } | null)?.fresh === true;
 
@@ -79,9 +79,9 @@ export function OrderDetailPage() {
   };
 
   const marginPercent =
-    order && toNumber(order.totalAmount) > 0
+    order && order.netProfit !== null && toNumber(order.totalAmount) > 0
       ? (order.netProfit / toNumber(order.totalAmount)) * 100
-      : 0;
+      : null;
   const baseFee = toNumber(shop?.deliveryBaseFee);
 
   return (
@@ -133,7 +133,7 @@ export function OrderDetailPage() {
                   Profit margin
                 </p>
                 <p className="font-display text-card-value text-ink-on-dark">
-                  {marginPercent.toFixed(0)}%
+                  {marginPercent === null ? '—' : `${marginPercent.toFixed(0)}%`}
                 </p>
                 <p className="text-label font-medium text-ink-on-dark-soft">
                   Profit {formatMoney(order.netProfit, currency)}
@@ -194,7 +194,7 @@ export function OrderDetailPage() {
             <SheetSection title="Cost">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-label text-ink-muted">Production cost</span>
-                <span className="text-body text-ink">{formatMoney(order.totalCost, currency)}</span>
+                <span className="text-body text-ink">{order.totalCost === null ? 'Incomplete — profit unknown' : formatMoney(order.totalCost, currency)}</span>
               </div>
             </SheetSection>
 

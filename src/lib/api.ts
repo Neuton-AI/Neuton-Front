@@ -140,7 +140,21 @@ export type Receipt = {
   updatedAt: string;
 };
 
+export type MeasurementState = 'ready' | 'estimated' | 'unresolved';
+
 export type ReceiptItem = {
+  rawSku?: string | null;
+  codeChain?: string | null;
+  packageQuantity?: string | null;
+  packageUnit?: string | null;
+  packagesPerPurchase?: string | null;
+  normalizedQuantity?: string | null;
+  normalizedUnit?: string | null;
+  normalizedRate?: string | null;
+  measurementStatus?: MeasurementState;
+  measurementReason?: string | null;
+  applicationStatus?: string;
+  reviewStatus?: string;
   id: string;
   shopId: string;
   receiptId: string;
@@ -164,7 +178,9 @@ export type ReceiptDetail = Receipt & { items: ReceiptItem[] };
 
 /** Body of POST /receipts/:id/verify: one verdict per extracted line. */
 export type VerifyReceiptBody = {
-  items: { id: string; accepted: boolean }[];
+  items: { id: string; accepted: boolean; rawName?: string; rawSku?: string; codeChain?: 'shufersal' | 'carrefour'; quantity?: number; unit?: string;
+    unitPrice?: number; totalPrice?: number; packageQuantity?: number; packageUnit?: 'g' | 'kg' | 'ml' | 'l' | 'each'; packagesPerPurchase?: number;
+    discountConfirmed?: boolean; saveProductMeasurement?: boolean }[];
 };
 
 /** Response of POST /receipts/:id/verify. */
@@ -176,6 +192,7 @@ export type VerifyReceiptOutcome = {
 };
 
 export type InventoryItem = {
+  measurementStatus?: string;
   id: string;
   shopId: string;
   categoryId: string | null;
@@ -198,12 +215,24 @@ export type InventoryItem = {
 
 /** One recipe line as costed against live inventory. */
 export type RecipeIngredient = {
+  id?: string;
+  measurementState?: MeasurementState;
+  measurementReason?: string | null;
+  normalizedQuantity?: number | null;
+  normalizedUnit?: string | null;
+  priceBasis?: string;
+  explanation?: string | null;
+  provenance?: string[];
+  alternateMeasurements?: { quantity: number | null; unit: string | null }[];
+  convention?: 'us' | 'metric' | 'imperial' | null;
+  alternatives?: string[];
+  selectedAlternative?: string | null;
   name: string;
-  quantity: number;
-  unit: string;
-  averageUnitCost: number;
-  lineCost: number;
-  currentQuantity: number;
+  quantity: number | null;
+  unit: string | null;
+  averageUnitCost: number | null;
+  lineCost: number | null;
+  currentQuantity: number | string | null;
   /** Inventory or supermarket price ID determines linking; never infer it from cost. */
   inventoryItemId?: string | null;
   generalPriceId?: string | null;
@@ -213,12 +242,18 @@ export type RecipeIngredient = {
 
 /** Live cost breakdown computed from stock; never stored. */
 export type RecipeCosting = {
+  currency?: string;
+  complete?: boolean;
+  measurementState?: MeasurementState;
+  costableCount?: number;
+  knownSubtotal?: number;
+  reasons?: string[];
   ingredientsCost: number;
   laborCost: number;
-  batchCost: number;
-  unitCost: number;
-  yieldQuantity: number;
-  retailPrice: number;
+  batchCost: number | null;
+  unitCost: number | null;
+  yieldQuantity: number | null;
+  retailPrice: number | null;
   /** Backend field is `appliedMarginPercent`. */
   appliedProfitMargin: number;
   /** False when any ingredient is short for a single batch. */
@@ -237,7 +272,7 @@ export type Recipe = {
   imageUrl: string | null;
   categoryId: string | null;
   prepTimeMinutes: number;
-  yieldQuantity: string;
+  yieldQuantity: string | null;
   yieldUnit: string;
   targetMarginPct: string | null;
   allergens: string[] | null;
@@ -262,16 +297,20 @@ export type OrderStatus = 'processing' | 'delivered' | 'cancelled';
 
 /** One sellable recipe as returned by GET /recipes/orderable. */
 export type OrderableRecipe = {
+  currency?: string;
+  costingStatus?: MeasurementState;
   id: string;
   name: string;
   imageUrl: string | null;
-  yieldQuantity: string;
+  yieldQuantity: string | null;
   yieldUnit: string;
-  unitCost: number;
-  retailPrice: number;
+  unitCost: number | null;
+  retailPrice: number | null;
 };
 
 export type Order = {
+  currency?: string | null;
+  costingStatus?: string;
   id: string;
   /**
    * Per-shop sequential invoice number, issued by the server at creation:
@@ -287,11 +326,11 @@ export type Order = {
   deliveryDistanceKm: string;
   deliveryFee: string;
   appliedProfitMargin: string | null;
-  totalCost: string;
+  totalCost: string | null;
   totalAmount: string;
   documentUrl: string | null;
   status: OrderStatus;
-  netProfit: number;
+  netProfit: number | null;
   createdAt: string;
 };
 
@@ -300,7 +339,7 @@ export type OrderItem = {
   orderId: string;
   recipeId: string;
   quantity: string;
-  unitCost: string;
+  unitCost: string | null;
   unitPrice: string;
 };
 
@@ -310,7 +349,7 @@ export type OrderDetailItem = {
   recipeId: string;
   name: string;
   quantity: string;
-  unitCost: string;
+  unitCost: string | null;
   unitPrice: string;
 };
 
@@ -318,25 +357,28 @@ export type OrderDetail = Order & { items: OrderDetailItem[] };
 
 /** Live price line from POST /orders/quote. */
 export type OrderQuoteItem = {
+  costingStatus?: MeasurementState;
+  reasons?: string[];
   recipeId: string;
   name: string;
   quantity: number;
-  unitCost: number;
-  unitPrice: number;
+  unitCost: number | null;
+  unitPrice: number | null;
   appliedProfitMargin: number;
-  retailPrice: number;
+  retailPrice: number | null;
 };
 
 export type OrderQuote = {
+  currency?: string;
   items: OrderQuoteItem[];
   deliveryDistanceKm: number;
   baseFee: number;
   ratePerKm: number;
-  totalCost: number;
-  totalAmount: number;
+  totalCost: number | null;
+  totalAmount: number | null;
   deliveryFee: number;
-  netProfit: number;
-  profitMarginPercent: number;
+  netProfit: number | null;
+  profitMarginPercent: number | null;
 };
 
 export type Shop = {
@@ -368,26 +410,30 @@ export type DashboardSummary = {
   range: { from: string; to: string };
   summary: {
     revenue: number;
-    expenses: number;
+    expenses: number | null;
+    knownExpenses?: number;
+    incompleteExpenseCount?: number;
     deliveryFees: number;
-    productionCost: number;
-    netProfit: number;
+    productionCost: number | null;
+    knownProductionCost?: number;
+    incompleteOrderCount?: number;
+    netProfit: number | null;
     orderCount: number;
-    profitMarginPercent: number;
+    profitMarginPercent: number | null;
   };
   trend: {
     revenuePercent: number;
-    profitPercent: number;
-    expensesPercent: number;
+    profitPercent: number | null;
+    expensesPercent: number | null;
   };
-  graph: { date: string; revenue: number; expenses: number; netProfit: number }[];
+  graph: { date: string; revenue: number; expenses: number; netProfit: number | null }[];
   topItem: {
     recipeId: string;
     name: string;
     imageUrl: string | null;
     unitsSold: number;
     revenue: number;
-    netProfit: number;
+    netProfit: number | null;
   } | null;
   orderProfitability: {
     average: number;

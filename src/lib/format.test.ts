@@ -50,8 +50,9 @@ describe('formatMoney', () => {
     expect(formatMoney('12.5', 'USD', { compact: true })).toBe('$13');
   });
 
-  it('renders a missing amount as zero, not NaN', () => {
-    expect(formatMoney(null)).toBe('$0.00');
+  it('renders missing money as unknown, distinct from known zero', () => {
+    expect(formatMoney(null)).toBe('—');
+    expect(formatMoney(0)).toBe('$0.00');
   });
 });
 

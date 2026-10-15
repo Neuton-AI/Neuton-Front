@@ -131,6 +131,18 @@ function renderDetail() {
 }
 
 describe('RecipeDetailPage verification', () => {
+  it('keeps a fully matched recipe incomplete when its price basis is unresolved', async () => {
+    const recipe = makeRecipe('verified');
+    Object.assign(recipe.costing, { complete: false, linkedCount: 1, totalCount: 1, costableCount: 0, unitCost: null, retailPrice: null });
+    Object.assign(recipe.costing.ingredients[0]!, { generalPriceId: 'offer', measurementState: 'unresolved', lineCost: null, explanation: 'suspect_package_size' });
+    api.apiFetch.mockResolvedValue({ recipe });
+    renderDetail();
+    expect(await screen.findByText(/1 of 1 ingredients linked; 0 costable/)).toBeInTheDocument();
+    expect(screen.getByText('Cost unknown', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('suspect package size')).toBeInTheDocument();
+    expect(screen.getByText(/Known ingredient subtotal/)).toBeInTheDocument();
+  });
+
   it('recognizes a supermarket price link when the server omits linked counters and flags', async () => {
     const recipe = makeRecipe('unverified');
     recipe.costing.ingredients[0]!.inventoryItemId = null;

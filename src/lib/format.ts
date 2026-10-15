@@ -12,6 +12,7 @@ export function formatMoney(
   currency = 'USD',
   options: { compact?: boolean } = {},
 ): string {
+  if (value === null || value === undefined) return '—';
   const amount = toNumber(value);
   try {
     return new Intl.NumberFormat('en-US', {
@@ -30,12 +31,14 @@ export function formatQuantity(
   value: string | number | null | undefined,
   unit?: string | null,
 ): string {
+  if (value === null || value === undefined) return '—';
   const amount = toNumber(value);
   const trimmed = Number.isInteger(amount) ? String(amount) : amount.toFixed(3).replace(/0+$/, '');
   return unit ? `${trimmed} ${unit}` : trimmed;
 }
 
 export function formatPercent(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
   const amount = toNumber(value);
   return `${amount > 0 ? '+' : ''}${amount.toFixed(1)}%`;
 }

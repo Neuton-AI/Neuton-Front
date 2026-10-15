@@ -126,6 +126,19 @@ function renderDetail() {
 }
 
 describe('OrderDetailPage delivery', () => {
+  it('keeps an incomplete production cost and profit margin unknown', async () => {
+    const order = makeOrderDetail('processing');
+    order.totalCost = null;
+    order.netProfit = null;
+    api.apiFetch.mockResolvedValue({ order });
+    renderDetail();
+
+    expect(await screen.findByText('Incomplete — profit unknown')).toBeInTheDocument();
+    expect(screen.getByText('Profit —')).toBeInTheDocument();
+    expect(screen.queryByText('0%')).toBeNull();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
   it('shows the status badge in the header', async () => {
     mockApi();
     renderDetail();

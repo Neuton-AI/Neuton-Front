@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { DashboardPeriod, DashboardSummary } from './api';
 
-export type ChartPoint = { date: string; netProfit: number };
+export type ChartPoint = { date: string; netProfit: number | null };
 
 /**
  * The backend returns one point per day that has orders. The chart wants an
@@ -34,9 +34,11 @@ export function bucketSeries(graph: ChartPoint[], period: DashboardPeriod): Char
 
   const step = BUCKET[period];
   const totals = new Map<string, number>();
+  const unresolved = new Set<string>();
 
   for (const point of graph) {
     const key = bucketKey(point.date, step);
+    if (point.netProfit == null) unresolved.add(key);
     totals.set(key, (totals.get(key) ?? 0) + Number(point.netProfit ?? 0));
   }
 
@@ -46,7 +48,7 @@ export function bucketSeries(graph: ChartPoint[], period: DashboardPeriod): Char
 
   return keys.map((key) => ({
     date: key,
-    netProfit: round2(totals.get(key) ?? 0),
+    netProfit: unresolved.has(key) ? null : round2(totals.get(key) ?? 0),
   }));
 }
 
