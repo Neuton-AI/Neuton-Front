@@ -180,6 +180,7 @@ export type InventoryItem = {
   shopId: string;
   categoryId: string | null;
   name: string;
+  rawMaterialName: string;
   sku: string | null;
   imageUrl: string | null;
   unit: string;
