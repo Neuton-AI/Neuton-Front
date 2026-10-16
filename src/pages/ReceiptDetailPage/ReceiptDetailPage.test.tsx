@@ -21,7 +21,9 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   apiFetch: api.apiFetch,
 }));
 
-const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'admin' | 'member' }));
+const state = vi.hoisted(() => ({
+  role: 'owner' as 'owner' | 'admin' | 'member',
+}));
 
 vi.mock('@/features/auth/supabase', async () => {
   const { buildShop } = await import('@/test/factories/shops.factory');
@@ -60,7 +62,12 @@ function mockApi() {
   api.apiFetch.mockImplementation(async (path: string) => {
     if (path.startsWith('/receipts/') && path.endsWith('/verify')) {
       current.status = 'verified';
-      return { receiptId: 'rc-1', status: 'verified', accepted: 1, rejected: 0 };
+      return {
+        receiptId: 'rc-1',
+        status: 'verified',
+        accepted: 1,
+        rejected: 0,
+      };
     }
     if (path.startsWith('/uploads/')) {
       return { url: 'https://cdn.test/rc-1.png', expiresIn: 60 };
@@ -92,7 +99,7 @@ describe('ReceiptDetailPage verification', () => {
     mockApi();
     renderDetail();
 
-    expect(await screen.findByRole('button', { name: 'Verify receipt' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Verify Receipt' })).toBeInTheDocument();
     expect(screen.getByText(/not been added to inventory/i)).toBeInTheDocument();
   });
 
@@ -102,7 +109,7 @@ describe('ReceiptDetailPage verification', () => {
     renderDetail();
 
     await screen.findByText('Verified');
-    expect(screen.queryByRole('button', { name: 'Verify receipt' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verify Receipt' })).toBeNull();
     expect(screen.queryByText(/not been added to inventory/i)).toBeNull();
   });
 
@@ -111,8 +118,8 @@ describe('ReceiptDetailPage verification', () => {
     mockApi();
     renderDetail();
 
-    await screen.findByText('Needs review');
-    expect(screen.queryByRole('button', { name: 'Verify receipt' })).toBeNull();
+    await screen.findByText('Unverified');
+    expect(screen.queryByRole('button', { name: 'Verify Receipt' })).toBeNull();
   });
 
   it('sends every extracted line as accepted and flips the sheet to verified', async () => {
@@ -120,7 +127,7 @@ describe('ReceiptDetailPage verification', () => {
     mockApi();
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Verify receipt' }));
+    await user.click(await screen.findByRole('button', { name: 'Verify Receipt' }));
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
@@ -135,7 +142,7 @@ describe('ReceiptDetailPage verification', () => {
     // The sheet hands straight over to the verified state: badge swapped, the
     // action gone, so the receipt cannot be posted twice.
     expect(await screen.findByText('Verified')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Verify receipt' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verify Receipt' })).toBeNull();
   });
 
   it('renders a dash, not $0.00, for a line whose total could not be read', async () => {
@@ -171,77 +178,66 @@ describe('ReceiptDetailPage verification', () => {
     });
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Verify receipt' }));
+    await user.click(await screen.findByRole('button', { name: 'Verify Receipt' }));
 
     expect(await screen.findByText('Receipt is already verified')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verify receipt' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Verify Receipt' })).toBeEnabled();
   });
 });
 
-describe('ReceiptDetailPage delete', () => {
-  it('enables delete on an unverified receipt', async () => {
+describe('ReceiptDetailPage visual-only actions', () => {
+  it('renders edit and line delete as disabled on an unverified receipt', async () => {
+    const user = userEvent.setup();
     mockApi();
     renderDetail();
-
-    expect(await screen.findByRole('button', { name: 'Delete receipt' })).toBeEnabled();
+    const edit = await screen.findByRole('button', { name: 'Edit Receipt' });
+    const removeLine = screen.getByRole('button', { name: 'Delete Flour' });
+    expect(edit).toBeDisabled();
+    expect(removeLine).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Delete Receipt' })).toBeNull();
+    await user.click(edit);
+    await user.click(removeLine);
+    expect(
+      api.apiFetch.mock.calls.some(
+        ([, init]) => init?.method === 'DELETE' || init?.method === 'PATCH',
+      ),
+    ).toBe(false);
+    expect(screen.getByText('Flour')).toBeInTheDocument();
   });
 
-  it('disables delete on a verified receipt and explains why', async () => {
+  it('renders edit and receipt delete as disabled on a verified receipt', async () => {
+    const user = userEvent.setup();
     const current = mockApi();
     current.status = 'verified';
     renderDetail();
-
-    const button = await screen.findByRole('button', { name: 'Delete receipt' });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/already moved stock and count as spend/i)).toBeInTheDocument();
+    const edit = await screen.findByRole('button', { name: 'Edit Receipt' });
+    const remove = screen.getByRole('button', { name: 'Delete Receipt' });
+    expect(edit).toBeDisabled();
+    expect(remove).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Delete Flour' })).toBeNull();
+    await user.click(edit);
+    await user.click(remove);
+    expect(
+      api.apiFetch.mock.calls.some(
+        ([, init]) => init?.method === 'DELETE' || init?.method === 'PATCH',
+      ),
+    ).toBe(false);
   });
 
-  it('hides the delete action from members, who would only get a 403', async () => {
+  it('keeps management actions hidden from members', async () => {
     state.role = 'member';
     mockApi();
     renderDetail();
-
     await screen.findByText('Corner Market');
-    expect(screen.queryByRole('button', { name: 'Delete receipt' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Edit|Delete|Verify/ })).toBeNull();
   });
 
-  it('calls DELETE /receipts/:id after confirmation', async () => {
-    const user = userEvent.setup();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    mockApi();
-    renderDetail();
-
-    await user.click(await screen.findByRole('button', { name: 'Delete receipt' }));
-
-    await waitFor(() =>
-      expect(api.apiFetch).toHaveBeenCalledWith(
-        '/receipts/rc-1',
-        expect.objectContaining({ method: 'DELETE', shopId: 'shop-1' }),
-      ),
-    );
-    expect(await screen.findByRole('heading', { name: 'Catalog destination' })).toBeInTheDocument();
-    confirm.mockRestore();
-  });
-
-  it('explains a failed delete inline (e.g. a 409 race with verify)', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    api.apiFetch.mockImplementation(async (path: string, init?: { method?: string }) => {
-      if (path.startsWith('/uploads/')) {
-        return { url: 'https://cdn.test/rc-1.png', expiresIn: 60 };
-      }
-      if (init?.method === 'DELETE') {
-        throw new Error(
-          'A verified receipt already moved stock and counted as spend; it cannot be deleted',
-        );
-      }
-      return { receipt: makeReceiptDetail('unverified') };
+  it('disables verification when there are no extracted lines', async () => {
+    api.apiFetch.mockResolvedValue({
+      receipt: buildReceiptDetail({ items: [], storagePath: null }),
     });
     renderDetail();
-
-    await user.click(await screen.findByRole('button', { name: 'Delete receipt' }));
-
-    expect(await screen.findByText(/already moved stock/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete receipt' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Verify Receipt' })).toBeDisabled();
+    expect(screen.getByText('No line items were extracted.')).toBeInTheDocument();
   });
 });

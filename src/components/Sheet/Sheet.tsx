@@ -5,10 +5,12 @@ type Props = {
   onClose: () => void;
   /** Accessible name for the dialog. */
   label: string;
+  /** Fill the available height for detail views with a bottom action bar. */
+  fillHeight?: boolean;
   children: ReactNode;
 };
 
-export function Sheet({ open, onClose, label, children }: Props) {
+export function Sheet({ open, onClose, label, children, fillHeight = false }: Props) {
   const { sheetRef } = useSheet({ open, onClose, label, children });
   if (!open) return null;
   return (
@@ -24,7 +26,7 @@ export function Sheet({ open, onClose, label, children }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="relative flex max-h-[88dvh] w-full max-w-shell flex-col rounded-t-[20px] bg-surface-canvas pb-[max(var(--safe-bottom),20px)] pt-2 shadow-[0_-12px_40px_rgba(24,23,21,0.28)] animate-[sheet-in_260ms_cubic-bezier(0.32,0.72,0,1)]"
+        className={`relative flex w-full max-w-shell flex-col bg-surface-canvas pb-[max(var(--safe-bottom),20px)] pt-2 shadow-[0_-12px_40px_rgba(24,23,21,0.28)] animate-[sheet-in_260ms_cubic-bezier(0.32,0.72,0,1)] ${fillHeight ? 'h-[calc(100dvh-56px)] rounded-t-2xl' : 'max-h-[88dvh] rounded-t-[20px]'}`}
       >
         <div className="flex justify-center pb-1" aria-hidden="true">
           <span className="h-1 w-10 rounded-full bg-hairline" />
