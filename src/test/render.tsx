@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
+import { render, renderHook, type RenderOptions, type RenderResult } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { MemoryRouter, type MemoryRouterProps } from 'react-router-dom';
 
@@ -27,11 +27,19 @@ export function renderWithRouter(
   {
     route = '/',
     queryClient,
+    initialEntries,
+    initialIndex,
     ...options
-  }: { route?: string; queryClient?: QueryClient } & RenderOptions = {},
+  }: {
+    route?: string;
+    queryClient?: QueryClient;
+    initialEntries?: string[];
+    initialIndex?: number;
+  } & RenderOptions = {},
 ): RenderResult {
   const routerProps: MemoryRouterProps = {
-    initialEntries: [route],
+    initialEntries: initialEntries ?? [route],
+    initialIndex,
     future: { v7_startTransition: true, v7_relativeSplatPath: true },
   };
   const client = queryClient ?? createTestQueryClient();
@@ -42,6 +50,27 @@ export function renderWithRouter(
   );
 
   return render(ui, { wrapper: Wrapper, ...options });
+}
+
+export function renderHookWithProviders<T, P>(
+  hook: (props: P) => T,
+  {
+    route = '/',
+    queryClient = createTestQueryClient(),
+    initialProps,
+  }: { route?: string; queryClient?: QueryClient; initialProps?: P } = {},
+) {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter
+        initialEntries={[route]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        {children}
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+  return { ...renderHook(hook, { wrapper, initialProps }), queryClient };
 }
 
 /** A `File` with the given type, for upload-path tests. */

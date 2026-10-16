@@ -1,8 +1,8 @@
+import { Button, ButtonLink, Field, Input, Select, Textarea } from '@/components/ui';
+import { renderWithRouter } from '@/test/render';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { renderWithRouter } from '../test/render';
-import { Button, ButtonLink, Field, Input, Select, Textarea } from './ui';
 
 describe('Button', () => {
   it('defaults to type="button" so it never submits a form by accident', () => {

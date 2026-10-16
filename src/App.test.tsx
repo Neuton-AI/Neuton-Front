@@ -1,8 +1,8 @@
+import { renderWithRouter } from '@/test/render';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderWithRouter } from './test/render';
 
 /**
  * App is the routing table plus two guards. These tests mount it for real but
@@ -24,8 +24,8 @@ const supabaseAuth = vi.hoisted(() => ({
   signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
 }));
 
-vi.mock('./lib/supabase', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./lib/supabase')>()),
+vi.mock('@/features/auth/supabase', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/auth/supabase')>()),
   // A fake client so AuthPage renders its real form regardless of whether the
   // developer's machine happens to have a .env with Supabase keys.
   supabase: { auth: supabaseAuth },
@@ -42,18 +42,26 @@ vi.mock('./lib/supabase', async (importOriginal) => ({
  * Stubs a lazy page module with a single identifiable heading. `vi.mock` only
  * hoists literal specifiers, so these are written out rather than looped.
  */
-vi.mock('./pages/DashboardPage', () => ({ DashboardPage: () => <h1>Dashboard</h1> }));
-vi.mock('./pages/CatalogPage', () => ({ CatalogPage: () => <h1>Catalog</h1> }));
-vi.mock('./pages/OrdersPage', () => ({ OrdersPage: () => <h1>Orders</h1> }));
-vi.mock('./pages/NewOrderPage', () => ({ NewOrderPage: () => <h1>New order</h1> }));
-vi.mock('./pages/NotFoundPage', () => ({ NotFoundPage: () => <h1>Page not found</h1> }));
-vi.mock('./pages/OrderDetailPage', () => ({ OrderDetailPage: () => <h1>Order detail</h1> }));
-vi.mock('./pages/ProfilePage', () => ({ ProfilePage: () => <h1>Profile</h1> }));
-vi.mock('./pages/CapturePage', () => ({ CapturePage: () => <h1>Capture</h1> }));
-vi.mock('./pages/RecipeDetailPage', () => ({ RecipeDetailPage: () => <h1>Recipe detail</h1> }));
-vi.mock('./pages/ReceiptDetailPage', () => ({ ReceiptDetailPage: () => <h1>Receipt detail</h1> }));
+vi.mock('@/pages/DashboardPage/DashboardPage', () => ({ DashboardPage: () => <h1>Dashboard</h1> }));
+vi.mock('@/pages/CatalogPage/CatalogPage', () => ({ CatalogPage: () => <h1>Catalog</h1> }));
+vi.mock('@/pages/OrdersPage/OrdersPage', () => ({ OrdersPage: () => <h1>Orders</h1> }));
+vi.mock('@/pages/NewOrderPage/NewOrderPage', () => ({ NewOrderPage: () => <h1>New order</h1> }));
+vi.mock('@/pages/NotFoundPage/NotFoundPage', () => ({
+  NotFoundPage: () => <h1>Page not found</h1>,
+}));
+vi.mock('@/pages/OrderDetailPage/OrderDetailPage', () => ({
+  OrderDetailPage: () => <h1>Order detail</h1>,
+}));
+vi.mock('@/pages/ProfilePage/ProfilePage', () => ({ ProfilePage: () => <h1>Profile</h1> }));
+vi.mock('@/pages/CapturePage/CapturePage', () => ({ CapturePage: () => <h1>Capture</h1> }));
+vi.mock('@/pages/RecipeDetailPage/RecipeDetailPage', () => ({
+  RecipeDetailPage: () => <h1>Recipe detail</h1>,
+}));
+vi.mock('@/pages/ReceiptDetailPage/ReceiptDetailPage', () => ({
+  ReceiptDetailPage: () => <h1>Receipt detail</h1>,
+}));
 
-const { App } = await import('./App');
+const { App } = await import('@/App');
 
 const WhereAmI = () => {
   const { pathname, search } = useLocation();
@@ -114,7 +122,7 @@ describe('RequireAuth', () => {
     renderApp('/signin');
 
     // No bounce back to the dashboard, and no second redirect.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await screen.findByRole('heading', { name: 'Welcome back' });
     expect(screen.getByTestId('where')).toHaveTextContent('/signin');
   });
 });

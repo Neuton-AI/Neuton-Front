@@ -1,7 +1,7 @@
+import { EmptyState, ErrorState, InlineNotice, Skeleton, Spinner } from '@/components/feedback';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyState, ErrorState, InlineNotice, Skeleton, Spinner } from './feedback';
 
 /**
  * These primitives are where the Front states what a screen currently is

@@ -1,39 +1,43 @@
+import { FullPageLoader } from '@/components/feedback';
+import { useAuth } from '@/features/auth/supabase';
+import { AuthPage } from '@/pages/AuthPage/AuthPage';
+import { LandingPage } from '@/pages/LandingPage/LandingPage';
 import { Suspense, lazy, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { FullPageLoader } from './components/feedback';
-import { AuthPage } from './pages/AuthPage';
-import { LandingPage } from './pages/LandingPage';
-import { useAuth } from './lib/supabase';
 
 const CapturePage = lazy(() =>
-  import('./pages/CapturePage').then((m) => ({ default: m.CapturePage })),
+  import('@/pages/CapturePage/CapturePage').then((m) => ({ default: m.CapturePage })),
 );
 const CatalogPage = lazy(() =>
-  import('./pages/CatalogPage').then((m) => ({ default: m.CatalogPage })),
+  import('@/pages/CatalogPage/CatalogPage').then((m) => ({ default: m.CatalogPage })),
 );
 const DashboardPage = lazy(() =>
-  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+  import('@/pages/DashboardPage/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 );
 const NewOrderPage = lazy(() =>
-  import('./pages/NewOrderPage').then((m) => ({ default: m.NewOrderPage })),
+  import('@/pages/NewOrderPage/NewOrderPage').then((m) => ({ default: m.NewOrderPage })),
 );
 const NotFoundPage = lazy(() =>
-  import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })),
+  import('@/pages/NotFoundPage/NotFoundPage').then((m) => ({ default: m.NotFoundPage })),
 );
 const OrderDetailPage = lazy(() =>
-  import('./pages/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage })),
+  import('@/pages/OrderDetailPage/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage })),
 );
 const OrdersPage = lazy(() =>
-  import('./pages/OrdersPage').then((m) => ({ default: m.OrdersPage })),
+  import('@/pages/OrdersPage/OrdersPage').then((m) => ({ default: m.OrdersPage })),
 );
 const ProfilePage = lazy(() =>
-  import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
+  import('@/pages/ProfilePage/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 );
 const ReceiptDetailPage = lazy(() =>
-  import('./pages/ReceiptDetailPage').then((m) => ({ default: m.ReceiptDetailPage })),
+  import('@/pages/ReceiptDetailPage/ReceiptDetailPage').then((m) => ({
+    default: m.ReceiptDetailPage,
+  })),
 );
 const RecipeDetailPage = lazy(() =>
-  import('./pages/RecipeDetailPage').then((m) => ({ default: m.RecipeDetailPage })),
+  import('@/pages/RecipeDetailPage/RecipeDetailPage').then((m) => ({
+    default: m.RecipeDetailPage,
+  })),
 );
 
 export function App() {

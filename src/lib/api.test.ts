@@ -36,7 +36,7 @@ afterEach(() => {
 async function loadApi(env: Record<string, string> = {}) {
   vi.stubEnv('VITE_API_BASE_URL', env.VITE_API_BASE_URL ?? 'https://api.test');
   vi.resetModules();
-  return import('./api');
+  return import('@/lib/api');
 }
 
 describe('base URL', () => {
@@ -61,7 +61,7 @@ describe('base URL', () => {
   it('falls back to the local API when the env var is absent', async () => {
     vi.stubEnv('VITE_API_BASE_URL', '');
     vi.resetModules();
-    const { apiFetch } = await import('./api');
+    const { apiFetch } = await import('@/lib/api');
     const fetchMock = mockFetch(json({}));
 
     await apiFetch('/recipes');
@@ -136,7 +136,12 @@ describe('apiFetch', () => {
       const { apiFetch } = await loadApi();
       mockFetch(
         json(
-          { statusCode: 401, code: 'UNAUTHORIZED', error: 'Unauthorized', message: 'Missing bearer token' },
+          {
+            statusCode: 401,
+            code: 'UNAUTHORIZED',
+            error: 'Unauthorized',
+            message: 'Missing bearer token',
+          },
           401,
         ),
       );
@@ -212,7 +217,7 @@ describe('apiFetch', () => {
 
 describe('ALLOWED_CONTENT_TYPES', () => {
   it('mirrors the backend upload allowlist', async () => {
-    const { ALLOWED_CONTENT_TYPES } = await loadApi();
+    const { ALLOWED_CONTENT_TYPES } = await import('@/features/uploads/types');
 
     expect([...ALLOWED_CONTENT_TYPES]).toEqual([
       'image/jpeg',
