@@ -26,7 +26,7 @@ Model types are exported from their modules; views receive the values, flags and
 | T4: duplicate fixtures/providers | Shared shop/recipe/receipt/order/analytics factories and one provider implementation for views/hooks. Common inline shop fixtures in five existing page suites now use the shared builder. One-off scenario fixtures remain local. |
 | T5: ineffective history assertion | Sheet uses a two-entry test router and proves arrival at the previous route; global history is restored after every test. |
 | T6: timing, selectors, destinations | Removed arbitrary sleep, made timer cleanup failure-safe, replaced conditional keyboard traversal with explicit focus expectations, changed invalid-value loops to parameterized cases, replaced paragraph-count assertions with visible content, used recipe status accessible labels, and asserted recipe/receipt deletion destinations. SVG geometry assertions are retained intentionally: they protect the financial-chart bucket/flat-line regression and complement independent numerical-series tests. |
-| Configuration | Lint enforces the main dependency boundaries. Coverage runs in CI and is uploaded as an artifact, with no numerical target replacing behavioral assertions. |
+| Configuration | Lint enforces the main dependency boundaries. The existing CI lint/typecheck/test/build checks are retained. The optional coverage-upload workflow change was omitted because the available GitHub token lacks workflow scope; the complete local coverage results are published in the PR. No numerical target replaces behavioral assertions. |
 
 ## Behavior corrections
 
@@ -40,7 +40,7 @@ The extraction also closes the camera's late-permission cleanup leak, rejects di
 
 Validation: lint passed with zero errors/warnings; typecheck passed; **47 files / 306 tests passed** through the full V8 coverage run; production build passed (728 modules). The original 214 regression tests remain protected; numerical/chart geometry cases are retained rather than weakened. Total line/statement coverage is **93.99%**, branch coverage **86.52%**, and function coverage **84.36%**, compared with audit line coverage 71.48%. No unmatched-route or React act warnings occurred. Node 24.14.0 was used locally; CI remains on Node 22.
 
-Hosted Chrome DevTools screenshots are linked in the PR from immutable evidence commit `96d9415492ac048e116d8722654d61543499f5dd`. Screenshots are kept on an evidence-only branch, outside application source. CI uploads text/HTML/JSON coverage output as an artifact.
+Hosted Chrome DevTools screenshots are linked in the PR from immutable evidence commit `96d9415492ac048e116d8722654d61543499f5dd`. Screenshots are kept on an evidence-only branch, outside application source. The local coverage run generates text/HTML/JSON reports. CI retains its existing ordinary test run.
 
 Material remaining gaps include the external Supabase subscription/error lifecycle, some multi-shop and catalog inventory presentation branches, signed-scan PDF/error presentation, and several defensive mutation branches. The migration keeps the existing SDK/RLS and backend extraction contracts; HTTP interception does not establish third-party availability or OCR correctness.
 
