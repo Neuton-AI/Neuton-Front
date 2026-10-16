@@ -85,6 +85,7 @@ function makeReceiptDetail(status: ReceiptStatus): ReceiptDetail {
         receiptId: 'rc-1',
         inventoryItemId: status === 'verified' ? 'inv-1' : null,
         rawName: 'Flour',
+        rawMaterialName: 'Wheat flour',
         rawSku: null,
         quantity: '2',
         unitPrice: '1.50',
