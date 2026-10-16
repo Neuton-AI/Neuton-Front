@@ -1,5 +1,5 @@
+import { ApiError } from '@/lib/api';
 import { QueryClient } from '@tanstack/react-query';
-import { ApiError } from './api';
 
 /**
  * Shared cache policy for every server read/write in the app.

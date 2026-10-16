@@ -7,7 +7,18 @@
  */
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { transferableAbortController } from 'node:util';
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
+import { server } from './mocks/server';
+
+// Node's native Request rejects jsdom AbortSignals. Use the matching native
+// controller for real fetch/MSW tests without changing browser production code.
+globalThis.AbortController = transferableAbortController().constructor as typeof AbortController;
+globalThis.AbortSignal = transferableAbortController().signal.constructor as typeof AbortSignal;
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 afterEach(() => {
   cleanup();
@@ -28,3 +39,13 @@ window.scrollTo = () => {};
 if (!('idx' in (window.history.state ?? {}))) {
   window.history.replaceState({ idx: 0 }, '');
 }
+
+let previousHistory: { state: unknown; url: string };
+beforeEach(() => {
+  previousHistory = { state: window.history.state, url: window.location.href };
+});
+afterEach(() => {
+  window.history.replaceState(previousHistory.state, '', previousHistory.url);
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});

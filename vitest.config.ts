@@ -19,7 +19,7 @@ export default mergeConfig(
       include: ['src/**/*.test.{ts,tsx}'],
       coverage: {
         provider: 'v8',
-        reporter: ['text', 'html'],
+        reporter: ['text', 'html', 'json-summary'],
         reportsDirectory: './coverage',
         include: ['src/**/*.{ts,tsx}'],
         exclude: [

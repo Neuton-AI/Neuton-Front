@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
 import {
   formatDate,
   formatMoney,
@@ -7,7 +6,8 @@ import {
   formatWeekday,
   relativeTime,
   toNumber,
-} from './format';
+} from '@/lib/format';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('toNumber', () => {
   it('parses the decimal strings Postgres returns for money columns', () => {
@@ -16,12 +16,12 @@ describe('toNumber', () => {
     expect(toNumber(7)).toBe(7);
   });
 
-  it('collapses every unusable value to 0 rather than rendering NaN', () => {
-    // A blank revenue figure must read as $0.00, not "$NaN".
-    for (const value of [null, undefined, '', 'not-a-number', Number.NaN, Infinity]) {
-      expect(toNumber(value as string | number | null | undefined)).toBe(0);
-    }
-  });
+  it.each([null, undefined, '', 'not-a-number', Number.NaN, Infinity])(
+    'renders unusable value %s as zero',
+    (value) => {
+      expect(toNumber(value)).toBe(0);
+    },
+  );
 });
 
 describe('formatMoney', () => {
@@ -126,3 +126,5 @@ describe('relativeTime', () => {
     expect(relativeTime('garbage')).toBe('—');
   });
 });
+
+afterEach(() => vi.useRealTimers());

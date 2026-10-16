@@ -1,0 +1,21 @@
+export type InventoryItem = {
+  id: string;
+  shopId: string;
+  categoryId: string | null;
+  name: string;
+  rawMaterialName: string;
+  sku: string | null;
+  imageUrl: string | null;
+  unit: string;
+  baseUnit: string;
+  baseUnitAmount: string;
+  baseUnitCost: string;
+  currentQuantity: string;
+  reorderLevel: string | null;
+  lastUnitCost: string | null;
+  averageUnitCost: string | null;
+  isActive: boolean;
+  isLowStock: boolean;
+  createdAt: string;
+  updatedAt: string;
+};

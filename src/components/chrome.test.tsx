@@ -1,12 +1,13 @@
+import { BottomNav } from '@/components/BottomNav/BottomNav';
+import { Fab } from '@/components/Fab/Fab';
+import { useFabNavigation } from '@/components/Fab/Fab.module';
+import { PageHeader } from '@/components/PageHeader/PageHeader';
+import { StatCard } from '@/components/StatCard/StatCard';
+import { renderWithRouter } from '@/test/render';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { renderWithRouter } from '../test/render';
-import { BottomNav } from './BottomNav';
-import { Fab, useFabNavigation } from './Fab';
-import { PageHeader } from './PageHeader';
-import { StatCard } from './StatCard';
 
 /**
  * These are the persistent navigation chrome. The promises worth protecting
@@ -206,10 +207,14 @@ describe('StatCard', () => {
   });
 
   it('renders the sub line only when given one', () => {
-    const withSub = renderWithRouter(<StatCard label="Revenue" value="£0" sub="+12% vs last week" />);
+    const withSub = renderWithRouter(
+      <StatCard label="Revenue" value="£0" sub="+12% vs last week" />,
+    );
     expect(withSub.container.textContent).toContain('+12% vs last week');
 
-    const withoutSub = renderWithRouter(<StatCard label="Revenue" value="£0" />);
-    expect(withoutSub.container.querySelectorAll('p')).toHaveLength(2);
+    withSub.unmount();
+    renderWithRouter(<StatCard label="Revenue" value="£0" />);
+    expect(screen.getByText('£0')).toBeInTheDocument();
+    expect(screen.queryByText('+12% vs last week')).toBeNull();
   });
 });

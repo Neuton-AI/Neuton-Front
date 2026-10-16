@@ -1,6 +1,12 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import { Spinner } from '@/components/feedback';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react';
 import { Link } from 'react-router-dom';
-import { Spinner } from './feedback';
 
 /* -------------------------------------------------------------------------- */
 /* Button                                                                      */
@@ -15,7 +21,8 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   secondary: 'bg-surface-dark text-ink-on-dark',
   ghost: 'bg-surface-cream-strong text-ink',
   danger: 'border border-semantic-error/40 bg-semantic-error/10 text-ink',
-  outline: 'border border-hairline bg-surface-canvas text-ink hover:bg-surface-soft hover:border-ink/20',
+  outline:
+    'border border-hairline bg-surface-canvas text-ink hover:bg-surface-soft hover:border-ink/20',
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
@@ -104,14 +111,16 @@ export function Field({
   htmlFor,
   hint,
   children,
+  className = '',
 }: {
   label: string;
   htmlFor: string;
   hint?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={`flex flex-col gap-1.5 ${className}`}>
       <label htmlFor={htmlFor} className="text-label font-medium text-ink-muted">
         {label}
       </label>
@@ -127,12 +136,7 @@ export function Input({
   className = '',
   ...rest
 }: InputHTMLAttributes<HTMLInputElement> & { dense?: boolean }) {
-  return (
-    <input
-      className={`${CONTROL} ${dense ? 'h-10' : 'h-11'} ${className}`}
-      {...rest}
-    />
-  );
+  return <input className={`${CONTROL} ${dense ? 'h-10' : 'h-11'} ${className}`} {...rest} />;
 }
 
 export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {

@@ -7,8 +7,8 @@ import tseslint from 'typescript-eslint';
 /**
  * Lint is deliberately narrow: `tsc --noEmit` already owns type correctness,
  * so ESLint here exists to catch the class of defect that typechecking cannot
- * see — a `<p>` wired to an onClick, a missing hook dependency, an unused
- * capture. That is the same class as most of the Front defect backlog.
+ * see — a missing hook dependency, an unused capture, or a view importing
+ * routing or business orchestration. Accessible interactions are tested by role.
  */
 export default tseslint.config(
   { ignores: ['dist', 'coverage', 'node_modules'] },
@@ -34,6 +34,28 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       eqeqeq: ['error', 'smart'],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    files: ['src/pages/**/*.tsx', 'src/components/{Fab,Sheet,ConfirmDialog}/**/*.tsx'],
+    ignores: ['**/*.test.tsx'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          { name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: 'Put lifecycle behavior in the companion module.' },
+          { name: 'react-router-dom', importNames: ['useNavigate', 'useLocation', 'useParams', 'useSearchParams'], message: 'Parse routes and navigate in the companion module.' },
+          { name: '@tanstack/react-query', message: 'Consume server state through the companion module.' },
+          { name: '@/lib/api', message: 'Call transport from a domain feature, then compose it in the companion module.' },
+        ],
+        patterns: [{ group: ['@/features/**/*Api', '@/features/auth/supabase', '@/features/uploads/upload'], allowTypeImports: true, message: 'Views receive behavior from their companion modules.' }],
+      }],
+    },
+  },
+  {
+    files: ['src/features/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.*'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['@/pages/**', '**/pages/**'], message: 'Features must not depend on route pages.' }] }],
     },
   },
   {
