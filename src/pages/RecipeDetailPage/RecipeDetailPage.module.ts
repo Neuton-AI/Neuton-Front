@@ -81,10 +81,7 @@ export function useRecipeDetailPage() {
     }
   };
 
-  const steps = (recipe?.instructions ?? '')
-    .split(/\r?\n+|(?:\d+[.)]\s+)/)
-    .map((step) => step.replace(/^\s*\d+[.)]\s*/, '').trim())
-    .filter(Boolean);
+  const steps = (recipe?.steps ?? []).map((step) => step.instruction);
 
   /**
    * Try-hard → fallback-soft lives server-side (DELETE /recipes/:id returns

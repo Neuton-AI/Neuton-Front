@@ -145,7 +145,7 @@ export function RecipeDetailPage() {
                             {isLinked ? null : <SheetBadge>Unlinked</SheetBadge>}
                           </span>
                           <span className="shrink-0 text-body text-ink-muted">
-                            {formatQuantity(ingredient.quantity, ingredient.unit)}
+                            {formatQuantity(ingredient.quantity, ingredient.rawSrcUnit)}
                           </span>
                         </li>
                       );
@@ -193,7 +193,7 @@ export function RecipeDetailPage() {
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-pill bg-brand-primary text-label font-medium text-ink-on-primary">
                         {index + 1}
                       </span>
-                      <span className="text-body text-ink-body">{step}</span>
+                      <span className="whitespace-pre-wrap text-body text-ink-body">{step}</span>
                     </li>
                   ))}
                 </ol>

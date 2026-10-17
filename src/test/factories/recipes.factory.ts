@@ -12,7 +12,7 @@ function makeRecipe(status: RecipeStatus): Recipe {
     yieldUnit: 'servings',
     targetMarginPct: '30',
     allergens: null,
-    instructions: 'Simmer the tomatoes.\nBlend until smooth.',
+    steps: [{ stepNumber: 1, instruction: 'Simmer the tomatoes.' }, { stepNumber: 2, instruction: 'Blend until smooth.' }],
     isActive: true,
     status,
     createdAt: '2026-02-10T09:00:00.000Z',
@@ -30,7 +30,7 @@ function makeRecipe(status: RecipeStatus): Recipe {
         {
           name: 'Tomatoes',
           quantity: 2,
-          unit: 'kg',
+          rawSrcUnit: 'kg',
           averageUnitCost: 1.5,
           lineCost: 3,
           currentQuantity: 8,
