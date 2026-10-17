@@ -193,7 +193,7 @@ describe('CatalogPage recipes tab incomplete cost', () => {
       yieldUnit: 'servings',
       targetMarginPct: null,
       allergens: null,
-      instructions: null,
+      steps: [],
       isActive: true,
       status: 'unverified',
       createdAt: '2026-02-10T09:00:00.000Z',
@@ -213,7 +213,7 @@ describe('CatalogPage recipes tab incomplete cost', () => {
           {
             name: 'Sugar',
             quantity: 100,
-            unit: 'g',
+            rawSrcUnit: 'g',
             averageUnitCost: 0.01,
             lineCost: 1,
             currentQuantity: 500,
@@ -224,7 +224,7 @@ describe('CatalogPage recipes tab incomplete cost', () => {
           {
             name: 'Beet sugar',
             quantity: 50,
-            unit: 'g',
+            rawSrcUnit: 'g',
             averageUnitCost: 0,
             lineCost: 0,
             currentQuantity: 0,

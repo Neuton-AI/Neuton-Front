@@ -14,7 +14,7 @@ vi.mock('react-router-dom', async (original) => ({
 }));
 beforeEach(resetAuth);
 it('derives preparation steps and linked ingredients outside the view', async () => {
-  const recipe = buildRecipe({ instructions: '1. Mix\n2. Bake' });
+  const recipe = buildRecipe({ steps: [{ stepNumber: 1, instruction: 'Mix' }, { stepNumber: 2, instruction: 'Bake' }] });
   recipe.costing.ingredients[0]!.generalPriceId = 'price-1';
   server.use(http.get(apiPath('/recipes/rp-1'), () => HttpResponse.json({ recipe })));
   const { result } = renderHookWithProviders(() => useRecipeDetailPage());

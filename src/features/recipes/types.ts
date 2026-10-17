@@ -3,7 +3,10 @@ export type RecipeStatus = 'pending' | 'processing' | 'unverified' | 'verified' 
 export type RecipeIngredient = {
   name: string;
   quantity: number;
-  unit: string;
+  rawSrcUnit: string;
+  rawMaterialName?: string;
+  baseUnit?: string | null;
+  baseUnitAmount?: string | null;
   averageUnitCost: number;
   lineCost: number;
   currentQuantity: number;
@@ -43,7 +46,7 @@ export type Recipe = {
   yieldUnit: string;
   targetMarginPct: string | null;
   allergens: string[] | null;
-  instructions: string | null;
+  steps: { stepNumber: number; instruction: string }[];
   isActive: boolean;
   status?: RecipeStatus;
   createdAt: string;
