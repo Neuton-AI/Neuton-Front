@@ -61,7 +61,7 @@ export function RecipeDetailPage() {
               <p className="text-body text-ink-muted">
                 {recipe.prepTimeMinutes} min prep · Serves{' '}
                 {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)} · Unit cost{' '}
-                {formatMoney(recipe.costing.unitCost, currency)}
+                {incomplete ? 'Incomplete' : formatMoney(recipe.costing.unitCost, currency)}
               </p>
             </div>
 
@@ -152,7 +152,7 @@ export function RecipeDetailPage() {
                     })}
                   </ul>
                   <p className="text-label font-medium text-ink-muted">
-                    Ingredients {formatMoney(recipe.costing.ingredientsCost, currency)} · Labor{' '}
+                    {incomplete ? 'Resolved ingredients' : 'Ingredients'} {formatMoney(recipe.costing.ingredientsCost, currency)} · Labor{' '}
                     {formatMoney(recipe.costing.laborCost, currency)}
                   </p>
                 </>

@@ -7,8 +7,8 @@ export type RecipeIngredient = {
   rawMaterialName?: string;
   baseUnit?: string | null;
   baseUnitAmount?: string | null;
-  averageUnitCost: number;
-  lineCost: number;
+  averageUnitCost: number | null;
+  lineCost: number | null;
   currentQuantity: number;
   /** Inventory or supermarket price ID determines linking; never infer it from cost. */
   inventoryItemId?: string | null;
@@ -18,12 +18,14 @@ export type RecipeIngredient = {
 };
 
 export type RecipeCosting = {
+  costComplete?: boolean;
+  unresolvedCount?: number;
   ingredientsCost: number;
   laborCost: number;
-  batchCost: number;
-  unitCost: number;
+  batchCost: number | null;
+  unitCost: number | null;
   yieldQuantity: number;
-  retailPrice: number;
+  retailPrice: number | null;
   /** Backend field is `appliedMarginPercent`. */
   appliedProfitMargin: number;
   /** False when any ingredient is short for a single batch. */
