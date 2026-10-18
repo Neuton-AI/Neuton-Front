@@ -213,3 +213,14 @@ describe('RecipeDetailPage delete', () => {
     expect(screen.getByRole('button', { name: 'Delete recipe' })).toBeEnabled();
   });
 });
+
+it('shows incomplete costs instead of formatting unresolved totals as zero', async () => {
+  const recipe = makeRecipe('verified');
+  Object.assign(recipe.costing, { costComplete: false, unitCost: null, batchCost: null, retailPrice: null, linkedCount: 0, totalCount: 1 });
+  Object.assign(recipe.costing.ingredients[0]!, { linked: false, lineCost: null, averageUnitCost: null });
+  api.apiFetch.mockResolvedValue({ recipe });
+  renderDetail();
+  expect(await screen.findByText(/Unit cost Incomplete/)).toBeInTheDocument();
+  expect(screen.getByText(/cost incomplete/)).toBeInTheDocument();
+  expect(screen.getByText(/Resolved ingredients/)).toBeInTheDocument();
+});

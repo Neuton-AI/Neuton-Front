@@ -167,7 +167,7 @@ export function CatalogPage() {
                           {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)}
                         </p>
                         <p className="shrink-0 text-label text-ink-muted">
-                          cost {formatMoney(recipe.costing.unitCost, currency)}
+                          cost {incomplete ? 'incomplete' : formatMoney(recipe.costing.unitCost, currency)}
                         </p>
                       </div>
                       {incomplete ? (
