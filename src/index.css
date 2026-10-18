@@ -37,6 +37,7 @@
 }
 
 @layer components {
+
   /* The phone-width column used on every screen. On desktop it stays centred
      and readable instead of stretching to the viewport. dvh keeps the shell
      filling the visible area when mobile browser chrome collapses. */
@@ -58,11 +59,13 @@
 }
 
 @layer utilities {
+
   /* Hides scrollbars on horizontal filter rails without losing scrollability. */
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -73,6 +76,7 @@
     transform: translateY(14px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -83,12 +87,30 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
 
+.recipe-cost-warning {
+  /* Match Verify's width; the arrow tip is the bottom-center anchor. */
+  transform-origin: 50% 100%;
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition:
+    transform 600ms ease-in,
+    opacity 180ms linear 420ms;
+}
+
+.recipe-cost-warning[data-exiting='true'] {
+  /* Close the 19px gap to the button's top edge. */
+  transform: translateY(19px) scale(0);
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -96,5 +118,13 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .recipe-cost-warning {
+    transition: opacity 600ms cubic-bezier(0.23, 1, 0.32, 1) !important;
+  }
+
+  .recipe-cost-warning[data-exiting='true'] {
+    transform: none;
   }
 }

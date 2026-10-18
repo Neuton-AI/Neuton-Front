@@ -2,7 +2,7 @@ import { useSheetClose } from '@/components/Sheet/Sheet.module';
 import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
 import { useDeleteRecipe, useRecipe, useVerifyRecipe } from '@/features/recipes/recipesApi';
 import { ingredientIsLinked, ingredientLinkSummary } from '@/features/recipes/selectors';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 export function useRecipeDetailPage() {
@@ -112,6 +112,22 @@ export function useRecipeDetailPage() {
   const { total, linked, incomplete } = recipe
     ? ingredientLinkSummary(recipe.costing)
     : { total: 0, linked: 0, incomplete: false };
+  const [costWarningDismissedFor, setCostWarningDismissedFor] = useState<string | null>(null);
+  const [costWarningExitingFor, setCostWarningExitingFor] = useState<string | null>(null);
+  const showCostWarning =
+    canVerify && recipe?.status === 'unverified' && incomplete && costWarningDismissedFor !== id;
+  const costWarningExiting = showCostWarning && costWarningExitingFor === id;
+
+  useEffect(() => {
+    if (!showCostWarning) return;
+    const exitTimeout = window.setTimeout(() => setCostWarningExitingFor(id), 2000);
+    const dismissTimeout = window.setTimeout(() => setCostWarningDismissedFor(id), 2600);
+    return () => {
+      window.clearTimeout(exitTimeout);
+      window.clearTimeout(dismissTimeout);
+    };
+  }, [id, showCostWarning]);
+
   const handleRetry = () => {
     void recipeQuery.refetch();
   };
@@ -132,6 +148,8 @@ export function useRecipeDetailPage() {
     total,
     linked,
     incomplete,
+    showCostWarning,
+    costWarningExiting,
     handleRetry,
     verifyPending,
     deletePending,

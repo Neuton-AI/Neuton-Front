@@ -1,7 +1,7 @@
 import type { Recipe, RecipeStatus } from '@/features/recipes/types';
 import { buildRecipe } from '@/test/factories/recipes.factory';
 import { renderWithRouter } from '@/test/render';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -84,6 +84,42 @@ function renderDetail() {
 }
 
 describe('RecipeDetailPage verification', () => {
+  it('holds the tooltip for two seconds, then keeps it mounted for its 600ms exit', async () => {
+    vi.useFakeTimers();
+    try {
+      mockApi();
+      renderDetail();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText('Danger: Incomplete cost')).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1999);
+      });
+      expect(screen.getByText('Danger: Incomplete cost')).toBeInTheDocument();
+      expect(screen.getByRole('note')).toHaveAttribute('data-exiting', 'false');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByRole('note')).toHaveAttribute('data-exiting', 'true');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(599);
+      });
+      expect(screen.getByText('Danger: Incomplete cost')).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.queryByText('Danger: Incomplete cost')).toBeNull();
+      expect(screen.getByText(/cost is incomplete/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verify Recipe' })).not.toHaveAttribute(
+        'aria-describedby',
+        expect.stringContaining('recipe-cost-warning'),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('recognizes a supermarket price link when the server omits linked counters and flags', async () => {
     const recipe = makeRecipe('unverified');
     recipe.costing.ingredients[0]!.inventoryItemId = null;
@@ -99,7 +135,7 @@ describe('RecipeDetailPage verification', () => {
     mockApi();
     renderDetail();
 
-    expect(await screen.findByRole('button', { name: 'Verify recipe' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Verify Recipe' })).toBeInTheDocument();
     expect(screen.getByText(/Verify it to publish the recipe for orders/i)).toBeInTheDocument();
   });
 
@@ -109,7 +145,7 @@ describe('RecipeDetailPage verification', () => {
     renderDetail();
 
     await screen.findByText('Verified');
-    expect(screen.queryByRole('button', { name: 'Verify recipe' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verify Recipe' })).toBeNull();
   });
 
   it('hides the verify action from members, who would only get a 403', async () => {
@@ -117,8 +153,8 @@ describe('RecipeDetailPage verification', () => {
     mockApi();
     renderDetail();
 
-    await screen.findByText('Needs review');
-    expect(screen.queryByRole('button', { name: 'Verify recipe' })).toBeNull();
+    await screen.findByText('Unverified');
+    expect(screen.queryByRole('button', { name: 'Verify Recipe' })).toBeNull();
   });
 
   it('calls the verify endpoint and flips the sheet to verified', async () => {
@@ -126,7 +162,7 @@ describe('RecipeDetailPage verification', () => {
     mockApi();
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Verify recipe' }));
+    await user.click(await screen.findByRole('button', { name: 'Verify Recipe' }));
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
@@ -141,7 +177,7 @@ describe('RecipeDetailPage verification', () => {
       ),
     );
     expect(await screen.findByText('Verified')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Verify recipe' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verify Recipe' })).toBeNull();
   });
 
   it('keeps the button in place and explains a failed verify', async () => {
@@ -154,21 +190,21 @@ describe('RecipeDetailPage verification', () => {
     });
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Verify recipe' }));
+    await user.click(await screen.findByRole('button', { name: 'Verify Recipe' }));
 
     expect(await screen.findByText('Recipe is already verified')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verify recipe' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Verify Recipe' })).toBeEnabled();
   });
 });
 
 describe('RecipeDetailPage delete', () => {
-  it('offers the delete action to owners on every status (no status gate)', async () => {
-    mockApi();
+  it('offers the delete action to owners on a verified recipe', async () => {
+    const current = mockApi();
+    current.status = 'verified';
     renderDetail();
-
     // Verified recipes are deletable too — the backend try-hard →
     // fallback-soft path decides hard vs soft, not the UI.
-    expect(await screen.findByRole('button', { name: 'Delete recipe' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Delete Recipe' })).toBeEnabled();
   });
 
   it('hides the delete action from members, who would only get a 403', async () => {
@@ -177,16 +213,17 @@ describe('RecipeDetailPage delete', () => {
     renderDetail();
 
     await screen.findByText('Tomato Soup');
-    expect(screen.queryByRole('button', { name: 'Delete recipe' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete Recipe' })).toBeNull();
   });
 
   it('calls DELETE /recipes/:id after confirmation', async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    mockApi();
+    const current = mockApi();
+    current.status = 'verified';
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Delete recipe' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete Recipe' }));
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
@@ -207,20 +244,84 @@ describe('RecipeDetailPage delete', () => {
     });
     renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Delete recipe' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete Recipe' }));
 
     expect(await screen.findByText('Could not delete the recipe.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete recipe' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Delete Recipe' })).toBeEnabled();
   });
 });
 
 it('shows incomplete costs instead of formatting unresolved totals as zero', async () => {
   const recipe = makeRecipe('verified');
-  Object.assign(recipe.costing, { costComplete: false, unitCost: null, batchCost: null, retailPrice: null, linkedCount: 0, totalCount: 1 });
-  Object.assign(recipe.costing.ingredients[0]!, { linked: false, lineCost: null, averageUnitCost: null });
+  Object.assign(recipe.costing, {
+    costComplete: false,
+    unitCost: null,
+    batchCost: null,
+    retailPrice: null,
+    linkedCount: 0,
+    totalCount: 1,
+  });
+  Object.assign(recipe.costing.ingredients[0]!, {
+    linked: false,
+    lineCost: null,
+    averageUnitCost: null,
+  });
   api.apiFetch.mockResolvedValue({ recipe });
   renderDetail();
   expect(await screen.findByText(/Unit cost Incomplete/)).toBeInTheDocument();
-  expect(screen.getByText(/cost incomplete/)).toBeInTheDocument();
-  expect(screen.getByText(/Resolved ingredients/)).toBeInTheDocument();
+  expect(screen.getByText(/cost is incomplete/)).toBeInTheDocument();
+  expect(screen.getByText(/Ingredients .*\(partial\)/)).toBeInTheDocument();
+});
+
+describe.each(['verified', 'unverified'] as const)('Recipe detail %s design', (status) => {
+  it.each([false, true])(
+    'shows the correct actions and link state (unlinked: %s)',
+    async (hasUnlinked) => {
+      const recipe = makeRecipe(status);
+      recipe.costing.ingredients = [
+        {
+          ...recipe.costing.ingredients[0]!,
+          name: 'Flour',
+          inventoryItemId: 'inv-1',
+          linked: true,
+        },
+        {
+          ...recipe.costing.ingredients[0]!,
+          name: 'Honey',
+          inventoryItemId: hasUnlinked ? null : 'inv-2',
+          linked: !hasUnlinked,
+        },
+      ];
+      recipe.costing.costComplete = !hasUnlinked;
+      api.apiFetch.mockResolvedValue({ recipe });
+      renderDetail();
+      expect(
+        await screen.findByText(status === 'verified' ? 'Verified' : 'Unverified'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Edit Recipe' })).toBeDisabled();
+      expect(
+        screen.getByRole('button', {
+          name: status === 'verified' ? 'Delete Recipe' : 'Verify Recipe',
+        }),
+      ).toBeEnabled();
+      expect(
+        screen.queryByRole('button', {
+          name: status === 'verified' ? 'Verify Recipe' : 'Delete Recipe',
+        }),
+      ).toBeNull();
+      if (hasUnlinked) {
+        expect(screen.getByText('1 of 2 not linked · cost is incomplete')).toBeInTheDocument();
+        expect(screen.getByText('Not Extracted · cost missing')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Link Honey' })).toBeDisabled();
+        expect(screen.getByTestId('unlinked-dot')).toHaveClass('bg-brand-primary-active');
+        expect(screen.getByText(/Unit cost/)).toHaveTextContent('(partial)');
+      } else {
+        expect(screen.queryByText(/cost is incomplete/)).toBeNull();
+        expect(screen.queryByRole('button', { name: /^Link / })).toBeNull();
+      }
+      expect(screen.queryByText('Danger: Incomplete cost') !== null).toBe(
+        status === 'unverified' && hasUnlinked,
+      );
+    },
+  );
 });
