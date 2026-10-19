@@ -1,7 +1,7 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { type OrderableRecipe } from '@/features/orders/types';
 import { recipesKeys } from '@/features/recipes/keys';
-import { type Recipe } from '@/features/recipes/types';
+import { type BarcodePrice, type BarcodePriceInput, type Recipe, type RecipeUpdate } from '@/features/recipes/types';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, Token } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
@@ -117,5 +117,30 @@ export function useDeleteRecipe(
       void queryClient.invalidateQueries({ queryKey: recipesKeys.orderableRecipes(shopId) });
       void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });
     },
+  });
+}
+
+export function useUpdateRecipe(token: Token, shopId: ShopId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: RecipeUpdate }) =>
+      apiFetch<{ recipe: Omit<Recipe, 'costing'> }>(`/recipes/${id}`, {
+        method: 'PATCH', token, shopId, body,
+      }),
+    onSuccess: (_data, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: recipesKeys.recipe(shopId, id) });
+      void queryClient.invalidateQueries({ queryKey: recipesKeys.recipes(shopId) });
+      void queryClient.invalidateQueries({ queryKey: recipesKeys.orderableRecipes(shopId) });
+      void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });
+    },
+  });
+}
+
+export function useBarcodePrice(token: Token, shopId: ShopId) {
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: BarcodePriceInput }) =>
+      apiFetch<{ price: BarcodePrice }>(`/recipes/${id}/barcode-price`, {
+        method: 'POST', token, shopId, body,
+      }),
   });
 }

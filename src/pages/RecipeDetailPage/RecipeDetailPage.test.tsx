@@ -78,12 +78,27 @@ function renderDetail() {
     <Routes>
       <Route path="/catalog" element={<h1>Catalog destination</h1>} />
       <Route path="/catalog/recipes/:id" element={<RecipeDetailPage />} />
+      <Route path="/catalog/recipes/:id/edit" element={<h1>Recipe editor destination</h1>} />
     </Routes>,
     { route: '/catalog/recipes/rp-1' },
   );
 }
 
 describe('RecipeDetailPage verification', () => {
+  it('opens the recipe editor from Edit Recipe', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    renderDetail();
+    await user.click(await screen.findByRole('button', { name: 'Edit Recipe' }));
+    expect(await screen.findByText('Recipe editor destination')).toBeInTheDocument();
+  });
+  it('opens the same editor from an unlinked ingredient Link action', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    renderDetail();
+    await user.click(await screen.findByRole('button', { name: 'Link Tomatoes' }));
+    expect(await screen.findByText('Recipe editor destination')).toBeInTheDocument();
+  });
   it('holds the tooltip for two seconds, then keeps it mounted for its 600ms exit', async () => {
     vi.useFakeTimers();
     try {
@@ -298,7 +313,7 @@ describe.each(['verified', 'unverified'] as const)('Recipe detail %s design', (s
       expect(
         await screen.findByText(status === 'verified' ? 'Verified' : 'Unverified'),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Edit Recipe' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Edit Recipe' })).toBeEnabled();
       expect(
         screen.getByRole('button', {
           name: status === 'verified' ? 'Delete Recipe' : 'Verify Recipe',
@@ -312,7 +327,7 @@ describe.each(['verified', 'unverified'] as const)('Recipe detail %s design', (s
       if (hasUnlinked) {
         expect(screen.getByText('1 of 2 not linked · cost is incomplete')).toBeInTheDocument();
         expect(screen.getByText('Not Extracted · cost missing')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Link Honey' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Link Honey' })).toBeEnabled();
         expect(screen.getByTestId('unlinked-dot')).toHaveClass('bg-brand-primary-active');
         expect(screen.getByText(/Unit cost/)).toHaveTextContent('(partial)');
       } else {

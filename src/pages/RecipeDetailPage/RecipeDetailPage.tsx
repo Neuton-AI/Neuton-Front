@@ -38,6 +38,7 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
     handleRetry,
     verifyPending,
     deletePending,
+    edit,
   } = model;
   const isUnverified = recipe?.status === 'unverified';
   const isReviewedState = isUnverified || recipe?.status === 'verified';
@@ -131,6 +132,7 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
               <RecipeIngredients
                 ingredients={recipe.costing.ingredients}
                 showLinkStatus={linked < total}
+                onLink={edit}
                 canManage={canVerify}
               />
               {recipe.costing.ingredients.length > 0 ? (
@@ -221,9 +223,8 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
             {isReviewedState ? (
               <button
                 type="button"
-                disabled
-                title="Recipe editing is coming soon"
-                className={`${actionClassName} cursor-not-allowed border border-hairline bg-surface-canvas text-ink`}
+                onClick={() => edit()}
+                className={`${actionClassName} border border-hairline bg-surface-canvas text-ink`}
               >
                 <IconEdit className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
                 Edit Recipe

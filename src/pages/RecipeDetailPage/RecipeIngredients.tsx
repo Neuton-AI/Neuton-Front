@@ -5,9 +5,10 @@ type Props = {
   ingredients: (RecipeIngredient & { isLinked: boolean })[];
   showLinkStatus: boolean;
   canManage: boolean;
+  onLink: (ingredient: number) => void;
 };
 
-export function RecipeIngredients({ ingredients, showLinkStatus, canManage }: Props) {
+export function RecipeIngredients({ ingredients, showLinkStatus, canManage, onLink }: Props) {
   if (ingredients.length === 0) {
     return <p className="text-[14px] leading-[155%] text-ink-muted">No ingredients linked yet.</p>;
   }
@@ -39,10 +40,9 @@ export function RecipeIngredients({ ingredients, showLinkStatus, canManage }: Pr
               {canManage ? (
                 <button
                   type="button"
-                  disabled
                   aria-label={`Link ${ingredient.name}`}
-                  title="Ingredient linking is coming soon"
-                  className="inline-flex h-8 shrink-0 cursor-not-allowed items-center gap-1.5 rounded-input border border-brand-primary-active pl-2.5 pr-3 font-semibold"
+                  onClick={() => onLink(index)}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-input border border-brand-primary-active pl-2.5 pr-3 font-semibold"
                 >
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path

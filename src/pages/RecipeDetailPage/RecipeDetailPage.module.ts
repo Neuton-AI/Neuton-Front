@@ -133,7 +133,12 @@ export function useRecipeDetailPage() {
   };
   const verifyPending = verifyMutation.isPending;
   const deletePending = deleteMutation.isPending;
+  const edit = (ingredient?: number) => {
+    if (!canVerify || !id) return;
+    navigate(`/catalog/recipes/${id}/edit${ingredient === undefined ? '' : `?ingredient=${ingredient}`}`);
+  };
   return {
+    edit,
     recipe,
     verifyError,
     deleteError,
