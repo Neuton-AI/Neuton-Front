@@ -138,7 +138,7 @@ it('supports keyboard tab navigation and excludes the inactive panel from focus 
   expect(preparationPanel.inert).toBe(true);
 });
 
-it('links an explicitly unresolved price without replacing original ingredient fields, then saves the draft', async () => {
+it('replaces an unresolved ingredient with the scanned product, preserving recipe amount and unit on save', async () => {
   const user = userEvent.setup();
   let barcodeBody: unknown;
   let savedBody: unknown;
@@ -149,8 +149,9 @@ it('links an explicitly unresolved price without replacing original ingredient f
         price: {
           id: 'price-1',
           rawName: 'Supermarket tomato pack',
+          rawMaterialName: 'supermarket tomato pack',
           quantity: 500,
-          rawSrcUnit: 'g',
+          rawSrcUnit: 'ml',
         },
       });
     }),
@@ -169,7 +170,7 @@ it('links an explicitly unresolved price without replacing original ingredient f
     quantity: 2,
     rawSrcUnit: 'kg',
   });
-  expect(screen.getByLabelText('Ingredient 1 name')).toHaveValue('Original tomatoes');
+  expect(screen.getByLabelText('Ingredient 1 name')).toHaveValue('Supermarket tomato pack');
   expect(screen.getByLabelText('Ingredient 1 amount')).toHaveValue(2);
   expect(screen.getByLabelText('Ingredient 1 unit')).toHaveValue('kg');
   expect(screen.queryByRole('button', { name: 'Scan barcode for ingredient 1' })).toBeNull();
@@ -178,8 +179,8 @@ it('links an explicitly unresolved price without replacing original ingredient f
   expect(savedBody).toMatchObject({
     ingredients: [
       {
-        rawName: 'Original tomatoes',
-        rawMaterialName: 'Tomato',
+        rawName: 'Supermarket tomato pack',
+        rawMaterialName: 'supermarket tomato pack',
         quantity: 2,
         rawSrcUnit: 'kg',
         inventoryItemId: null,

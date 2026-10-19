@@ -46,6 +46,7 @@ export type BarcodePriceInput = {
 export type BarcodePrice = {
   id: string;
   rawName: string;
+  rawMaterialName: string;
   rawSrcUnit: string;
   quantity: number;
   baseUnit: string;
