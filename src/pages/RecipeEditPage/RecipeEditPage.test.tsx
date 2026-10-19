@@ -8,7 +8,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RecipeEditPage } from './RecipeEditPage';
 
 vi.mock('@/features/auth/supabase', async () => (await import('@/test/auth')).authMock);
@@ -30,7 +30,31 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
   ),
 }));
 
-beforeEach(resetAuth);
+const originalScrollTo = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTo');
+const scrollTo = vi.fn(function (this: HTMLElement, options: ScrollToOptions) {
+  // jsdom supplies no layout or element scrolling. Tests that supply a viewport
+  // width get the browser's scroll event; other workflows need only a safe stub.
+  if (this.clientWidth === 0) return;
+  this.scrollLeft = options.left ?? this.scrollLeft;
+  fireEvent.scroll(this);
+});
+
+beforeEach(() => {
+  resetAuth();
+  scrollTo.mockClear();
+  Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+    configurable: true,
+    value: scrollTo,
+  });
+});
+
+afterEach(() => {
+  if (originalScrollTo) {
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', originalScrollTo);
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
+  }
+});
 
 function renderEditor() {
   const recipe = buildRecipe();
@@ -62,20 +86,56 @@ it('keeps one draft across swipes and tabs, resets edits, and focuses the reques
   await waitFor(() => expect(name).toHaveFocus());
   expect(name).toHaveValue('Original tomatoes');
   fireEvent.change(screen.getByLabelText('RECIPE NAME'), { target: { value: 'Changed recipe' } });
-  const panes = name.closest('fieldset')!;
-  fireEvent.touchStart(panes, { touches: [{ clientX: 300, clientY: 100 }] });
-  fireEvent.touchEnd(panes, { changedTouches: [{ clientX: 100, clientY: 104 }] });
-  expect(screen.getByRole('tab', { name: '2 of 2 · Preparation' })).toHaveAttribute(
+  const ingredientPanel = screen.getByRole('tabpanel', { name: 'Ingredients' });
+  const carousel = ingredientPanel.parentElement!;
+  Object.defineProperty(carousel, 'clientWidth', { configurable: true, value: 390 });
+  fireEvent.scroll(carousel, { target: { scrollLeft: 390 } });
+  expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveFocus();
   await user.click(screen.getByRole('button', { name: 'Gluten' }));
-  await user.click(screen.getByRole('tab', { name: '1 of 2 · Ingredients' }));
+  await user.click(screen.getByRole('tab', { name: 'Ingredients' }));
   expect(screen.getByLabelText('RECIPE NAME')).toHaveValue('Changed recipe');
   await user.click(screen.getByRole('button', { name: 'Reset' }));
   expect(screen.getByLabelText('RECIPE NAME')).toHaveValue('Tomato Soup');
-  await user.click(screen.getByRole('tab', { name: '2 of 2 · Preparation' }));
+  await user.click(screen.getByRole('tab', { name: 'Preparation' }));
   expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+it('supports keyboard tab navigation and excludes the inactive panel from focus and accessibility', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await screen.findByLabelText('Ingredient 1 name');
+  const ingredientsTab = screen.getByRole('tab', { name: 'Ingredients' });
+  const preparationTab = screen.getByRole('tab', { name: 'Preparation' });
+  const ingredientsPanel = document.getElementById(ingredientsTab.getAttribute('aria-controls')!)!;
+  const preparationPanel = document.getElementById(preparationTab.getAttribute('aria-controls')!)!;
+  expect(ingredientsPanel.inert).toBe(false);
+  expect(preparationPanel.inert).toBe(true);
+  expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull();
+  await user.click(ingredientsTab);
+
+  await user.keyboard('{ArrowRight}');
+  expect(preparationTab).toHaveFocus();
+  expect(preparationTab).toHaveAttribute('aria-selected', 'true');
+  expect(preparationTab).toHaveAttribute('tabindex', '0');
+  expect(ingredientsTab).toHaveAttribute('tabindex', '-1');
+  expect(ingredientsPanel.inert).toBe(true);
+  expect(preparationPanel.inert).toBe(false);
+  expect(screen.queryByRole('textbox', { name: 'Ingredient 1 name' })).toBeNull();
+  expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: 'instant' }));
+
+  await user.keyboard('{Home}');
+  expect(ingredientsTab).toHaveFocus();
+  expect(screen.getByRole('textbox', { name: 'Ingredient 1 name' })).toHaveValue('Original tomatoes');
+  await user.keyboard('{End}');
+  expect(preparationTab).toHaveFocus();
+  await user.keyboard('{ArrowLeft}');
+  expect(ingredientsTab).toHaveFocus();
+  expect(ingredientsPanel.inert).toBe(false);
+  expect(preparationPanel.inert).toBe(true);
 });
 
 it('links an explicitly unresolved price without replacing original ingredient fields, then saves the draft', async () => {
@@ -162,8 +222,10 @@ it('keeps an unsuccessful save in the editor and validates missing ingredients',
   await user.click(await screen.findByRole('button', { name: 'Save changes' }));
   expect(await screen.findByText('Save failed')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Remove ingredient 1' }));
+  await user.click(screen.getByRole('tab', { name: 'Preparation' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(screen.getByText(/at least one ingredient/)).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Ingredients' })).toHaveAttribute('aria-selected', 'true');
   expect(save).toHaveBeenCalledTimes(1);
 });
 
@@ -186,7 +248,7 @@ it('uses canonical shop settings for labor when membership shop fields are unava
   );
   renderEditor();
   fireEvent.change(await screen.findByLabelText('PREP TIME · MIN'), { target: { value: '30' } });
-  await user.click(screen.getByRole('tab', { name: '2 of 2 · Preparation' }));
+  await user.click(screen.getByRole('tab', { name: 'Preparation' }));
   await waitFor(() => expect(screen.getByLabelText('LABOR · AUTO')).toHaveValue('$9.00'));
 });
 

@@ -8,7 +8,7 @@ import {
 import { ingredientIsLinked } from '@/features/recipes/selectors';
 import type { Recipe, RecipeUpdate } from '@/features/recipes/types';
 import { useShopSettings } from '@/features/shops/shopsApi';
-import { useEffect, useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 type IngredientDraft = {
@@ -79,11 +79,28 @@ export function useRecipeEditPage() {
   const initialized = useRef('');
   const nextKey = useRef(0);
   const scanRequest = useRef(0);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
   const focusIngredient = params.get('ingredient');
   const focusedContext = useRef('');
   const busy = update.isPending || deletion.isPending;
+  const editorReady =
+    Boolean(draft && recipe && canManage) &&
+    !authLoading &&
+    !membershipsLoading &&
+    !query.isLoading;
   const detailPath = `/catalog/recipes/${id}`;
+
+  useEffect(() => {
+    carouselRef.current
+      ?.querySelectorAll<HTMLElement>('[role="tabpanel"]')
+      .forEach((panel, index) => {
+        // Keep offscreen form controls out of keyboard navigation as well as the accessibility tree.
+        if (index !== page && panel.contains(document.activeElement)) {
+          document.getElementById(`recipe-tab-${page}`)?.focus({ preventScroll: true });
+        }
+        panel.inert = index !== page;
+      });
+  }, [page, editorReady]);
 
   useEffect(() => {
     const context = `${activeShopId}:${id}`;
@@ -277,7 +294,7 @@ export function useRecipeEditPage() {
       setError(
         'Enter a recipe name, valid preparation time and servings, and at least one ingredient with a positive amount and unit.',
       );
-      setPage(0);
+      selectPage(0);
       return;
     }
     const body: RecipeUpdate = {
@@ -330,25 +347,40 @@ export function useRecipeEditPage() {
     setEditingPhoto(false);
   }
 
-  function onTouchStart(event: TouchEvent) {
-    const touch = event.touches[0];
-    touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  function selectPage(index: number, animate = true) {
+    const carousel = carouselRef.current;
+    if (!carousel?.clientWidth || !animate) setPage(index);
+    // CSS supplies smooth scrolling and the reduced-motion override; keyboard changes stay instant.
+    carousel?.scrollTo({
+      left: index * carousel.clientWidth,
+      behavior: animate ? 'auto' : 'instant',
+    });
   }
-  function onTouchEnd(event: TouchEvent) {
-    const start = touchStart.current;
-    const touch = event.changedTouches[0];
-    touchStart.current = null;
-    if (!start || !touch) return;
-    const dx = touch.clientX - start.x;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(touch.clientY - start.y) * 1.5)
-      setPage(dx < 0 ? 1 : 0);
+
+  function onCarouselScroll(event: UIEvent<HTMLDivElement>) {
+    const carousel = event.currentTarget;
+    if (carousel.clientWidth > 0) {
+      setPage(Math.max(0, Math.min(1, Math.round(carousel.scrollLeft / carousel.clientWidth))));
+    }
+  }
+
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let next: number;
+    if (event.key === 'ArrowRight') next = Math.min(index + 1, 1);
+    else if (event.key === 'ArrowLeft') next = Math.max(index - 1, 0);
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = 1;
+    else return;
+    event.preventDefault();
+    selectPage(next, false);
+    document.getElementById(`recipe-tab-${next}`)?.focus({ preventScroll: true });
   }
 
   return {
     draft,
     recipe,
     page,
-    setPage,
+    selectPage,
     error: error ?? (query.error instanceof Error ? query.error.message : null),
     loading: authLoading || membershipsLoading || query.isLoading,
     canManage,
@@ -369,8 +401,9 @@ export function useRecipeEditPage() {
     reset,
     close: () => navigate(detailPath),
     retry: () => void query.refetch(),
-    onTouchStart,
-    onTouchEnd,
+    carouselRef,
+    onCarouselScroll,
+    onTabKeyDown,
     isLinked: (ingredient: IngredientDraft) => ingredientIsLinked(ingredient),
     scanKey,
     scanError,
