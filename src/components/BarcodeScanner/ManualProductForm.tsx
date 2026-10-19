@@ -111,8 +111,8 @@ export function ManualProductForm({
         <div className="flex gap-3">
           <label className={`${labelClass} flex-1`}>
             PRICE
-            <div className="relative">
-              <span className="absolute left-3.5 top-3 text-sm tracking-normal">
+            <div className="flex h-11 items-center gap-1.5 rounded-lg border border-[#E6DFD8] px-3.5 focus-within:border-[#CC785C]">
+              <span className="shrink-0 text-sm tracking-normal">
                 {currencySymbol}
               </span>
               <input
@@ -126,7 +126,7 @@ export function ManualProductForm({
                 value={price}
                 onChange={(event) => setPrice(event.target.value)}
                 placeholder="4.50"
-                className={`${fieldClass} pl-10 tracking-normal`}
+                className="h-full w-0 min-w-0 flex-1 bg-transparent text-base tracking-normal text-[#141413] outline-none"
               />
             </div>
           </label>
@@ -153,10 +153,25 @@ export function ManualProductForm({
                 aria-expanded={open}
                 aria-controls="manual-package-units"
                 onClick={() => setOpen(!open)}
-                className="flex h-[34px] shrink-0 items-center gap-2 rounded-md border border-[#E6DFD8] bg-[#F5F0E8] px-2.5 text-[15px] tracking-normal text-[#141413]"
+                className={`flex h-[34px] shrink-0 items-center gap-2 rounded-md border bg-[#F5F0E8] pl-3 pr-2.5 text-[15px] font-medium tracking-normal text-[#141413] ${open ? 'border-[#CC785C]' : 'border-[#E6DFD8]'}`}
               >
                 {unit}
-                <span aria-hidden="true">⌄</span>
+                <svg
+                  aria-hidden="true"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  className={`shrink-0 ${open ? 'rotate-180' : ''}`}
+                >
+                  <path
+                    d="m6 9 6 6 6-6"
+                    fill="none"
+                    stroke="#6C6A64"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
             </div>
             {open ? (
