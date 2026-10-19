@@ -29,6 +29,7 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
     canVerify,
     verify,
     steps,
+    openEdit,
     remove,
     total,
     linked,
@@ -132,6 +133,7 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
                 ingredients={recipe.costing.ingredients}
                 showLinkStatus={linked < total}
                 canManage={canVerify}
+                onLink={openEdit}
               />
               {recipe.costing.ingredients.length > 0 ? (
                 <p className="text-label font-medium text-ink-muted">
@@ -221,9 +223,9 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
             {isReviewedState ? (
               <button
                 type="button"
-                disabled
-                title="Recipe editing is coming soon"
-                className={`${actionClassName} cursor-not-allowed border border-hairline bg-surface-canvas text-ink`}
+                disabled={!canVerify}
+                onClick={openEdit}
+                className={`${actionClassName} pressable border border-hairline bg-surface-canvas text-ink disabled:cursor-not-allowed disabled:opacity-45`}
               >
                 <IconEdit className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
                 Edit Recipe

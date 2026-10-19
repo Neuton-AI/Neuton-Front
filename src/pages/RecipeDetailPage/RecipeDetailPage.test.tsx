@@ -298,7 +298,7 @@ describe.each(['verified', 'unverified'] as const)('Recipe detail %s design', (s
       expect(
         await screen.findByText(status === 'verified' ? 'Verified' : 'Unverified'),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Edit Recipe' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Edit Recipe' })).toBeEnabled();
       expect(
         screen.getByRole('button', {
           name: status === 'verified' ? 'Delete Recipe' : 'Verify Recipe',
@@ -312,7 +312,7 @@ describe.each(['verified', 'unverified'] as const)('Recipe detail %s design', (s
       if (hasUnlinked) {
         expect(screen.getByText('1 of 2 not linked · cost is incomplete')).toBeInTheDocument();
         expect(screen.getByText('Not Extracted · cost missing')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Link Honey' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Link Honey' })).toBeEnabled();
         expect(screen.getByTestId('unlinked-dot')).toHaveClass('bg-brand-primary-active');
         expect(screen.getByText(/Unit cost/)).toHaveTextContent('(partial)');
       } else {

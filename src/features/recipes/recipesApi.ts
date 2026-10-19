@@ -1,7 +1,7 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { type OrderableRecipe } from '@/features/orders/types';
 import { recipesKeys } from '@/features/recipes/keys';
-import { type Recipe } from '@/features/recipes/types';
+import { type Recipe, type RecipeCosting } from '@/features/recipes/types';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, Token } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
@@ -95,6 +95,82 @@ export function useVerifyRecipe(
       void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({ queryKey: recipesKeys.recipes(shopId) });
       void queryClient.invalidateQueries({ queryKey: recipesKeys.orderableRecipes(shopId) });
+    },
+  });
+}
+
+/**
+ * Fields PATCHable by the edit screen. The server recomputes base-unit columns
+ * from `rawSrcUnit`/`quantity`, so `baseUnit`/`baseUnitAmount` must never
+ * travel here — the ingredients array is a full replace, minimum one row.
+ */
+export type UpdateRecipeFields = {
+  name?: string;
+  prepTimeMinutes?: number;
+  yieldQuantity?: number;
+  allergens?: string[];
+  steps?: { stepNumber: number; instruction: string }[];
+  ingredients?: {
+    inventoryItemId?: string | null;
+    generalPriceId?: string | null;
+    rawName: string;
+    rawMaterialName?: string;
+    quantity: number;
+    rawSrcUnit: string;
+  }[];
+};
+
+export function useUpdateRecipe(
+  token: Token,
+  shopId: ShopId,
+): UseMutationResult<{ recipe: Recipe }, Error, { id: string; fields: UpdateRecipeFields }> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }) =>
+      apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, {
+        method: 'PATCH',
+        token,
+        shopId,
+        body: fields,
+      }),
+    // The response is the recipe row without costing, so the merge keeps the
+    // costing the detail query already holds until the invalidation refetches.
+    onSuccess: (data, { id }) => {
+      const key = recipesKeys.recipe(shopId, id);
+      queryClient.setQueryData<{ recipe: Recipe }>(key, (old) =>
+        old ? { recipe: { ...old.recipe, ...data.recipe } } : old,
+      );
+      void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({ queryKey: recipesKeys.recipes(shopId) });
+    },
+  });
+}
+
+export function useLinkIngredient(
+  token: Token,
+  shopId: ShopId,
+  recipeId: string,
+  ingredientId: string,
+): UseMutationResult<{ costing: RecipeCosting }, Error, { barcode: string }> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // Keyed per ingredient so the edit screen can show exactly which row's
+    // camera button is mid-link (useMutationState filters on this prefix).
+    mutationKey: ['linkIngredient', recipeId, ingredientId],
+    mutationFn: ({ barcode }) =>
+      apiFetch<{ costing: RecipeCosting }>(
+        `/recipes/${recipeId}/ingredients/${ingredientId}/link`,
+        { method: 'POST', token, shopId, body: { barcode } },
+      ),
+    // The response only carries the costing, so the recipe detail is refetched
+    // to pick up the linked ingredient (the row's linked indicator reads from it).
+    onSuccess: (data) => {
+      const key = recipesKeys.recipe(shopId, recipeId);
+      queryClient.setQueryData<{ recipe: Recipe }>(key, (old) =>
+        old ? { recipe: { ...old.recipe, costing: data.costing } } : old,
+      );
+      void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({ queryKey: recipesKeys.recipes(shopId) });
     },
   });
 }

@@ -1,6 +1,8 @@
 export type RecipeStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 
 export type RecipeIngredient = {
+  /** Stable row id from costRecipe — the link endpoint targets it. */
+  id?: string | null;
   name: string;
   quantity: number;
   rawSrcUnit: string;

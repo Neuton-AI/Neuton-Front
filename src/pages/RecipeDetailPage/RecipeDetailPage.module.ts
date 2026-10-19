@@ -83,6 +83,8 @@ export function useRecipeDetailPage() {
 
   const steps = (recipe?.steps ?? []).map((step) => step.instruction);
 
+  const openEdit = () => navigate(`/catalog/recipes/${id}/edit`);
+
   /**
    * Try-hard → fallback-soft lives server-side (DELETE /recipes/:id returns
    * `{ mode: 'hard' | 'soft' }`): unreferenced recipes are removed outright
@@ -144,6 +146,7 @@ export function useRecipeDetailPage() {
     canVerify,
     verify,
     steps,
+    openEdit,
     remove,
     total,
     linked,

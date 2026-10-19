@@ -7,7 +7,15 @@ import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { recipesKeys } from './keys';
-import { useDeleteRecipe, useRecipe, useRecipes, useVerifyRecipe } from './recipesApi';
+import {
+  type UpdateRecipeFields,
+  useDeleteRecipe,
+  useLinkIngredient,
+  useRecipe,
+  useRecipes,
+  useUpdateRecipe,
+  useVerifyRecipe,
+} from './recipesApi';
 
 describe('recipes API contracts', () => {
   it('enables only active lists with credentials and a shop', () => {
@@ -100,6 +108,87 @@ describe('recipes API contracts', () => {
     expect(client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))?.isInvalidated).toBe(
       true,
     );
+    client.clear();
+  });
+  it('patches the edit fields verbatim and merges the response into the detail cache', async () => {
+    let body: unknown;
+    let method = '';
+    server.use(
+      http.patch(apiPath('/recipes/rp-1'), async ({ request }) => {
+        method = request.method;
+        body = await request.json();
+        return (
+          requireContext(request) ??
+          HttpResponse.json({ recipe: buildRecipe({ name: 'Roasted Tomato Soup', status: 'verified' }) })
+        );
+      }),
+    );
+    const client = createTestQueryClient();
+    client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
+    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), { recipe: buildRecipe() });
+    client.setQueryData(recipesKeys.recipes('shop-1'), { recipes: [] });
+    const { result } = renderHookWithProviders(() => useUpdateRecipe('token-1', 'shop-1'), {
+      queryClient: client,
+    });
+    const fields: UpdateRecipeFields = {
+      name: 'Roasted Tomato Soup',
+      prepTimeMinutes: 25,
+      yieldQuantity: 4,
+      allergens: ['Dairy'],
+      steps: [{ stepNumber: 1, instruction: 'Roast the tomatoes.' }],
+      ingredients: [
+        {
+          inventoryItemId: null,
+          generalPriceId: null,
+          rawName: 'Tomatoes',
+          quantity: 2,
+          rawSrcUnit: 'kg',
+        },
+      ],
+    };
+    await act(() => result.current.mutateAsync({ id: 'rp-1', fields }));
+    expect(method).toBe('PATCH');
+    expect(body).toEqual(fields);
+    expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
+      recipe: buildRecipe({ name: 'Roasted Tomato Soup', status: 'verified' }),
+    });
+    expect(client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated).toBe(true);
+    client.clear();
+  });
+  it('posts the barcode to the ingredient link endpoint and merges the fresh costing', async () => {
+    let body: unknown;
+    const linkedCosting = {
+      ...buildRecipe().costing,
+      ingredientsCost: 9.75,
+      costComplete: true,
+      linkedCount: 1,
+      totalCount: 1,
+    };
+    server.use(
+      http.post(apiPath('/recipes/rp-1/ingredients/ing-1/link'), async ({ request }) => {
+        body = await request.json();
+        return (
+          requireContext(request) ?? HttpResponse.json({ costing: linkedCosting })
+        );
+      }),
+    );
+    const client = createTestQueryClient();
+    client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
+    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), { recipe: buildRecipe() });
+    client.setQueryData(recipesKeys.recipes('shop-1'), { recipes: [] });
+    const { result } = renderHookWithProviders(
+      () => useLinkIngredient('token-1', 'shop-1', 'rp-1', 'ing-1'),
+      { queryClient: client },
+    );
+    await act(() => result.current.mutateAsync({ barcode: '4006381333931' }));
+    expect(body).toEqual({ barcode: '4006381333931' });
+    expect(
+      client.getQueryData<{ recipe: ReturnType<typeof buildRecipe> }>(
+        recipesKeys.recipe('shop-1', 'rp-1'),
+      )?.recipe.costing,
+    ).toEqual(linkedCosting);
+    expect(client.getQueryState(recipesKeys.recipe('shop-1', 'rp-1'))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated).toBe(true);
     client.clear();
   });
   it('propagates rejected reads as typed API errors', async () => {

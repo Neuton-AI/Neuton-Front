@@ -143,6 +143,10 @@ export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTM
   return <textarea className={`${CONTROL} resize-none py-2.5 ${className}`} {...rest} />;
 }
 
-export function Select({ className = '', ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={`${CONTROL} h-11 appearance-none ${className}`} {...rest} />;
+export function Select({
+  dense = false,
+  className = '',
+  ...rest
+}: SelectHTMLAttributes<HTMLSelectElement> & { dense?: boolean }) {
+  return <select className={`${CONTROL} ${dense ? 'h-10' : 'h-11'} appearance-none ${className}`} {...rest} />;
 }

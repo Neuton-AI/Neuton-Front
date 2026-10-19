@@ -14,6 +14,11 @@ const CatalogPage = lazy(() =>
 const DashboardPage = lazy(() =>
   import('@/pages/DashboardPage/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 );
+const IngredientScanPage = lazy(() =>
+  import('@/pages/IngredientScanPage/IngredientScanPage').then((m) => ({
+    default: m.IngredientScanPage,
+  })),
+);
 const NewOrderPage = lazy(() =>
   import('@/pages/NewOrderPage/NewOrderPage').then((m) => ({ default: m.NewOrderPage })),
 );
@@ -39,6 +44,9 @@ const RecipeDetailPage = lazy(() =>
     default: m.RecipeDetailPage,
   })),
 );
+const RecipeEditPage = lazy(() =>
+  import('@/pages/RecipeEditPage/RecipeEditPage').then((m) => ({ default: m.RecipeEditPage })),
+);
 
 export function App() {
   return (
@@ -59,6 +67,11 @@ export function App() {
                 <Route path="orders" element={<OrdersPage />} />
                 <Route path="orders/new" element={<NewOrderPage />} />
                 <Route path="orders/:id" element={<OrderDetailPage />} />
+                <Route path="catalog/recipes/:id/edit" element={<RecipeEditPage />} />
+                <Route
+                  path="catalog/recipes/:id/edit/ingredients/:ingredientId/scan"
+                  element={<IngredientScanPage />}
+                />
                 <Route path="catalog/recipes/:id" element={<RecipeDetailPage />} />
                 <Route path="catalog/receipts/:id" element={<ReceiptDetailPage />} />
                 <Route path="profile" element={<ProfilePage />} />
