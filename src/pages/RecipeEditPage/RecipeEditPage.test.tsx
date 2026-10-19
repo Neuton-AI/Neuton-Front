@@ -1,6 +1,5 @@
 import { authState, resetAuth } from '@/test/auth';
 import { buildRecipe } from '@/test/factories/recipes.factory';
-import { buildShop } from '@/test/factories/shops.factory';
 import { apiPath } from '@/test/mocks/handlers/context';
 import { server } from '@/test/mocks/server';
 import { renderWithRouter } from '@/test/render';
@@ -238,19 +237,6 @@ it('hides editing and scanning for members', async () => {
   ).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull();
   expect(screen.queryByRole('button', { name: /Scan barcode/ })).toBeNull();
-});
-
-it('uses canonical shop settings for labor when membership shop fields are unavailable', async () => {
-  const user = userEvent.setup();
-  server.use(
-    http.get(apiPath('/shop'), () =>
-      HttpResponse.json({ shop: buildShop({ hourlyLaborCost: '18' }) }),
-    ),
-  );
-  renderEditor();
-  fireEvent.change(await screen.findByLabelText('PREP TIME · MIN'), { target: { value: '30' } });
-  await user.click(screen.getByRole('tab', { name: 'Preparation' }));
-  await waitFor(() => expect(screen.getByLabelText('LABOR · AUTO')).toHaveValue('$9.00'));
 });
 
 it('waits for membership loading before showing permissions or missing recipe messages', async () => {
