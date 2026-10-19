@@ -39,6 +39,9 @@ const RecipeDetailPage = lazy(() =>
     default: m.RecipeDetailPage,
   })),
 );
+const RecipeEditPage = lazy(() =>
+  import('@/pages/RecipeEditPage/RecipeEditPage').then((m) => ({ default: m.RecipeEditPage })),
+);
 
 export function App() {
   return (
@@ -60,6 +63,7 @@ export function App() {
                 <Route path="orders/new" element={<NewOrderPage />} />
                 <Route path="orders/:id" element={<OrderDetailPage />} />
                 <Route path="catalog/recipes/:id" element={<RecipeDetailPage />} />
+                <Route path="catalog/recipes/:id/edit" element={<RecipeEditPage />} />
                 <Route path="catalog/receipts/:id" element={<ReceiptDetailPage />} />
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="capture" element={<CapturePage />} />

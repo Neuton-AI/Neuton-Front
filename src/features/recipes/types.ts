@@ -1,6 +1,7 @@
 export type RecipeStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 
 export type RecipeIngredient = {
+  id?: string;
   name: string;
   quantity: number;
   rawSrcUnit: string;
@@ -15,6 +16,41 @@ export type RecipeIngredient = {
   generalPriceId?: string | null;
   rawName?: string;
   linked?: boolean;
+};
+
+export type RecipeUpdate = {
+  name: string;
+  imageUrl: string | null;
+  prepTimeMinutes: number;
+  yieldQuantity: number;
+  yieldUnit: string;
+  allergens: string[];
+  steps: { stepNumber: number; instruction: string }[];
+  ingredients: {
+    rawName: string;
+    rawMaterialName: string;
+    quantity: number;
+    rawSrcUnit: string;
+    inventoryItemId: string | null;
+    generalPriceId: string | null;
+  }[];
+};
+
+export type BarcodePriceInput = {
+  barcode: string;
+  rawMaterialName: string;
+  quantity: number;
+  rawSrcUnit: string;
+};
+
+export type BarcodePrice = {
+  id: string;
+  rawName: string;
+  rawSrcUnit: string;
+  quantity: number;
+  baseUnit: string;
+  baseUnitAmount: number | string;
+  baseUnitCost: number | string;
 };
 
 export type RecipeCosting = {

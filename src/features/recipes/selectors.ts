@@ -6,7 +6,7 @@ export function ingredientLinkSummary(costing: RecipeCosting) {
   return { total, linked, incomplete: costing.costComplete === false || total === 0 || linked < total };
 }
 
-export function ingredientIsLinked(ingredient: RecipeIngredient): boolean {
+export function ingredientIsLinked(ingredient: Pick<RecipeIngredient, 'linked' | 'inventoryItemId' | 'generalPriceId'>): boolean {
   return (
     ingredient.linked ?? (ingredient.inventoryItemId != null || ingredient.generalPriceId != null)
   );
