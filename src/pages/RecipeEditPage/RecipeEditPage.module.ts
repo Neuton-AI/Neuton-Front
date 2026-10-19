@@ -257,7 +257,16 @@ export function useRecipeEditPage() {
               ...current,
               ingredients: current.ingredients.map((ingredient) =>
                 ingredient.key === row.key
-                  ? { ...ingredient, inventoryItemId: null, generalPriceId: price.id, linked: true }
+                  ? {
+                      key: ingredient.key,
+                      rawName: price.rawName,
+                      rawMaterialName: price.rawMaterialName,
+                      quantity: ingredient.quantity,
+                      rawSrcUnit: ingredient.rawSrcUnit,
+                      inventoryItemId: null,
+                      generalPriceId: price.id,
+                      linked: true,
+                    }
                   : ingredient,
               ),
             }
