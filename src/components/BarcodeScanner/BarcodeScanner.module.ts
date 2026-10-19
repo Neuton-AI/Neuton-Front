@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import type { ProductDetails } from './ManualProductForm';
 
 export type BarcodeScannerProps = {
   onDetected: (barcode: string) => void;
   onClose: () => void;
   busy?: boolean;
   error?: string | null;
+  onManualSave?: (details: ProductDetails) => void;
+  ingredient?: {
+    rawMaterialName: string;
+    quantity: string;
+    rawSrcUnit: string;
+  };
+  currency?: string;
+  paused?: boolean;
+  onModeChange?: () => void;
 };
 
 type BarcodeDetectorConstructor = {
@@ -22,6 +32,7 @@ export function useBarcodeScanner({
   onClose,
   busy = false,
   error,
+  paused = false,
 }: BarcodeScannerProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -30,6 +41,9 @@ export function useBarcodeScanner({
   const callbacks = useRef({ onDetected, onClose });
   const submitted = useRef(false);
   const stopCamera = useRef<() => void>(() => {});
+  const cameraTrack = useRef<MediaStreamTrack | null>(null);
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const [pending, setPending] = useState(false);
   const [barcode, setBarcode] = useState('');
   const [cameraNotice, setCameraNotice] = useState<string | null>(null);
@@ -77,7 +91,7 @@ export function useBarcodeScanner({
       if (event.key !== 'Tab') return;
       event.stopImmediatePropagation();
       const controls = dialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), [tabindex="0"]',
+        'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
       );
       if (!controls?.length) return;
       const first = controls[0];
@@ -99,7 +113,7 @@ export function useBarcodeScanner({
   }, [close]);
 
   useEffect(() => {
-    if (busy || pending) return;
+    if (busy || pending || paused) return;
     let active = true;
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -109,6 +123,9 @@ export function useBarcodeScanner({
       clearTimeout(timer);
       stream?.getTracks().forEach((track) => track.stop());
       stream = null;
+      cameraTrack.current = null;
+      setTorchAvailable(false);
+      setTorchOn(false);
       if (video) video.srcObject = null;
     };
     stopCamera.current = stop;
@@ -138,6 +155,11 @@ export function useBarcodeScanner({
           return;
         }
         stream = camera;
+        const track = camera.getVideoTracks?.()[0];
+        cameraTrack.current = track ?? null;
+        setTorchAvailable(
+          Boolean((track?.getCapabilities?.() as { torch?: boolean } | undefined)?.torch),
+        );
         if (video) video.srcObject = camera;
         setCameraNotice(null);
         const scan = async () => {
@@ -167,7 +189,7 @@ export function useBarcodeScanner({
     }
     void start();
     return stop;
-  }, [busy, pending, detect]);
+  }, [busy, pending, paused, detect]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -179,6 +201,18 @@ export function useBarcodeScanner({
     setValidationError(null);
     detect(value);
   };
+
+  async function toggleTorch() {
+    if (!cameraTrack.current || !torchAvailable) return;
+    try {
+      await cameraTrack.current.applyConstraints({
+        advanced: [{ torch: !torchOn } as MediaTrackConstraintSet],
+      });
+      setTorchOn(!torchOn);
+    } catch {
+      setCameraNotice('Flashlight is unavailable on this camera.');
+    }
+  }
 
   return {
     titleId,
@@ -192,5 +226,8 @@ export function useBarcodeScanner({
     cameraNotice,
     validationError,
     waiting: busy || pending,
+    torchAvailable,
+    torchOn,
+    toggleTorch,
   };
 }

@@ -408,6 +408,10 @@ export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
           onClose={model.closeScanner}
           busy={model.scanBusy}
           error={model.scanError}
+          ingredient={model.scanIngredient}
+          currency={model.scanCurrency}
+          onManualSave={(details) => void model.linkManualProduct(details)}
+          onModeChange={model.clearScanError}
         />
       ) : null}
     </main>

@@ -15,19 +15,93 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
   BarcodeScanner: ({
     onDetected,
     onClose,
+    onManualSave,
     error,
   }: {
     onDetected: (barcode: string) => void;
     onClose: () => void;
+    onManualSave: (details: {
+      name: string;
+      price: number;
+      packageSize: number;
+      packageUnit: 'kg';
+    }) => void;
     error?: string;
   }) => (
     <div role="dialog" aria-label="Barcode scanner">
       <button onClick={() => onDetected('7290000000001')}>Scan product</button>
       <button onClick={onClose}>Cancel scan</button>
+      <button
+        onClick={() =>
+          onManualSave({
+            name: 'Manual tomato pack',
+            price: 10,
+            packageSize: 1,
+            packageUnit: 'kg',
+          })
+        }
+      >
+        Save manual product
+      </button>
       {error}
     </div>
   ),
 }));
+
+it('persists a manually added product as the draft inventory link when saving the recipe', async () => {
+  const user = userEvent.setup();
+  let createdBody: unknown;
+  let savedBody: unknown;
+  server.use(
+    http.post(apiPath('/recipes/rp-1/manual-product'), async ({ request }) => {
+      createdBody = await request.json();
+      return HttpResponse.json(
+        {
+          product: {
+            id: 'manual-product-1',
+            name: 'Manual tomato pack',
+            rawMaterialName: 'Tomato',
+          },
+        },
+        { status: 201 },
+      );
+    }),
+    http.patch(apiPath('/recipes/rp-1'), async ({ request }) => {
+      savedBody = await request.json();
+      return HttpResponse.json({ recipe: { id: 'rp-1' } });
+    }),
+  );
+  renderEditor();
+  await user.click(
+    await screen.findByRole('button', {
+      name: 'Scan barcode for ingredient 1',
+    }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Save manual product' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(createdBody).toEqual({
+    name: 'Manual tomato pack',
+    price: 10,
+    packageSize: 1,
+    packageUnit: 'kg',
+    rawMaterialName: 'Tomato',
+    quantity: 2,
+    rawSrcUnit: 'kg',
+  });
+  expect(screen.getByLabelText('Ingredient 1 name')).toHaveValue('Manual tomato pack');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Recipe destination')).toBeInTheDocument();
+  expect(savedBody).toMatchObject({
+    ingredients: [
+      {
+        inventoryItemId: 'manual-product-1',
+        generalPriceId: null,
+        quantity: 2,
+        rawSrcUnit: 'kg',
+      },
+    ],
+  });
+});
 
 const originalScrollTo = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTo');
 const scrollTo = vi.fn(function (this: HTMLElement, options: ScrollToOptions) {
@@ -84,15 +158,17 @@ it('keeps one draft across swipes and tabs, resets edits, and focuses the reques
   const name = await screen.findByLabelText('Ingredient 1 name');
   await waitFor(() => expect(name).toHaveFocus());
   expect(name).toHaveValue('Original tomatoes');
-  fireEvent.change(screen.getByLabelText('RECIPE NAME'), { target: { value: 'Changed recipe' } });
+  fireEvent.change(screen.getByLabelText('RECIPE NAME'), {
+    target: { value: 'Changed recipe' },
+  });
   const ingredientPanel = screen.getByRole('tabpanel', { name: 'Ingredients' });
   const carousel = ingredientPanel.parentElement!;
-  Object.defineProperty(carousel, 'clientWidth', { configurable: true, value: 390 });
+  Object.defineProperty(carousel, 'clientWidth', {
+    configurable: true,
+    value: 390,
+  });
   fireEvent.scroll(carousel, { target: { scrollLeft: 390 } });
-  expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveFocus();
   await user.click(screen.getByRole('button', { name: 'Gluten' }));
   await user.click(screen.getByRole('tab', { name: 'Ingredients' }));
@@ -111,8 +187,10 @@ it('supports keyboard tab navigation and excludes the inactive panel from focus 
   const preparationTab = screen.getByRole('tab', { name: 'Preparation' });
   const ingredientsPanel = document.getElementById(ingredientsTab.getAttribute('aria-controls')!)!;
   const preparationPanel = document.getElementById(preparationTab.getAttribute('aria-controls')!)!;
-  expect(ingredientsPanel.inert).toBe(false);
-  expect(preparationPanel.inert).toBe(true);
+  await waitFor(() => {
+    expect(ingredientsPanel.inert).toBe(false);
+    expect(preparationPanel.inert).toBe(true);
+  });
   expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull();
   await user.click(ingredientsTab);
 
@@ -128,7 +206,9 @@ it('supports keyboard tab navigation and excludes the inactive panel from focus 
 
   await user.keyboard('{Home}');
   expect(ingredientsTab).toHaveFocus();
-  expect(screen.getByRole('textbox', { name: 'Ingredient 1 name' })).toHaveValue('Original tomatoes');
+  expect(screen.getByRole('textbox', { name: 'Ingredient 1 name' })).toHaveValue(
+    'Original tomatoes',
+  );
   await user.keyboard('{End}');
   expect(preparationTab).toHaveFocus();
   await user.keyboard('{ArrowLeft}');
@@ -160,7 +240,11 @@ it('replaces an unresolved ingredient with the scanned product, preserving recip
     }),
   );
   renderEditor();
-  await user.click(await screen.findByRole('button', { name: 'Scan barcode for ingredient 1' }));
+  await user.click(
+    await screen.findByRole('button', {
+      name: 'Scan barcode for ingredient 1',
+    }),
+  );
   await user.click(screen.getByRole('button', { name: 'Scan product' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(barcodeBody).toEqual({
