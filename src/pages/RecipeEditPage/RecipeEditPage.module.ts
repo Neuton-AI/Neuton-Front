@@ -1,4 +1,4 @@
-import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
+import { useAuth, useShopMemberships } from '@/features/auth/supabase';
 import {
   useBarcodePrice,
   useDeleteRecipe,
@@ -7,7 +7,6 @@ import {
 } from '@/features/recipes/recipesApi';
 import { ingredientIsLinked } from '@/features/recipes/selectors';
 import type { Recipe, RecipeUpdate } from '@/features/recipes/types';
-import { useShopSettings } from '@/features/shops/shopsApi';
 import { useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
@@ -60,9 +59,6 @@ export function useRecipeEditPage() {
   const navigate = useNavigate();
   const { user, token, loading: authLoading } = useAuth();
   const { memberships, activeShopId, loading: membershipsLoading } = useShopMemberships(user?.id);
-  const currentShop = useCurrentShop(memberships, activeShopId);
-  const shopSettings = useShopSettings(token, activeShopId);
-  const shop = shopSettings.data?.shop ?? currentShop;
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
   const canManage = role === 'owner' || role === 'admin';
   const query = useRecipe(token, activeShopId, id);
@@ -395,10 +391,6 @@ export function useRecipeEditPage() {
     canManage,
     busy,
     saving: update.isPending,
-    currency: shop?.currency ?? 'USD',
-    laborCost: shopSettings.data
-      ? (Number(draft?.prepTimeMinutes ?? 0) / 60) * Number(shopSettings.data.shop.hourlyLaborCost)
-      : null,
     changeField,
     changeIngredient,
     addIngredient,

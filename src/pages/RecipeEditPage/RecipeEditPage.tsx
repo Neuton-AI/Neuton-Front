@@ -2,7 +2,6 @@ import { BarcodeScanner } from '@/components/BarcodeScanner/BarcodeScanner';
 import { ErrorState, InlineNotice, Spinner } from '@/components/feedback';
 import { IconCamera, IconClose, IconPlus, IconTrash } from '@/components/icons';
 import { Button, Field, Input, Textarea } from '@/components/ui';
-import { formatMoney } from '@/lib/format';
 import { useRecipeEditPage, type RecipeEditPageModel } from './RecipeEditPage.module';
 
 const ALLERGENS = ['Gluten', 'Eggs', 'Dairy', 'Tree nuts', 'Peanuts', 'Soy', 'Sesame', 'Fish'];
@@ -331,18 +330,6 @@ export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
                         ))}
                       </div>
                     </section>
-                    <Field label="LABOR · AUTO" htmlFor="recipe-labor">
-                      <Input
-                        id="recipe-labor"
-                        readOnly
-                        value={
-                          model.laborCost == null
-                            ? 'Unavailable'
-                            : formatMoney(model.laborCost, model.currency)
-                        }
-                        className="bg-surface-soft text-ink-muted"
-                      />
-                    </Field>
                     <section className="flex flex-col gap-2.5" aria-labelledby="edit-preparation">
                       <h2 id="edit-preparation" className="text-[18px] font-medium">
                         Preparation
