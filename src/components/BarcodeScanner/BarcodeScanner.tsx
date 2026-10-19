@@ -86,12 +86,18 @@ export function BarcodeScanner(props: BarcodeScannerProps) {
       ) : (
         <>
           {props.ingredient ? (
-            <p className="mb-4 rounded-full bg-[#252320] px-3.5 py-[7px] text-[13px] leading-[18px]">
-              <span className="mr-2 text-[#E8A48C]" aria-hidden="true">
+            <p className="mb-4 inline-flex w-max max-w-[60vw] shrink-0 items-center gap-2 rounded-full bg-[#252320] px-3.5 py-[7px] text-[13px] leading-[18px]">
+              <span className="shrink-0 text-[#E8A48C]" aria-hidden="true">
                 <IconProductLink />
               </span>
-              <span className="text-[#A09D96]">Linking to </span>
-              <strong className="font-semibold">{props.ingredient.rawMaterialName}</strong>
+              <span className="shrink-0 whitespace-nowrap text-[#A09D96]">Linking to</span>
+              <strong
+                dir="auto"
+                title={props.ingredient.rawMaterialName}
+                className="min-w-0 truncate font-semibold"
+              >
+                {props.ingredient.rawMaterialName}
+              </strong>
             </p>
           ) : null}
           <div className="relative flex min-h-[240px] w-full max-w-[358px] flex-1 basis-[390px] items-center justify-center overflow-hidden rounded-2xl bg-[#1F1E1B]">
