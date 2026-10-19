@@ -43,6 +43,19 @@ export type BarcodePriceInput = {
   rawSrcUnit: string;
 };
 
+export type ManualProductInput = Omit<BarcodePriceInput, 'barcode'> & {
+  name: string;
+  price: number;
+  packageSize: number;
+  packageUnit: 'g' | 'kg' | 'ml' | 'l' | 'pcs';
+};
+
+export type ManualProduct = {
+  id: string;
+  name: string;
+  rawMaterialName: string;
+};
+
 export type BarcodePrice = {
   id: string;
   rawName: string;

@@ -34,6 +34,27 @@ function enterBarcode(barcode = '7290000000001') {
 }
 
 describe('BarcodeScanner', () => {
+  it('releases the camera for manual entry and restores scanning with ingredient context', async () => {
+    const onModeChange = vi.fn();
+    render(
+      <BarcodeScanner
+        onDetected={vi.fn()}
+        onClose={vi.fn()}
+        onManualSave={vi.fn()}
+        onModeChange={onModeChange}
+        ingredient={{ rawMaterialName: 'Butter', quantity: '120', rawSrcUnit: 'g' }}
+      />,
+    );
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Add manually' }));
+    expect(screen.getByRole('heading', { name: 'Add product' })).toBeInTheDocument();
+    expect(screen.getByText('Butter · 120 g in this recipe')).toBeInTheDocument();
+    expect(stop).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Scan' }));
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('heading', { name: 'Scan barcode' })).toBeInTheDocument();
+    expect(onModeChange).toHaveBeenCalledTimes(2);
+  });
   it('keeps manual lookup available without a native barcode detector', async () => {
     vi.stubGlobal('BarcodeDetector', undefined);
     const onDetected = vi.fn();

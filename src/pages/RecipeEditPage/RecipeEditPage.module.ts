@@ -1,12 +1,13 @@
 import { useAuth, useShopMemberships } from '@/features/auth/supabase';
 import {
   useBarcodePrice,
+  useManualProduct,
   useDeleteRecipe,
   useRecipe,
   useUpdateRecipe,
 } from '@/features/recipes/recipesApi';
 import { ingredientIsLinked } from '@/features/recipes/selectors';
-import type { Recipe, RecipeUpdate } from '@/features/recipes/types';
+import type { Recipe, RecipeUpdate, ManualProductInput } from '@/features/recipes/types';
 import { useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
@@ -66,6 +67,7 @@ export function useRecipeEditPage() {
   const update = useUpdateRecipe(token, activeShopId);
   const deletion = useDeleteRecipe(token, activeShopId);
   const barcode = useBarcodePrice(token, activeShopId);
+  const manual = useManualProduct(token, activeShopId);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +280,51 @@ export function useRecipeEditPage() {
     }
   }
 
+  async function linkManualProduct(
+    value: Pick<ManualProductInput, 'name' | 'price' | 'packageSize' | 'packageUnit'>,
+  ) {
+    const row = draft?.ingredients.find((ingredient) => ingredient.key === scanKey);
+    if (!row || !canManage || manual.isPending || !token || !activeShopId) return;
+    const request = ++scanRequest.current;
+    setScanError(null);
+    try {
+      const { product } = await manual.mutateAsync({
+        id,
+        body: {
+          ...value,
+          rawMaterialName: row.rawMaterialName,
+          quantity: Number(row.quantity),
+          rawSrcUnit: row.rawSrcUnit,
+        },
+      });
+      if (request !== scanRequest.current) return;
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              ingredients: current.ingredients.map((ingredient) =>
+                ingredient.key === row.key
+                  ? {
+                      ...ingredient,
+                      rawName: product.name,
+                      rawMaterialName: product.rawMaterialName,
+                      inventoryItemId: product.id,
+                      generalPriceId: null,
+                      linked: true,
+                    }
+                  : ingredient,
+              ),
+            }
+          : current,
+      );
+      closeScanner();
+    } catch (cause) {
+      if (request === scanRequest.current) {
+        setScanError(cause instanceof Error ? cause.message : 'Could not save product.');
+      }
+    }
+  }
+
   async function save() {
     if (!draft || !canManage || !token || !activeShopId || busy) return;
     setError(null);
@@ -311,7 +358,10 @@ export function useRecipeEditPage() {
       allergens: draft.allergens,
       steps: draft.steps
         .filter((step) => step.trim())
-        .map((instruction, index) => ({ stepNumber: index + 1, instruction: instruction.trim() })),
+        .map((instruction, index) => ({
+          stepNumber: index + 1,
+          instruction: instruction.trim(),
+        })),
       ingredients: draft.ingredients.map(
         ({ key: _key, linked: _linked, quantity, ...ingredient }) => ({
           ...ingredient,
@@ -408,7 +458,11 @@ export function useRecipeEditPage() {
     isLinked: (ingredient: IngredientDraft) => ingredientIsLinked(ingredient),
     scanKey,
     scanError,
-    scanBusy: barcode.isPending,
+    clearScanError: () => setScanError(null),
+    scanBusy: barcode.isPending || manual.isPending,
+    scanIngredient: draft?.ingredients.find((ingredient) => ingredient.key === scanKey),
+    scanCurrency: memberships.find((row) => row.shopId === activeShopId)?.shops?.currency ?? 'USD',
+    linkManualProduct,
     openScanner,
     closeScanner,
     linkBarcode,
