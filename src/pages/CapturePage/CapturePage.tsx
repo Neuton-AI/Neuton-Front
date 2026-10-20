@@ -1,169 +1,528 @@
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { ErrorState, InlineNotice, Spinner } from '@/components/feedback';
 import { IconClose } from '@/components/icons';
 import type { MediaKind } from '@/features/uploads/types';
-import { type UploadProgress } from '@/features/uploads/upload';
+import type { UploadSession } from '@/features/uploads/upload';
 import { useCapturePage } from './CapturePage.module';
+import { CaptureDialog } from './CaptureDialog';
+import { SourcePreview } from './SourcePreview';
 import { IconUpload } from './IconUpload/IconUpload';
+import './CapturePage.css';
+
 const KINDS: { key: MediaKind; label: string }[] = [
   { key: 'receipt', label: 'Receipt' },
   { key: 'recipe', label: 'Recipe' },
   { key: 'product', label: 'Product' },
   { key: 'order', label: 'Order' },
 ];
+const ACCEPTED = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
 
-const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
-
-function describePhase(progress: UploadProgress): string {
-  switch (progress.phase) {
+function describePhase(session: UploadSession): string {
+  switch (session.phase) {
     case 'presigning':
-      return 'Preparing a secure upload link…';
+      return 'Preparing secure upload links…';
     case 'uploading':
-      return 'Sending the file to storage…';
+      return 'Sending your document to storage…';
     case 'queueing':
       return 'Queued. Neuton is reading the document.';
     case 'done':
       return 'Done. Your document is being processed.';
+    case 'failed':
+      return 'Your document is saved here. Retry to send the remaining files.';
   }
 }
+
+function CaptureIcon({
+  kind,
+}: {
+  kind: 'plus' | 'send' | 'delete' | 'replace';
+}) {
+  const paths = {
+    plus: 'M12 5v14M5 12h14',
+    send: 'M5 12.5l4.5 4.5L19 7',
+    delete: 'M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5',
+    replace:
+      'M4 10a8 8 0 0 1 14-5l2 2M20 3v4h-4M20 14a8 8 0 0 1-14 5l-2-2M4 21v-4h4',
+  };
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d={paths[kind]}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CaptureAction({
+  label,
+  variant = '',
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  variant?: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={`capture-action ${variant}`}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="capture-action-circle">{children}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export function CapturePage() {
+  const model = useCapturePage();
   const {
-    handleShutter,
-    handleBrowse,
+    current,
+    stacked,
+    total,
+    busy,
+    adding,
+    locked,
     kind,
     setKind,
-    file,
-    previewUrl,
-    progress,
     error,
-    busy,
-    fileInputRef,
-    videoRef,
-    onPick,
+    progress,
     handleClose,
-  } = useCapturePage();
+    handleBrowse,
+    handleShutter,
+    handleFocus,
+    retake,
+    addCurrent,
+    submit,
+    onPick,
+    fileInputRef,
+    galleryInputRef,
+    nativeCameraInputRef,
+    videoRef,
+    previewRef,
+    sourcePickerOpen,
+    closeSourcePicker,
+    chooseSource,
+    reviewIndex,
+    openReview,
+    closeReview,
+    setReviewIndex,
+    deleteSource,
+    moveSource,
+    replaceSource,
+    reviewSources,
+    openCurrentReview,
+  } = model;
+  const [instant, setInstant] = useState(false);
+  const swipeStart = useRef<number | null>(null);
+  const sources = reviewSources;
+  const selected = reviewIndex === null ? null : sources[reviewIndex];
+  const editingDisabled = busy || adding || locked;
+  const pickFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    onPick(event.target.files ?? undefined);
+    event.target.value = '';
+  };
+  const stepReview = (direction: -1 | 1) => {
+    if (reviewIndex === null) return;
+    setReviewIndex(
+      Math.max(0, Math.min(sources.length - 1, reviewIndex + direction)),
+    );
+  };
+
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center overflow-hidden bg-[#181715] px-4 pb-8 pt-[max(var(--safe-top)+16px,16px)]">
-      {/* Header */}
-      <div className="relative mb-6 flex w-full max-w-[358px] items-center justify-center">
+    <main
+      className="capture-page"
+      data-keyboard={instant || undefined}
+      onPointerDownCapture={() => setInstant(false)}
+      onKeyDownCapture={() => setInstant(true)}
+    >
+      <div className="capture-layout">
+        <header className="capture-header">
+          <button
+            type="button"
+            className="capture-close"
+            aria-label="Close capture"
+            disabled={busy || adding}
+            onClick={handleClose}
+          >
+            <IconClose className="h-[18px] w-[18px]" strokeWidth={1.5} />
+          </button>
+          <h1>Capture</h1>
+        </header>
+        <div className="capture-preview-area">
+          <div className="capture-preview" ref={previewRef}>
+            {current ? (
+              <SourcePreview key={current.id} source={current} />
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="capture-video"
+                  onPointerDown={(event) =>
+                    handleFocus(event.clientX, event.clientY)
+                  }
+                />
+                <span className="capture-guide capture-guide--tl" />
+                <span className="capture-guide capture-guide--tr" />
+                <span className="capture-guide capture-guide--bl" />
+                <span className="capture-guide capture-guide--br" />
+              </>
+            )}
+          </div>
+          {current && (
+            <button
+              type="button"
+              className="capture-inspect"
+              aria-label="Review current document"
+              disabled={busy || adding}
+              onClick={openCurrentReview}
+            />
+          )}
+          <button
+            type="button"
+            data-capture-stack
+            className="capture-stack"
+            hidden={!stacked.length}
+            aria-label={`Review ${stacked.length} saved ${stacked.length === 1 ? 'source' : 'sources'}`}
+            disabled={busy || adding}
+            onClick={() => openReview()}
+          >
+            {stacked
+              .slice(0, 2)
+              .reverse()
+              .map((source, index) => (
+                <span
+                  key={source.id}
+                  className={`capture-stack-card ${stacked.length > 1 && index === 0 ? 'capture-stack-card--back' : ''}`}
+                >
+                  <SourcePreview source={source} thumbnail />
+                </span>
+              ))}
+            <span className="capture-stack-count">{stacked.length}</span>
+          </button>
+        </div>
+        <div className="capture-kinds" aria-label="Document type">
+          {KINDS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={kind === key}
+              disabled={total > 0 || editingDisabled}
+              onClick={() => setKind(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div
+          className={`capture-controls${current ? ' capture-controls--captured' : ''}`}
+        >
+          {current ? (
+            <>
+              <CaptureAction
+                label="Retake"
+                variant="capture-action--retake"
+                disabled={editingDisabled}
+                onClick={retake}
+              >
+                <IconClose className="h-[22px] w-[22px]" />
+              </CaptureAction>
+              <CaptureAction
+                label="Add"
+                variant="capture-action--add"
+                disabled={editingDisabled || total >= 4}
+                onClick={() => void addCurrent(instant)}
+              >
+                <CaptureIcon kind="plus" />
+              </CaptureAction>
+              <CaptureAction
+                label={progress?.phase === 'failed' && !busy ? 'Retry' : 'Send'}
+                variant="capture-action--send"
+                disabled={busy || adding}
+                onClick={() => void submit()}
+              >
+                {busy ? (
+                  <Spinner className="h-6 w-6" />
+                ) : (
+                  <CaptureIcon kind="send" />
+                )}
+                {total > 1 && (
+                  <span className="capture-send-count">{total}</span>
+                )}
+              </CaptureAction>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="capture-shutter"
+                aria-label="Take photo"
+                disabled={editingDisabled || total >= 4}
+                onClick={handleShutter}
+              >
+                <span />
+              </button>
+              {stacked.length > 0 && (
+                <button
+                  type="button"
+                  className="capture-send-saved"
+                  disabled={busy || adding}
+                  onClick={() => void submit()}
+                >
+                  {busy ? 'Sending…' : progress?.phase === 'failed' ? 'Retry' : `Send ${total}`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <div className="capture-feedback" aria-live="polite">
+          {error && <ErrorState message={error} />}
+          {progress && (
+            <>
+              <InlineNotice>{describePhase(progress)}</InlineNotice>
+              <ol className="capture-upload-status">
+                {progress.sources.map((source, index) => (
+                  <li key={`${index}-${source.file.name}`}>
+                    {index + 1}. {source.file.name} — {source.status}
+                    {source.error ? `: ${source.error}` : ''}
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+          {total >= 4 && !busy && (
+            <p>4 of 4 sources. Send your document or review to make changes.</p>
+          )}
+        </div>
         <button
           type="button"
-          aria-label="Close capture"
-          onClick={handleClose}
-          className="absolute left-0 flex h-9 w-9 items-center justify-center rounded-full bg-[#252320]"
+          className="capture-dropzone"
+          disabled={editingDisabled || total >= 4}
+          onClick={handleBrowse}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (!editingDisabled && total < 4) onPick(event.dataTransfer.files);
+          }}
         >
-          <IconClose className="h-[18px] w-[18px] text-[#FAF9F5]" strokeWidth={1.5} />
+          <IconUpload className="h-[22px] w-[22px]" />
+          <strong>Drop a file here or browse</strong>
+          <span>Supported files · JPG, PNG, WebP, HEIC, PDF</span>
+          <span>Up to 4 files · 10 MB each · 40 MB total</span>
         </button>
-        <span className="text-[18px] font-medium leading-[25px] text-[#FAF9F5]">Capture</span>
       </div>
-
-      {/* Camera preview */}
-      <div className="relative h-[370px] w-full max-w-[358px] shrink-0 overflow-hidden rounded-[16px] bg-[#1F1E1B]">
-        {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Selected document preview"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            {/* Guides */}
-            <div className="absolute left-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute left-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute right-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute right-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 left-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 left-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 right-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 right-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-
-            <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 rounded-full bg-[#252320] px-[14px] py-[8px]">
-              <span className="whitespace-nowrap text-[13px] font-medium leading-[18px] text-[#FAF9F5]">
-                Align receipt within frame
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Type chips */}
-      <div className="no-scrollbar mt-5 flex w-full max-w-[358px] justify-center gap-2 overflow-x-auto pb-1">
-        {KINDS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setKind(key)}
-            className={`shrink-0 rounded-full px-4 py-2 transition-colors ${
-              kind === key ? 'bg-[#CC785C] text-[#FFFFFF]' : 'bg-[#252320] text-[#A09D96]'
-            }`}
-          >
-            <span className="text-sm font-medium leading-[17px]">{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Shutter */}
-      <button
-        type="button"
-        disabled={busy}
-        aria-label={file ? 'Upload document' : 'Take photo'}
-        onClick={handleShutter}
-        className="mt-4 flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-[4px] border-[#FAF9F5] transition-opacity disabled:opacity-50"
-      >
-        {busy ? (
-          <Spinner className="h-6 w-6 text-[#FAF9F5]" />
-        ) : (
-          <div className="h-[56px] w-[56px] rounded-full bg-[#FAF9F5]" />
-        )}
-      </button>
-
-      {file && !busy ? (
-        <p className="mt-3 text-sm text-[#FAF9F5]">Tap to upload {file.name}</p>
-      ) : null}
-
-      <div className="flex-1 min-h-[16px]" />
-
-      {/* Error/Progress */}
-      {error ? (
-        <div className="mb-4 w-full max-w-[358px]">
-          <ErrorState message={error} />
-        </div>
-      ) : null}
-
-      {progress ? (
-        <div className="mb-4 w-full max-w-[358px]">
-          <InlineNotice>{describePhase(progress)}</InlineNotice>
-        </div>
-      ) : null}
-
-      {/* Drop zone */}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={handleBrowse}
-        className="flex w-full max-w-[358px] flex-col items-center justify-center gap-1 rounded-[16px] border border-dashed border-[#A09D96] bg-[#1F1E1B] px-4 py-3.5 transition-opacity disabled:opacity-50"
-      >
-        <IconUpload className="h-[22px] w-[22px] text-[#A09D96]" />
-        <span className="text-sm font-medium text-[#FAF9F5]">Drop a file here or browse</span>
-        <span className="text-center text-[13px] font-medium leading-[18px] text-[#A09D96]">
-          Receipt, recipe, product, or order &middot; JPG, PNG, WebP, HEIC, PDF
-        </span>
-      </button>
-
+      <input
+        ref={galleryInputRef}
+        type="file"
+        aria-label="Choose photos from gallery"
+        accept="image/jpeg,image/png,image/webp,image/heic"
+        multiple
+        hidden
+        onChange={pickFiles}
+      />
       <input
         ref={fileInputRef}
         type="file"
-        aria-label="Choose document"
-        accept={ACCEPTED.join(',')}
-        className="sr-only"
-        onChange={(event) => onPick(event.target.files?.[0])}
+        aria-label="Choose document files"
+        accept={ACCEPTED}
+        multiple
+        hidden
+        onChange={pickFiles}
       />
-    </div>
+      <input
+        ref={nativeCameraInputRef}
+        type="file"
+        aria-label="Take a photo with device camera"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={pickFiles}
+      />
+      <CaptureDialog
+        open={sourcePickerOpen}
+        title="Choose upload source"
+        className="capture-source-picker"
+        instant={instant}
+        onClose={closeSourcePicker}
+      >
+        <h2>Add a photo or file</h2>
+        <p>Up to 4 sources · 10 MB each · 40 MB total</p>
+        <button type="button" onClick={() => chooseSource('gallery')}>
+          Photo gallery
+        </button>
+        <button type="button" onClick={() => chooseSource('file')}>
+          Browse files
+        </button>
+        <button type="button" onClick={() => chooseSource('camera')}>
+          Take a photo
+        </button>
+        <button
+          type="button"
+          className="capture-picker-cancel"
+          onClick={closeSourcePicker}
+        >
+          Cancel
+        </button>
+      </CaptureDialog>
+      <CaptureDialog
+        open={reviewIndex !== null}
+        title="Review document sources"
+        className="capture-review"
+        instant={instant}
+        onClose={closeReview}
+      >
+        <header className="capture-header">
+          <button
+            type="button"
+            className="capture-close"
+            aria-label="Close review"
+            onClick={closeReview}
+          >
+            <IconClose className="h-[18px] w-[18px]" />
+          </button>
+          <h2>Review</h2>
+        </header>
+        <div
+          className="capture-carousel"
+          role="region"
+          tabIndex={0}
+          aria-roledescription="carousel"
+          aria-label="Document sources"
+          onKeyDown={(event) => {
+            setInstant(true);
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault();
+              stepReview(-1);
+            }
+            if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              stepReview(1);
+            }
+          }}
+          onPointerDown={(event) => {
+            if (swipeStart.current === null) swipeStart.current = event.clientX;
+          }}
+          onPointerCancel={() => {
+            swipeStart.current = null;
+          }}
+          onPointerUp={(event) => {
+            if (
+              swipeStart.current !== null &&
+              Math.abs(event.clientX - swipeStart.current) > 48
+            ) {
+              setInstant(false);
+              stepReview(event.clientX < swipeStart.current ? 1 : -1);
+            }
+            swipeStart.current = null;
+          }}
+        >
+          <div
+            className="capture-carousel-track"
+            style={{
+              transform: `translateX(calc(${reviewIndex ?? 0} * (80px - 100%)))`,
+            }}
+          >
+            {sources.map((source, index) => (
+              <article
+                key={source.id}
+                className="capture-review-card"
+                aria-hidden={index !== reviewIndex}
+                data-active={index === reviewIndex || undefined}
+              >
+                <SourcePreview source={source} />
+                <span className="capture-review-count">
+                  {index + 1} of {sources.length}
+                </span>
+              </article>
+            ))}
+          </div>
+        </div>
+        <nav className="capture-review-nav" aria-label="Navigate sources">
+          <button
+            type="button"
+            disabled={reviewIndex === 0}
+            onClick={() => stepReview(-1)}
+          >
+            ← Previous
+          </button>
+          <span aria-live="polite">
+            {(reviewIndex ?? 0) + 1} of {sources.length}
+          </span>
+          <button
+            type="button"
+            disabled={reviewIndex === sources.length - 1}
+            onClick={() => stepReview(1)}
+          >
+            Next →
+          </button>
+        </nav>
+        <div className="capture-review-actions">
+          <CaptureAction
+            label="Delete"
+            disabled={!selected || editingDisabled}
+            onClick={() => {
+              if (selected) deleteSource(selected.id);
+            }}
+          >
+            <CaptureIcon kind="delete" />
+          </CaptureAction>
+          <CaptureAction
+            label="Replace"
+            disabled={!selected || editingDisabled}
+            onClick={() => {
+              if (selected) replaceSource(selected.id);
+            }}
+          >
+            <CaptureIcon kind="replace" />
+          </CaptureAction>
+        </div>
+        <div className="capture-reorder" aria-label="Reorder source">
+          <button
+            type="button"
+            disabled={reviewIndex === 0 || editingDisabled}
+            onClick={() => {
+              if (selected) moveSource(selected.id, -1);
+            }}
+          >
+            Move earlier
+          </button>
+          <button
+            type="button"
+            disabled={reviewIndex === sources.length - 1 || editingDisabled}
+            onClick={() => {
+              if (selected) moveSource(selected.id, 1);
+            }}
+          >
+            Move later
+          </button>
+        </div>
+        <button
+          type="button"
+          className="capture-review-done"
+          onClick={closeReview}
+        >
+          Done
+        </button>
+      </CaptureDialog>
+    </main>
   );
 }

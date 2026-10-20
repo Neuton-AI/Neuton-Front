@@ -12,6 +12,17 @@ import {
 } from '@/features/uploads/types';
 import { apiFetch } from '@/lib/api';
 
+export {
+  uploadSources,
+  UploadSourcesError,
+  validateUploadFiles,
+  MAX_UPLOAD_SOURCES,
+  MAX_UPLOAD_FILE_BYTES,
+  MAX_UPLOAD_TOTAL_BYTES,
+  type UploadSession,
+  type UploadSourceState,
+} from './uploadSources';
+
 export type UploadContext = {
   token: string | null;
   shopId: string | null;
