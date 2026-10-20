@@ -3,6 +3,7 @@ import { InlineNotice } from '@/components/feedback';
 import { IconLogout } from '@/components/icons';
 import { Layout } from '@/components/Layout/Layout';
 import { PageHeader } from '@/components/PageHeader/PageHeader';
+import { InstallAppButton } from '@/features/pwa/InstallApp';
 import { MeTab } from './MeTab/MeTab';
 import { useProfilePage } from './ProfilePage.module';
 import { ShopTab } from './ShopTab/ShopTab';
@@ -30,7 +31,11 @@ export function ProfilePage() {
       className="shell"
       mainContent={
         <div className="flex-1 px-4 pb-32 pt-[max(var(--safe-top)+44px,44px)]">
-          <PageHeader eyebrow="Account & shop" title="Profile" />
+          <PageHeader
+            eyebrow="Account & shop"
+            title="Profile"
+            action={tab === 'me' ? <InstallAppButton /> : undefined}
+          />
 
           <div
             role="tablist"

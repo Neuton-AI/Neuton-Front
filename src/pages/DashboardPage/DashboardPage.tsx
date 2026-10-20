@@ -4,6 +4,7 @@ import { ErrorState, FullPageLoader } from '@/components/feedback';
 import { IconStore } from '@/components/icons';
 import { Layout } from '@/components/Layout/Layout';
 import { StatCard } from '@/components/StatCard/StatCard';
+import { InstallAppPopover } from '@/features/pwa/InstallApp';
 import type { DashboardPeriod } from '@/features/analytics/types';
 import { formatMoney, formatPercent } from '@/lib/format';
 import { useDashboardPage } from './DashboardPage.module';
@@ -95,6 +96,7 @@ export function DashboardPage() {
               ) : null}
             </div>
           </header>
+          <InstallAppPopover />
 
           {error ? <ErrorState message={errorMessage} onRetry={() => void refetch()} /> : null}
 
