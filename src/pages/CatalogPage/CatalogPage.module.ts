@@ -4,7 +4,7 @@ import { useInventory } from '@/features/inventory/inventoryApi';
 import { useReceipts } from '@/features/receipts/receiptsApi';
 import { useRecipes } from '@/features/recipes/recipesApi';
 import { ingredientLinkSummary } from '@/features/recipes/selectors';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 type Tab = 'recipes' | 'receipts' | 'inventory';
 
 const TABS: { key: Tab; label: string }[] = [
@@ -19,6 +19,7 @@ const TAB_TO_KIND: Record<Tab, MediaKind> = {
   receipts: 'receipt',
 };
 export function useCatalogPage() {
+  const location = useLocation();
   const { user, token } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
@@ -92,6 +93,9 @@ export function useCatalogPage() {
     tab === 'inventory' && !errors.inventory && loadingTab !== 'inventory' && inventory.length > 0;
   const handleSelectTab = (key: Tab) => setSearchParams(key === 'recipes' ? {} : { tab: key });
   return {
+    recipeNavigationState: {
+      recipeReturnTo: `${location.pathname}${location.search}${location.hash}`,
+    },
     shop,
     tab,
     fabNavigation,
