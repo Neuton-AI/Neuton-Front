@@ -255,14 +255,31 @@
 }
 .capture-send-saved {
   position: absolute;
-  right: 0;
-  top: 26px;
-  min-height: 44px;
-  padding: 0 14px;
+  right: 20px;
+  top: -27px;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 12px;
+}
+.capture-send-saved .capture-action-circle {
+  width: 39px;
+  height: 39px;
+  border-radius: 20px;
+}
+.capture-send-saved svg {
+  width: 17px;
+  height: 17px;
+}
+.capture-send-saved .capture-send-count {
+  top: -3px;
+  left: 24px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  border-width: 1.5px;
   border-radius: 8px;
-  background: #cc785c;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 8px;
+  line-height: 8px;
 }
 .capture-feedback {
   display: flex;
