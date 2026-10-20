@@ -5,8 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 const MAX_BYTES = 10 * 1024 * 1024;
 
-export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
-export const DOCUMENT_TYPES = [...IMAGE_TYPES, 'application/pdf'];
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
 export function useCapturePage() {
   const { user, token } = useAuth();
 
@@ -32,20 +31,7 @@ export function useCapturePage() {
 
   const [busy, setBusy] = useState(false);
 
-  const [sourceChooserOpen, setSourceChooserOpen] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const browseButtonRef = useRef<HTMLButtonElement>(null);
-  const galleryButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!sourceChooserOpen) return;
-    const browseButton = browseButtonRef.current;
-    galleryButtonRef.current?.focus();
-    return () => browseButton?.focus();
-  }, [sourceChooserOpen]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -65,7 +51,7 @@ export function useCapturePage() {
     let stream: MediaStream | null = null;
     let active = true;
 
-    if (file || sourceChooserOpen) return;
+    if (file) return;
 
     async function startCamera() {
       try {
@@ -81,8 +67,8 @@ export function useCapturePage() {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
+        console.error('Camera access denied or unavailable', err);
         if (active) {
-          console.error('Camera access denied or unavailable', err);
           setError('Camera access denied or unavailable. You can still upload a file.');
         }
       }
@@ -96,14 +82,13 @@ export function useCapturePage() {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [file, sourceChooserOpen]);
+  }, [file]);
 
   const onPick = useCallback((picked: File | undefined) => {
-    setSourceChooserOpen(false);
     if (!picked) return;
     setError(null);
 
-    if (!DOCUMENT_TYPES.includes(picked.type)) {
+    if (!ACCEPTED.includes(picked.type)) {
       setError('Use a JPG, PNG, WebP, HEIC, or PDF file.');
       return;
     }
@@ -158,42 +143,17 @@ export function useCapturePage() {
     if (file) void submit();
     else captureFrame();
   };
-  const handleBrowse = () => setSourceChooserOpen(true);
-  const closeSourceChooser = useCallback(() => setSourceChooserOpen(false), []);
-  // React 18 does not expose the file input's native cancel event as a prop.
-  useEffect(() => {
-    if (!sourceChooserOpen) return;
-    const inputs = [galleryInputRef.current, fileInputRef.current, cameraInputRef.current];
-    inputs.forEach((input) => input?.addEventListener('cancel', closeSourceChooser));
-    return () => {
-      inputs.forEach((input) => input?.removeEventListener('cancel', closeSourceChooser));
-    };
-  }, [sourceChooserOpen, closeSourceChooser]);
-  const chooseSource = useCallback((source: 'gallery' | 'file' | 'camera') => {
-    const input = {
-      gallery: galleryInputRef,
-      file: fileInputRef,
-      camera: cameraInputRef,
-    }[source].current;
-    try {
-      if (!input) throw new Error('Upload picker unavailable');
-      // Reset only the input, so cancelling keeps the current document selected.
-      input.value = '';
-      input.click();
-    } catch {
-      setError(
-        'Could not open that source. Try Gallery or File explorer, or check camera permissions.',
-      );
-    }
-  }, []);
+  const handleBrowse = () => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    // Let the browser open its native picker. Clearing the input allows the
+    // same file to be chosen again without discarding the current selection.
+    input.value = '';
+    input.click();
+  };
   return {
     handleShutter,
     handleBrowse,
-    sourceChooserOpen,
-    closeSourceChooser,
-    chooseSource,
-    browseButtonRef,
-    galleryButtonRef,
     kind,
     setKind,
     file,
@@ -202,8 +162,6 @@ export function useCapturePage() {
     error,
     busy,
     fileInputRef,
-    galleryInputRef,
-    cameraInputRef,
     videoRef,
     onPick,
     handleClose,
