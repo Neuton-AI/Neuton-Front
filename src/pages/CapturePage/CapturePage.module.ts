@@ -3,6 +3,8 @@ import type { MediaKind } from '@/features/uploads/types';
 import { uploadMedia, type UploadProgress } from '@/features/uploads/upload';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CAMERA_VIDEO_CONSTRAINTS, capturePhoto } from './cameraCapture';
+import { enableContinuousFocus, focusAtPoint } from './cameraFocus';
 const MAX_BYTES = 10 * 1024 * 1024;
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
@@ -30,10 +32,24 @@ export function useCapturePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const capturePendingRef = useRef(false);
+  const captureVersionRef = useRef(0);
+  const focusPendingRef = useRef(false);
+  const autofocusRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    if (!focusPoint) return;
+    const timeout = window.setTimeout(() => setFocusPoint(null), 700);
+    return () => window.clearTimeout(timeout);
+  }, [focusPoint]);
 
   // Object URLs are revoked so repeated captures do not leak memory.
   useEffect(() => {
@@ -56,7 +72,7 @@ export function useCapturePage() {
     async function startCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
+          video: CAMERA_VIDEO_CONSTRAINTS,
           audio: false,
         });
         if (!active) {
@@ -66,6 +82,9 @@ export function useCapturePage() {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+        streamRef.current = stream;
+        const track = stream.getVideoTracks()[0];
+        if (track) autofocusRef.current = enableContinuousFocus(track);
       } catch (err) {
         console.error('Camera access denied or unavailable', err);
         if (active) {
@@ -78,6 +97,8 @@ export function useCapturePage() {
 
     return () => {
       active = false;
+      captureVersionRef.current += 1;
+      streamRef.current = null;
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
@@ -97,32 +118,55 @@ export function useCapturePage() {
       return;
     }
     setFile(picked);
+    setCapturing(false);
+    captureVersionRef.current += 1;
+    setFocusPoint(null);
   }, []);
 
-  const captureFrame = useCallback(() => {
-    if (!videoRef.current) return;
+  const captureFrame = useCallback(async () => {
     const video = videoRef.current;
+    if (!video || video.readyState < 2 || capturePendingRef.current) return;
+    capturePendingRef.current = true;
+    setCapturing(true);
+    const version = captureVersionRef.current;
+    try {
+      const captured = await capturePhoto(video);
+      if (version === captureVersionRef.current && captured) onPick(captured);
+    } catch {
+      if (version === captureVersionRef.current) {
+        setError('Could not take a photo. Try again or use your phone camera.');
+      }
+    } finally {
+      capturePendingRef.current = false;
+      if (version === captureVersionRef.current) setCapturing(false);
+    }
+  }, [onPick]);
 
-    if (video.readyState < 2) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        const newFile = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-        setFile(newFile);
-      },
-      'image/jpeg',
-      0.9,
-    );
-  }, []);
+  const handleFocus = useCallback(
+    async (clientX: number, clientY: number) => {
+      const video = videoRef.current;
+      const stream = streamRef.current;
+      const track = stream?.getVideoTracks()[0];
+      if (!video || !track || file || busy || capturing || focusPendingRef.current) return;
+      focusPendingRef.current = true;
+      setFocusPoint(null);
+      try {
+        await autofocusRef.current;
+        if (streamRef.current !== stream) return;
+        const accepted = await focusAtPoint(track, video, clientX, clientY);
+        if (accepted && streamRef.current === stream) {
+          const bounds = video.getBoundingClientRect();
+          // A request indicator, not a claim that the hardware locked focus.
+          setFocusPoint({ x: clientX - bounds.left, y: clientY - bounds.top });
+        }
+      } catch {
+        // Focus is optional; unsupported or rejected requests stay invisible.
+      } finally {
+        focusPendingRef.current = false;
+      }
+    },
+    [file, busy, capturing],
+  );
 
   const submit = async () => {
     if (!file || !token || !activeShopId || busy) return;
@@ -140,13 +184,26 @@ export function useCapturePage() {
   };
   const handleClose = () => navigate(-1);
   const handleShutter = () => {
+    if (busy || capturing) return;
     if (file) void submit();
-    else captureFrame();
+    else void captureFrame();
   };
   const handleBrowse = () => fileInputRef.current?.click();
+  const handleNativeCamera = () => nativeCameraInputRef.current?.click();
+  const handleRetake = () => {
+    if (busy || capturing) return;
+    captureVersionRef.current += 1;
+    setFile(null);
+    setError(null);
+    setFocusPoint(null);
+  };
   return {
     handleShutter,
     handleBrowse,
+    handleNativeCamera,
+    handleRetake,
+    handleFocus,
+    focusPoint,
     kind,
     setKind,
     file,
@@ -154,7 +211,9 @@ export function useCapturePage() {
     progress,
     error,
     busy,
+    capturing,
     fileInputRef,
+    nativeCameraInputRef,
     videoRef,
     onPick,
     handleClose,

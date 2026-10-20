@@ -29,6 +29,10 @@ export function CapturePage() {
   const {
     handleShutter,
     handleBrowse,
+    handleNativeCamera,
+    handleRetake,
+    handleFocus,
+    focusPoint,
     kind,
     setKind,
     file,
@@ -36,7 +40,9 @@ export function CapturePage() {
     progress,
     error,
     busy,
+    capturing,
     fileInputRef,
+    nativeCameraInputRef,
     videoRef,
     onPick,
     handleClose,
@@ -58,12 +64,18 @@ export function CapturePage() {
 
       {/* Camera preview */}
       <div className="relative h-[370px] w-full max-w-[358px] shrink-0 overflow-hidden rounded-[16px] bg-[#1F1E1B]">
-        {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Selected document preview"
-            className="h-full w-full object-cover"
-          />
+        {file ? (
+          previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Selected document preview"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-6 text-center text-[#FAF9F5]">
+              {file.name}
+            </div>
+          )
         ) : (
           <>
             <video
@@ -71,23 +83,38 @@ export function CapturePage() {
               autoPlay
               playsInline
               muted
+              aria-label="Camera preview"
+              onPointerUp={(event) => {
+                if (event.isPrimary && event.button === 0) {
+                  void handleFocus(event.clientX, event.clientY);
+                }
+              }}
               className="absolute inset-0 h-full w-full object-cover"
             />
             {/* Guides */}
-            <div className="absolute left-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute left-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute right-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute right-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 left-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 left-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 right-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
-            <div className="absolute bottom-7 right-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+            <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+              <div className="absolute left-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute left-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute right-7 top-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute right-7 top-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute bottom-7 left-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute bottom-7 left-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute bottom-7 right-7 h-1 w-9 rounded-sm bg-[#FAF9F5]" />
+              <div className="absolute bottom-7 right-7 h-9 w-1 rounded-sm bg-[#FAF9F5]" />
 
-            <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 rounded-full bg-[#252320] px-[14px] py-[8px]">
-              <span className="whitespace-nowrap text-[13px] font-medium leading-[18px] text-[#FAF9F5]">
-                Align receipt within frame
-              </span>
+              <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 rounded-full bg-[#252320] px-[14px] py-[8px]">
+                <span className="whitespace-nowrap text-[13px] font-medium leading-[18px] text-[#FAF9F5]">
+                  Align receipt within frame
+                </span>
+              </div>
             </div>
+            {focusPoint ? (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-[#FAF9F5]"
+                style={{ left: focusPoint.x, top: focusPoint.y }}
+              />
+            ) : null}
           </>
         )}
       </div>
@@ -111,12 +138,12 @@ export function CapturePage() {
       {/* Shutter */}
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || capturing}
         aria-label={file ? 'Upload document' : 'Take photo'}
         onClick={handleShutter}
         className="mt-4 flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-[4px] border-[#FAF9F5] transition-opacity disabled:opacity-50"
       >
-        {busy ? (
+        {busy || capturing ? (
           <Spinner className="h-6 w-6 text-[#FAF9F5]" />
         ) : (
           <div className="h-[56px] w-[56px] rounded-full bg-[#FAF9F5]" />
@@ -124,8 +151,26 @@ export function CapturePage() {
       </button>
 
       {file && !busy ? (
-        <p className="mt-3 text-sm text-[#FAF9F5]">Tap to upload {file.name}</p>
+        <>
+          <p className="mt-3 text-sm text-[#FAF9F5]">Tap to upload {file.name}</p>
+          <button
+            type="button"
+            onClick={handleRetake}
+            className="mt-2 text-sm text-[#FAF9F5] underline"
+          >
+            Retake or choose another file
+          </button>
+        </>
       ) : null}
+
+      <button
+        type="button"
+        disabled={busy || capturing}
+        onClick={handleNativeCamera}
+        className="mt-4 rounded-full bg-[#252320] px-4 py-2 text-sm font-medium text-[#FAF9F5] disabled:opacity-50"
+      >
+        Use phone camera
+      </button>
 
       <div className="flex-1 min-h-[16px]" />
 
@@ -145,7 +190,7 @@ export function CapturePage() {
       {/* Drop zone */}
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || capturing}
         onClick={handleBrowse}
         className="flex w-full max-w-[358px] flex-col items-center justify-center gap-1 rounded-[16px] border border-dashed border-[#A09D96] bg-[#1F1E1B] px-4 py-3.5 transition-opacity disabled:opacity-50"
       >
@@ -162,7 +207,22 @@ export function CapturePage() {
         aria-label="Choose document"
         accept={ACCEPTED.join(',')}
         className="sr-only"
-        onChange={(event) => onPick(event.target.files?.[0])}
+        onChange={(event) => {
+          onPick(event.target.files?.[0]);
+          event.target.value = '';
+        }}
+      />
+      <input
+        ref={nativeCameraInputRef}
+        type="file"
+        aria-label="Take photo with phone camera"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={(event) => {
+          onPick(event.target.files?.[0]);
+          event.target.value = '';
+        }}
       />
     </div>
   );

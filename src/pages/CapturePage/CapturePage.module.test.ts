@@ -13,18 +13,194 @@ vi.mock('react-router-dom', async (original) => ({
 }));
 
 const stop = vi.fn();
-const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+const applyConstraints = vi.fn();
+const track = {
+  stop,
+  readyState: 'live',
+  getCapabilities: () => ({ focusMode: ['continuous'] }),
+  applyConstraints,
+};
+const stream = {
+  getTracks: () => [track],
+  getVideoTracks: () => [track],
+} as unknown as MediaStream;
 const getUserMedia = vi.fn<() => Promise<MediaStream>>();
 beforeEach(() => {
   resetAuth();
   boundary.upload.mockReset().mockResolvedValue({});
   boundary.navigate.mockReset();
   stop.mockReset();
+  applyConstraints.mockReset().mockResolvedValue(undefined);
   getUserMedia.mockReset().mockResolvedValue(stream);
-  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia,
+      getSupportedConstraints: () => ({ pointsOfInterest: true }),
+    },
+  });
 });
 
 describe('useCapturePage', () => {
+  it('rejects oversized camera captures with recovery while keeping the camera available', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) =>
+      callback(new Blob([new Uint8Array(10 * 1024 * 1024 + 1)], { type: 'image/jpeg' })),
+    );
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const video = document.createElement('video');
+    Object.defineProperties(video, {
+      readyState: { value: 2 },
+      videoWidth: { value: 640 },
+      videoHeight: { value: 480 },
+    });
+    Object.defineProperty(result.current.videoRef, 'current', { value: video });
+    await act(async () => result.current.handleShutter());
+    expect(result.current.error).toMatch(/larger than 10 MB.*smaller photo/);
+    expect(result.current.file).toBeNull();
+    expect(result.current.capturing).toBe(false);
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('discards a pending capture after navigating away', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    let finish!: BlobCallback;
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      finish = callback;
+    });
+    const create = vi.spyOn(URL, 'createObjectURL');
+    const { result, unmount } = renderHookWithProviders(() => useCapturePage());
+    const video = document.createElement('video');
+    Object.defineProperties(video, {
+      readyState: { value: 2 },
+      videoWidth: { value: 640 },
+      videoHeight: { value: 480 },
+    });
+    Object.defineProperty(result.current.videoRef, 'current', { value: video });
+    await act(async () => result.current.handleShutter());
+    unmount();
+    await act(async () => finish(new Blob(['late'], { type: 'image/jpeg' })));
+    expect(create).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledOnce();
+  });
+  it('requests high resolution and continuous autofocus by default, without surfacing failures', async () => {
+    applyConstraints.mockRejectedValue(new Error('Not supported'));
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    await waitFor(() =>
+      expect(applyConstraints).toHaveBeenCalledWith({
+        advanced: [{ focusMode: 'continuous' }],
+      }),
+    );
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: false,
+      video: expect.objectContaining({
+        width: { ideal: 3840 },
+        height: { ideal: 2160 },
+      }),
+    });
+    expect(result.current.error).toBeNull();
+  });
+
+  it('silently rejects tap focus and keeps capturing available', async () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    await waitFor(() => expect(applyConstraints).toHaveBeenCalledOnce());
+    const video = document.createElement('video');
+    Object.defineProperties(video, {
+      videoWidth: { value: 1920 },
+      videoHeight: { value: 1080 },
+    });
+    vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 300,
+    } as DOMRect);
+    Object.defineProperty(result.current.videoRef, 'current', { value: video });
+    applyConstraints.mockRejectedValue(new Error('Camera refused'));
+    await act(async () => result.current.handleFocus(150, 150));
+    expect(result.current.error).toBeNull();
+    expect(result.current.focusPoint).toBeNull();
+    expect(result.current.capturing).toBe(false);
+    expect(applyConstraints).toHaveBeenLastCalledWith({
+      advanced: [{ focusMode: 'continuous', pointsOfInterest: [{ x: 0.5, y: 0.5 }] }],
+    });
+  });
+
+  it('shows only a temporary request indicator after supported focus and can retake', async () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    await waitFor(() => expect(applyConstraints).toHaveBeenCalledOnce());
+    const video = document.createElement('video');
+    Object.defineProperties(video, {
+      videoWidth: { value: 1920 },
+      videoHeight: { value: 1080 },
+    });
+    vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      top: 20,
+      width: 300,
+      height: 300,
+    } as DOMRect);
+    Object.defineProperty(result.current.videoRef, 'current', { value: video });
+    await act(async () => result.current.handleFocus(160, 170));
+    expect(result.current.focusPoint).toEqual({ x: 150, y: 150 });
+    act(() => result.current.onPick(makeFile('scan.jpg', 'image/jpeg')));
+    expect(result.current.focusPoint).toBeNull();
+    act(() => result.current.handleRetake());
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
+    expect(result.current.file).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it('discards a capture resolving after a picker selection and guards double shutters', async () => {
+    const drawImage = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D);
+    let finish!: BlobCallback;
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      finish = callback;
+    });
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const video = document.createElement('video');
+    Object.defineProperties(video, {
+      readyState: { value: 2 },
+      videoWidth: { value: 640 },
+      videoHeight: { value: 480 },
+    });
+    Object.defineProperty(result.current.videoRef, 'current', { value: video });
+    await act(async () => {
+      result.current.handleShutter();
+      result.current.handleShutter();
+    });
+    expect(drawImage).toHaveBeenCalledOnce();
+    const selected = makeFile('chosen.png', 'image/png');
+    act(() => result.current.onPick(selected));
+    await act(async () => finish(new Blob(['late'], { type: 'image/jpeg' })));
+    expect(result.current.file).toBe(selected);
+    expect(result.current.capturing).toBe(false);
+  });
+
+  it.each(['receipt', 'recipe', 'product', 'order'])(
+    'preserves the %s upload kind',
+    async (kind) => {
+      const { result } = renderHookWithProviders(() => useCapturePage(), {
+        route: `/capture?kind=${kind}`,
+      });
+      const picked = makeFile('chosen.png', 'image/png');
+      act(() => result.current.onPick(picked));
+      await act(async () => result.current.handleShutter());
+      expect(boundary.upload).toHaveBeenCalledWith(
+        picked,
+        kind,
+        expect.any(Object),
+        expect.any(Function),
+      );
+    },
+  );
   it('captures a ready camera frame as an image preview', async () => {
     const drawImage = vi.fn();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
