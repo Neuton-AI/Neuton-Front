@@ -18,6 +18,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 export function CatalogPage() {
   const {
+    recipeNavigationState,
     shop,
     tab,
     fabNavigation,
@@ -149,6 +150,7 @@ export function CatalogPage() {
                     <Link
                       key={recipe.id}
                       to={`/catalog/recipes/${recipe.id}`}
+                      state={recipeNavigationState}
                       className="pressable flex flex-col gap-2 rounded-card bg-surface-card p-4"
                     >
                       <div className="flex items-start justify-between gap-3">

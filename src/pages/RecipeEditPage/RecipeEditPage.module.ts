@@ -7,6 +7,7 @@ import {
   useUpdateRecipe,
 } from '@/features/recipes/recipesApi';
 import { ingredientIsLinked } from '@/features/recipes/selectors';
+import { useRecipeNavigation } from '@/features/recipes/recipeNavigation';
 import type { Recipe, RecipeUpdate, ManualProductInput } from '@/features/recipes/types';
 import { useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -86,7 +87,7 @@ export function useRecipeEditPage() {
     !authLoading &&
     !membershipsLoading &&
     !query.isLoading;
-  const detailPath = `/catalog/recipes/${id}`;
+  const { showDetails } = useRecipeNavigation();
 
   useEffect(() => {
     carouselRef.current
@@ -371,7 +372,7 @@ export function useRecipeEditPage() {
     };
     try {
       await update.mutateAsync({ id, body });
-      navigate(detailPath, { replace: true });
+      showDetails();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the recipe.');
     }
@@ -450,7 +451,7 @@ export function useRecipeEditPage() {
     save,
     remove,
     reset,
-    close: () => navigate(detailPath),
+    close: showDetails,
     retry: () => void query.refetch(),
     carouselRef,
     onCarouselScroll,

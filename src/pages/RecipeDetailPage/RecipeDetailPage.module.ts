@@ -1,4 +1,4 @@
-import { useSheetClose } from '@/components/Sheet/Sheet.module';
+import { useRecipeNavigation } from '@/features/recipes/recipeNavigation';
 import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
 import { useDeleteRecipe, useRecipe, useVerifyRecipe } from '@/features/recipes/recipesApi';
 import { ingredientIsLinked, ingredientLinkSummary } from '@/features/recipes/selectors';
@@ -51,7 +51,7 @@ export function useRecipeDetailPage() {
 
   const currency = shop?.currency ?? 'USD';
 
-  const close = useSheetClose('/catalog?tab=recipes');
+  const { close, edit: openEditor } = useRecipeNavigation();
 
   const navigate = useNavigate();
 
@@ -135,7 +135,7 @@ export function useRecipeDetailPage() {
   const deletePending = deleteMutation.isPending;
   const edit = (ingredient?: number) => {
     if (!canVerify || !id) return;
-    navigate(`/catalog/recipes/${id}/edit${ingredient === undefined ? '' : `?ingredient=${ingredient}`}`);
+    openEditor(ingredient);
   };
   return {
     edit,
