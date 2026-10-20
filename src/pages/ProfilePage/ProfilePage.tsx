@@ -34,7 +34,13 @@ export function ProfilePage() {
           <PageHeader
             eyebrow="Account & shop"
             title="Profile"
-            action={tab === 'me' ? <InstallAppButton /> : undefined}
+            action={
+              tab === 'me' ? (
+                <div className="pt-5">
+                  <InstallAppButton />
+                </div>
+              ) : undefined
+            }
           />
 
           <div

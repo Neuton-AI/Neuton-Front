@@ -39,7 +39,7 @@ export function InstallAppPopover() {
   return (
     <aside
       aria-label="Install Neuton"
-      className="fixed inset-x-4 bottom-[calc(max(var(--safe-bottom),12px)+88px)] z-30 mx-auto flex max-w-[388px] flex-col gap-[18px] rounded-[20px] bg-[#181715] p-5 shadow-[0_12px_36px_#14131347,0_2px_6px_#1413131F]"
+      className="fixed inset-x-4 bottom-[calc(max(var(--safe-bottom),12px)+88px)] z-[35] mx-auto flex max-w-[388px] flex-col gap-[18px] rounded-[20px] bg-[#181715] p-5 shadow-[0_12px_36px_#14131347,0_2px_6px_#1413131F]"
     >
       <div className="flex items-center gap-3.5">
         <span
