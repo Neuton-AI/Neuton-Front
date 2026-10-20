@@ -25,3 +25,5 @@ it('derives margin from server money and exposes failed delivery near its action
   expect(result.current.markError).toBe('Delivery failed');
   expect(result.current.error).toBeNull();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

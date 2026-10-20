@@ -2,7 +2,7 @@ import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
 import type { StatusFilter } from '@/features/orders/types';
 import { type Order, type OrderDetail, type OrderQuote } from '@/features/orders/types';
-import { apiFetch } from '@/lib/api';
+import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, Token } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {

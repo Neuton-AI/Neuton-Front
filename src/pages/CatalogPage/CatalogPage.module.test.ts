@@ -31,3 +31,5 @@ it('loads only the selected tab and keeps failures isolated by tab', async () =>
   expect(result.current.tab).toBe('receipts');
   expect(result.current.errors.receipts).toBeUndefined();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

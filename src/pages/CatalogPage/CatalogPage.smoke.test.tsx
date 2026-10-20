@@ -17,3 +17,5 @@ it('shows a price for supermarket-linked ingredients without optional server cou
   expect(await screen.findByRole('link', { name: /Tomato Soup/ })).toHaveTextContent('$10.50');
   expect(screen.queryByText(/cost incomplete/)).toBeNull();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

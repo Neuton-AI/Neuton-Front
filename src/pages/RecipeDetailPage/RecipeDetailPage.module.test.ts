@@ -32,3 +32,5 @@ it('rejects member actions through the public hook as well as the UI', async () 
   expect(result.current.verifyError).toBeNull();
   expect(result.current.deleteError).toBeNull();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

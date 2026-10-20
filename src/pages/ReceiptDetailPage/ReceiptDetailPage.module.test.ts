@@ -34,3 +34,5 @@ it('rejects member verification without requesting a write', async () => {
   expect(result.current.canVerify).toBe(false);
   expect(result.current.verifyError).toBeNull();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

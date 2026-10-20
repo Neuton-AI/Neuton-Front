@@ -26,3 +26,6 @@ it('renders module errors and forwards retry and status-selection actions', asyn
   await user.click(screen.getByRole('tab', { name: 'Delivered' }));
   expect(model.setStatusFilter).toHaveBeenCalledWith('delivered');
 });
+
+// Keep these screen contracts independent of persistence; sync integration is exercised separately.
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

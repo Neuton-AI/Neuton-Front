@@ -340,3 +340,6 @@ describe.each(['verified', 'unverified'] as const)('Recipe detail %s design', (s
     },
   );
 });
+
+// Keep these screen contracts independent of persistence; sync integration is exercised separately.
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

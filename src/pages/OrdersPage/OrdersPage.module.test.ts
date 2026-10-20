@@ -37,3 +37,5 @@ it('sorts sales newest first and preserves empty status-filter results', async (
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.visibleOrders).toEqual([]);
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

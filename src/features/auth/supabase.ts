@@ -2,6 +2,7 @@ import { type ShopMembership } from '@/features/shops/types';
 import type { Session } from '@supabase/supabase-js';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { logoutCleanup } from '@/features/sync/store';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -40,11 +41,21 @@ export function useAuth() {
       setLoading(false);
       return;
     }
+    let authenticatedId: string | undefined;
     void supabase.auth.getSession().then(({ data }) => {
+      authenticatedId = data.session?.user.id;
       setSession(data.session);
       setLoading(false);
     });
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, next) => {
+      if (authenticatedId && authenticatedId !== next?.user.id) {
+        window.dispatchEvent(new Event('neuton-account-change'));
+      }
+      if (event === 'SIGNED_OUT' && authenticatedId) {
+        localStorage.removeItem(`neuton.memberships:${authenticatedId}`);
+        void logoutCleanup(authenticatedId).catch(() => undefined);
+      }
+      authenticatedId = next?.user.id;
       setSession(next);
     });
     return () => subscription.subscription.unsubscribe();
@@ -67,6 +78,18 @@ export function useShopMemberships(userId: string | undefined): MembershipState 
     }
     setLoading(true);
     setError(null);
+    // Previously authenticated shops remain available when reopening the PWA offline.
+    const cacheKey = `neuton.memberships:${userId}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const rows = JSON.parse(cached) as ShopMembership[];
+        setMemberships(rows);
+        const selected = localStorage.getItem(ACTIVE_SHOP_KEY);
+        setActiveShopIdState(rows.find((row) => row.shopId === selected)?.shopId ?? rows[0]?.shopId ?? null);
+        setLoading(false);
+      } catch { localStorage.removeItem(cacheKey); }
+    }
     try {
       // Read directly through RLS: the user's own memberships are all it returns.
       const { data, error: queryError } = await supabase
@@ -83,6 +106,7 @@ export function useShopMemberships(userId: string | undefined): MembershipState 
       }));
 
       setMemberships(rows);
+      try { localStorage.setItem(cacheKey, JSON.stringify(rows)); } catch { /* Optional offline shop cache must not block online access. */ }
 
       const stored = localStorage.getItem(ACTIVE_SHOP_KEY);
       const stillValid = stored && rows.some((row) => row.shopId === stored);

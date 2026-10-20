@@ -88,3 +88,6 @@ describe('receipts API contracts', () => {
     client.clear();
   });
 });
+
+// Domain hook contracts use the network adapter; persistent synchronization has its own integration suite.
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

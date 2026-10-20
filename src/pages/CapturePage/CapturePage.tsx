@@ -1,8 +1,7 @@
 import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { ErrorState, InlineNotice, Spinner } from '@/components/feedback';
+import { ErrorState, Spinner } from '@/components/feedback';
 import { IconClose } from '@/components/icons';
 import type { MediaKind } from '@/features/uploads/types';
-import type { UploadSession } from '@/features/uploads/upload';
 import { useCapturePage } from './CapturePage.module';
 import { CaptureDialog } from './CaptureDialog';
 import { SourcePreview } from './SourcePreview';
@@ -16,21 +15,6 @@ const KINDS: { key: MediaKind; label: string }[] = [
   { key: 'order', label: 'Order' },
 ];
 const ACCEPTED = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
-
-function describePhase(session: UploadSession): string {
-  switch (session.phase) {
-    case 'presigning':
-      return 'Preparing secure upload links…';
-    case 'uploading':
-      return 'Sending your document to storage…';
-    case 'queueing':
-      return 'Queued. Neuton is reading the document.';
-    case 'done':
-      return 'Done. Your document is being processed.';
-    case 'failed':
-      return 'Your document is saved here. Retry to send the remaining files.';
-  }
-}
 
 function CaptureIcon({
   kind,
@@ -102,7 +86,6 @@ export function CapturePage() {
     kind,
     setKind,
     error,
-    progress,
     handleClose,
     handleBrowse,
     handleShutter,
@@ -255,7 +238,7 @@ export function CapturePage() {
                 <CaptureIcon kind="plus" />
               </CaptureAction>
               <CaptureAction
-                label={progress?.phase === 'failed' && !busy ? 'Retry' : 'Send'}
+                label="Send"
                 variant="capture-action--send"
                 disabled={busy || adding}
                 onClick={() => void submit()}
@@ -283,7 +266,7 @@ export function CapturePage() {
               </button>
               {stacked.length > 0 && (
                 <CaptureAction
-                  label={busy ? 'Sending…' : progress?.phase === 'failed' ? 'Retry' : 'Send'}
+                  label={busy ? 'Saving…' : 'Send'}
                   variant="capture-action--send capture-send-saved"
                   disabled={busy || adding || model.capturing}
                   onClick={() => void submit()}
@@ -301,19 +284,6 @@ export function CapturePage() {
         </div>
         <div className="capture-feedback" aria-live="polite">
           {error && <ErrorState message={error} />}
-          {progress && (
-            <>
-              <InlineNotice>{describePhase(progress)}</InlineNotice>
-              <ol className="capture-upload-status">
-                {progress.sources.map((source, index) => (
-                  <li key={`${index}-${source.file.name}`}>
-                    {index + 1}. {source.file.name} — {source.status}
-                    {source.error ? `: ${source.error}` : ''}
-                  </li>
-                ))}
-              </ol>
-            </>
-          )}
           {total >= 4 && !busy && (
             <p>4 of 4 sources. Send your document or review to make changes.</p>
           )}
