@@ -282,14 +282,19 @@ export function CapturePage() {
                 <span />
               </button>
               {stacked.length > 0 && (
-                <button
-                  type="button"
-                  className="capture-send-saved"
-                  disabled={busy || adding}
+                <CaptureAction
+                  label={busy ? 'Sending…' : progress?.phase === 'failed' ? 'Retry' : 'Send'}
+                  variant="capture-action--send capture-send-saved"
+                  disabled={busy || adding || model.capturing}
                   onClick={() => void submit()}
                 >
-                  {busy ? 'Sending…' : progress?.phase === 'failed' ? 'Retry' : `Send ${total}`}
-                </button>
+                  {busy ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <CaptureIcon kind="send" />
+                  )}
+                  <span className="capture-send-count">{total}</span>
+                </CaptureAction>
               )}
             </>
           )}
