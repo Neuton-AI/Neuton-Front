@@ -1,8 +1,9 @@
 import { ErrorState, InlineNotice, Spinner } from '@/components/feedback';
 import { IconClose } from '@/components/icons';
+import { Sheet } from '@/components/Sheet/Sheet';
 import type { MediaKind } from '@/features/uploads/types';
 import { type UploadProgress } from '@/features/uploads/upload';
-import { useCapturePage } from './CapturePage.module';
+import { DOCUMENT_TYPES, IMAGE_TYPES, useCapturePage } from './CapturePage.module';
 import { IconUpload } from './IconUpload/IconUpload';
 const KINDS: { key: MediaKind; label: string }[] = [
   { key: 'receipt', label: 'Receipt' },
@@ -10,8 +11,6 @@ const KINDS: { key: MediaKind; label: string }[] = [
   { key: 'product', label: 'Product' },
   { key: 'order', label: 'Order' },
 ];
-
-const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
 
 function describePhase(progress: UploadProgress): string {
   switch (progress.phase) {
@@ -37,6 +36,13 @@ export function CapturePage() {
     error,
     busy,
     fileInputRef,
+    galleryInputRef,
+    cameraInputRef,
+    sourceChooserOpen,
+    closeSourceChooser,
+    chooseSource,
+    browseButtonRef,
+    galleryButtonRef,
     videoRef,
     onPick,
     handleClose,
@@ -130,7 +136,7 @@ export function CapturePage() {
       <div className="flex-1 min-h-[16px]" />
 
       {/* Error/Progress */}
-      {error ? (
+      {error && !sourceChooserOpen ? (
         <div className="mb-4 w-full max-w-[358px]">
           <ErrorState message={error} />
         </div>
@@ -147,6 +153,8 @@ export function CapturePage() {
         type="button"
         disabled={busy}
         onClick={handleBrowse}
+        ref={browseButtonRef}
+        aria-haspopup="dialog"
         className="flex w-full max-w-[358px] flex-col items-center justify-center gap-1 rounded-[16px] border border-dashed border-[#A09D96] bg-[#1F1E1B] px-4 py-3.5 transition-opacity disabled:opacity-50"
       >
         <IconUpload className="h-[22px] w-[22px] text-[#A09D96]" />
@@ -156,14 +164,59 @@ export function CapturePage() {
         </span>
       </button>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        aria-label="Choose document"
-        accept={ACCEPTED.join(',')}
-        className="sr-only"
-        onChange={(event) => onPick(event.target.files?.[0])}
-      />
+      <Sheet open={sourceChooserOpen} onClose={closeSourceChooser} label="Choose upload source">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 py-4 text-ink">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-medium">Choose upload source</h2>
+            <button type="button" aria-label="Close upload sources" onClick={closeSourceChooser}>
+              <IconClose className="h-6 w-6" />
+            </button>
+          </div>
+          {(
+            [
+              ['gallery', 'Gallery', 'Select an existing image'],
+              ['file', 'File explorer', 'Select an image or PDF'],
+              ['camera', 'Native camera', 'Take a new photo with your phone'],
+            ] as const
+          ).map(([source, label, description]) => (
+            <button
+              key={source}
+              ref={source === 'gallery' ? galleryButtonRef : undefined}
+              type="button"
+              disabled={busy}
+              onClick={() => chooseSource(source)}
+              className="rounded-xl bg-surface-card px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary"
+            >
+              <span className="block font-medium">{label}</span>
+              <span className="block text-sm text-ink-muted">{description}</span>
+            </button>
+          ))}
+          <p className="text-sm text-ink-muted">
+            Native camera depends on your phone and browser. If camera access is denied or
+            unavailable, allow it in device settings or choose Gallery or File explorer. Your
+            browser may show its own source picker.
+          </p>
+          {error ? <ErrorState message={error} /> : null}
+        </div>
+      </Sheet>
+      {(
+        [
+          [galleryInputRef, 'Choose gallery image', IMAGE_TYPES, undefined],
+          [fileInputRef, 'Choose document', DOCUMENT_TYPES, undefined],
+          [cameraInputRef, 'Take native camera photo', IMAGE_TYPES, 'environment'],
+        ] as const
+      ).map(([ref, label, types, capture]) => (
+        <input
+          key={label}
+          ref={ref}
+          type="file"
+          aria-label={label}
+          accept={types.join(',')}
+          capture={capture}
+          hidden
+          onChange={(event) => onPick(event.target.files?.[0])}
+        />
+      ))}
     </div>
   );
 }

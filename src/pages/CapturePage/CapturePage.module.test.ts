@@ -21,10 +21,127 @@ beforeEach(() => {
   boundary.navigate.mockReset();
   stop.mockReset();
   getUserMedia.mockReset().mockResolvedValue(stream);
-  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia },
+  });
 });
 
 describe('useCapturePage', () => {
+  it('routes each source to its own picker synchronously and resets it for repeat selections', () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const sources = [
+      { source: 'gallery', ref: result.current.galleryInputRef },
+      { source: 'file', ref: result.current.fileInputRef },
+      { source: 'camera', ref: result.current.cameraInputRef },
+    ] as const;
+    for (const { source, ref } of sources) {
+      const input = document.createElement('input');
+      input.value = 'previous-selection';
+      vi.spyOn(input, 'click').mockImplementation(() => {});
+      Object.defineProperty(ref, 'current', { value: input });
+      act(() => result.current.handleBrowse());
+      act(() => result.current.chooseSource(source));
+      expect(input.value).toBe('');
+      expect(input.click).toHaveBeenCalledOnce();
+      expect(result.current.sourceChooserOpen).toBe(true);
+    }
+  });
+  it('pauses the in-app camera while choosing a source and restarts it after cancellation', async () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+    act(() => result.current.handleBrowse());
+    expect(stop).toHaveBeenCalledOnce();
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    act(() => result.current.onPick(undefined));
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
+    expect(result.current.sourceChooserOpen).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+  it('preserves the current document and error when the picker is cancelled', () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const file = makeFile('existing.jpg', 'image/jpeg');
+    act(() => result.current.onPick(file));
+    act(() => result.current.onPick(makeFile('unsupported.txt', 'text/plain')));
+    const error = result.current.error;
+    act(() => result.current.handleBrowse());
+    act(() => result.current.onPick(undefined));
+    expect(result.current.file).toBe(file);
+    expect(result.current.error).toBe(error);
+    expect(result.current.sourceChooserOpen).toBe(false);
+  });
+  it('handles native cancellation from all three inputs without losing the selected document', () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const inputs = [
+      result.current.galleryInputRef,
+      result.current.fileInputRef,
+      result.current.cameraInputRef,
+    ].map((ref) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      Object.defineProperty(ref, 'current', { value: input });
+      return input;
+    });
+    const file = makeFile('existing.jpg', 'image/jpeg');
+    act(() => result.current.onPick(file));
+    for (const input of inputs) {
+      act(() => result.current.handleBrowse());
+      expect(result.current.sourceChooserOpen).toBe(true);
+      act(() => input.dispatchEvent(new Event('cancel')));
+      expect(result.current.sourceChooserOpen).toBe(false);
+      expect(result.current.file).toBe(file);
+      expect(result.current.error).toBeNull();
+    }
+  });
+  it('keeps alternate sources usable after a picker fails to open', () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const input = document.createElement('input');
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+    Object.defineProperty(result.current.galleryInputRef, 'current', {
+      value: input,
+    });
+    act(() => result.current.handleBrowse());
+    act(() => result.current.chooseSource('camera'));
+    expect(result.current.error).toMatch(/Try Gallery or File explorer/);
+    expect(result.current.sourceChooserOpen).toBe(true);
+    act(() => result.current.chooseSource('gallery'));
+    expect(click).toHaveBeenCalledOnce();
+  });
+  it('ignores a camera denial from before the source chooser opened', async () => {
+    let reject!: (reason: Error) => void;
+    getUserMedia.mockReturnValue(
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+    );
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    act(() => result.current.handleBrowse());
+    await act(async () => reject(new Error('Camera interrupted')));
+    expect(result.current.error).toBeNull();
+  });
+  it.each([
+    ['scan.jpg', 'image/jpeg'],
+    ['scan.png', 'image/png'],
+    ['scan.webp', 'image/webp'],
+    ['scan.heic', 'image/heic'],
+    ['scan.pdf', 'application/pdf'],
+  ])('passes a selected %s through validation and upload', async (name, type) => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    const file = makeFile(name, type);
+    act(() => result.current.handleBrowse());
+    act(() => result.current.onPick(file));
+    expect(result.current.sourceChooserOpen).toBe(false);
+    expect(result.current.file).toBe(file);
+    act(() => result.current.handleShutter());
+    await waitFor(() =>
+      expect(boundary.upload).toHaveBeenCalledWith(
+        file,
+        'receipt',
+        { token: 'token-1', shopId: 'shop-1' },
+        expect.any(Function),
+      ),
+    );
+  });
   it('captures a ready camera frame as an image preview', async () => {
     const drawImage = vi.fn();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
