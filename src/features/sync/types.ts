@@ -17,6 +17,7 @@ export type LocalDocument = {
   lastSyncedAt?: number;
 };
 export type PendingWrite = {
+  operation?: import('./errors').Operation;
   key: string;
   scope: string;
   documentKey: string;
@@ -27,6 +28,12 @@ export type PendingWrite = {
   body?: unknown;
 };
 export type PendingScan = {
+  upload?: {
+    uploadId: string | null;
+    receiptId: string | null;
+    recipeId: string | null;
+    sources: { sourceId: string | null; uploaded: boolean }[];
+  };
   key: string;
   scope: string;
   documentKey: string;
@@ -52,8 +59,7 @@ export function scopeFor(
   token: string | null | undefined,
   shopId: string | null | undefined,
 ): Scope {
-  if (!token || !shopId)
-    throw new Error('Sign in and select a shop to use saved documents.');
+  if (!token || !shopId) throw new Error('Sign in');
   const part = token.split('.')[1];
   const userId = part
     ? (
@@ -62,6 +68,6 @@ export function scopeFor(
         }
       ).sub
     : undefined;
-  if (!userId) throw new Error('Your session is invalid. Sign in again.');
+  if (!userId) throw new Error('Session expired');
   return { userId, shopId, key: `${userId}:${shopId}` };
 }

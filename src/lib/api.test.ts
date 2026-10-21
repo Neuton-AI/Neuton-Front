@@ -40,6 +40,15 @@ async function loadApi(env: Record<string, string> = {}) {
 }
 
 describe('base URL', () => {
+  it.each(['90', 'Wed, 21 Oct 2026 12:01:30 GMT'])('preserves Retry-After %s and the response trace ID for classification', async (retryAfter) => {
+    const { apiFetch } = await loadApi();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-21T12:00:00Z'));
+    mockFetch(new Response(JSON.stringify({ error: { code: 'LIMITED', message: 'Rate limited' } }), {
+      status: 429, headers: { 'Retry-After': retryAfter, 'x-trace-id': 'trace-123' },
+    }));
+    await expect(apiFetch('/sync/check')).rejects.toMatchObject({ status: 429, code: 'LIMITED', retryAfterMs: 90_000, traceId: 'trace-123' });
+    clock.mockRestore();
+  });
   it('prefixes the versioned API root onto the requested path', async () => {
     const { apiFetch } = await loadApi();
     const fetchMock = mockFetch(json({ ok: true }));

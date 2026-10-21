@@ -6,7 +6,7 @@ import {
   type UploadCompleteResponse,
 } from './types';
 import type { UploadContext } from './upload';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 
 export const MAX_UPLOAD_SOURCES = 4;
 export const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
@@ -37,28 +37,43 @@ type UploadSourcesOptions = {
   context: UploadContext;
   session?: UploadSession | null;
   onProgress?: (session: UploadSession) => void;
+  persistProgress?: (session: UploadSession) => Promise<void>;
   orderId?: string;
 };
 
 export class UploadSourcesError extends Error {
-  constructor(message: string, readonly session: UploadSession) {
+  constructor(
+    message: string,
+    readonly session: UploadSession,
+    readonly cause?: unknown,
+    readonly failures: {
+      error: unknown;
+      phase: 'presign' | 'storage-put' | 'completion' | 'local-persistence';
+      sourceIndex: number | null;
+      sourceId: string | null;
+    }[] = [],
+  ) {
     super(message);
     this.name = 'UploadSourcesError';
   }
 }
 
 export function validateUploadFiles(files: readonly File[]): string | null {
-  if (files.length === 0) return 'Add at least one photo or file.';
-  if (files.length > MAX_UPLOAD_SOURCES) return 'Add up to 4 photos or files per document.';
+  if (files.length === 0) return 'Add files';
+  if (files.length > MAX_UPLOAD_SOURCES) return '4 files maximum';
   for (const file of files) {
-    if (!ALLOWED_CONTENT_TYPES.some((contentType) => contentType === file.type)) {
-      return `${file.name}: choose a JPG, PNG, WebP, HEIC, or PDF file.`;
+    if (
+      !ALLOWED_CONTENT_TYPES.some((contentType) => contentType === file.type)
+    ) {
+      return 'Unsupported format';
     }
-    if (file.size === 0) return `${file.name} is empty. Choose another file.`;
-    if (file.size > MAX_UPLOAD_FILE_BYTES) return `${file.name} exceeds the 10 MB file limit.`;
+    if (file.size === 0) return 'Empty file';
+    if (file.size > MAX_UPLOAD_FILE_BYTES) return 'File oversized';
   }
-  if (files.reduce((total, file) => total + file.size, 0) > MAX_UPLOAD_TOTAL_BYTES) {
-    return 'The document exceeds the 40 MB total limit.';
+  if (
+    files.reduce((total, file) => total + file.size, 0) > MAX_UPLOAD_TOTAL_BYTES
+  ) {
+    return 'Document oversized';
   }
   return null;
 }
@@ -67,21 +82,32 @@ export function validateUploadFiles(files: readonly File[]): string | null {
 export async function uploadSources(
   files: readonly File[],
   kind: MediaKind,
-  { context, session: previous, onProgress, orderId }: UploadSourcesOptions,
+  {
+    context,
+    session: previous,
+    onProgress,
+    persistProgress,
+    orderId,
+  }: UploadSourcesOptions,
 ): Promise<UploadCompleteResponse> {
   const validationError = validateUploadFiles(files);
   if (validationError) throw new Error(validationError);
-  if (previous && (
-    previous.kind !== kind || previous.orderId !== orderId ||
-    previous.sources.length !== files.length ||
-    previous.sources.some((source, index) => source.file !== files[index])
-  )) {
-    throw new Error('This upload has already started. Retry with the same document sources.');
+  if (
+    previous &&
+    (previous.kind !== kind ||
+      previous.orderId !== orderId ||
+      previous.sources.length !== files.length ||
+      previous.sources.some((source, index) => source.file !== files[index]))
+  ) {
+    throw new Error('Sources changed');
   }
   if (previous?.result) return previous.result;
 
   let session: UploadSession = previous
-    ? { ...previous, sources: previous.sources.map((source) => ({ ...source })) }
+    ? {
+        ...previous,
+        sources: previous.sources.map((source) => ({ ...source })),
+      }
     : {
         clientRequestId: crypto.randomUUID(),
         kind,
@@ -91,22 +117,52 @@ export async function uploadSources(
         recipeId: null,
         phase: 'presigning',
         ratio: null,
-        sources: files.map((file) => ({ file, status: 'pending', error: null, presign: null })),
+        sources: files.map((file) => ({
+          file,
+          status: 'pending',
+          error: null,
+          presign: null,
+        })),
       };
 
   // Every publication is a new snapshot so React and callers can retain prior states.
-  function publish(update: Partial<UploadSession> = {}) {
-    session = { ...session, ...update, sources: session.sources.map((source) => ({ ...source })) };
-    onProgress?.({ ...session, sources: session.sources.map((source) => ({ ...source })) });
+  async function publish(update: Partial<UploadSession> = {}) {
+    session = {
+      ...session,
+      ...update,
+      sources: session.sources.map((source) => ({ ...source })),
+    };
+    onProgress?.({
+      ...session,
+      sources: session.sources.map((source) => ({ ...source })),
+    });
+    try {
+      await persistProgress?.(session);
+    } catch (error) {
+      failures.push({
+        error,
+        phase: 'local-persistence',
+        sourceId: null,
+        sourceIndex: null,
+      });
+      throw error;
+    }
   }
   function uploadedRatio() {
-    return session.sources.filter((source) => source.status === 'uploaded').length / files.length;
+    return (
+      session.sources.filter((source) => source.status === 'uploaded').length /
+      files.length
+    );
   }
+  let phase: 'presign' | 'storage-put' | 'completion' = 'presign';
+  const failures: UploadSourcesError['failures'] = [];
 
   try {
-    const pending = session.sources.filter((source) => source.status !== 'uploaded');
+    const pending = session.sources.filter(
+      (source) => source.status !== 'uploaded',
+    );
     if (pending.length > 0) {
-      publish({ phase: 'presigning', ratio: uploadedRatio() });
+      await publish({ phase: 'presigning', ratio: uploadedRatio() });
       const presign = await apiFetch<GroupPresignResponse>('/uploads/presign', {
         method: 'POST',
         ...context,
@@ -114,7 +170,11 @@ export async function uploadSources(
           ? {
               uploadId: session.uploadId,
               ...(pending.every((source) => source.presign)
-                ? { sourceIds: pending.map((source) => source.presign!.sourceId) }
+                ? {
+                    sourceIds: pending.map(
+                      (source) => source.presign!.sourceId,
+                    ),
+                  }
                 : {}),
             }
           : {
@@ -136,56 +196,86 @@ export async function uploadSources(
         const source = session.sources[index];
         if (source.status === 'uploaded') continue;
         const signedSource = source.presign
-          ? presign.sources.find((signed) => signed.sourceId === source.presign!.sourceId)
+          ? presign.sources.find(
+              (signed) => signed.sourceId === source.presign!.sourceId,
+            )
           : presign.sources[index];
-        if (!signedSource) throw new Error('The server did not provide an upload link for every source.');
+        if (!signedSource)
+          throw new Error(
+            'The server did not provide an upload link for every source.',
+          );
         source.presign = signedSource;
         source.error = null;
         source.status = 'pending';
       }
-      publish({ phase: 'uploading', ratio: uploadedRatio() });
+      await publish({ phase: 'uploading', ratio: uploadedRatio() });
+      phase = 'storage-put';
 
       for (let index = 0; index < session.sources.length; index += 1) {
         const source = session.sources[index];
         if (source.status === 'uploaded') continue;
-        session.sources[index] = { ...source, status: 'uploading', error: null };
-        publish({ phase: 'uploading', ratio: uploadedRatio() });
+        session.sources[index] = {
+          ...source,
+          status: 'uploading',
+          error: null,
+        };
+        await publish({ phase: 'uploading', ratio: uploadedRatio() });
         try {
           const response = await fetch(source.presign!.uploadUrl, {
             method: presign.method,
             headers: { 'Content-Type': source.file.type },
             body: source.file,
           });
-          if (!response.ok) throw new Error(`Upload to storage failed (${response.status}). Try again.`);
-          session.sources[index] = { ...source, status: 'uploaded', error: null };
+          if (!response.ok)
+            throw new ApiError('Storage upload failed', response.status);
+          session.sources[index] = {
+            ...source,
+            status: 'uploaded',
+            error: null,
+          };
         } catch (error) {
+          failures.push({
+            error,
+            phase: 'storage-put',
+            sourceIndex: index,
+            sourceId: source.presign?.sourceId ?? null,
+          });
           session.sources[index] = {
             ...source,
             status: 'failed',
-            error: error instanceof Error ? error.message : 'Upload failed. Try again.',
+            error: 'Upload failed',
           };
         }
-        publish({ ratio: uploadedRatio() });
+        await publish({ ratio: uploadedRatio() });
       }
     }
 
-    const failed = session.sources.filter((source) => source.status !== 'uploaded');
+    const failed = session.sources.filter(
+      (source) => source.status !== 'uploaded',
+    );
     if (failed.length > 0) {
-      throw new Error(`${failed.length} ${failed.length === 1 ? 'source failed' : 'sources failed'} to upload. Retry to continue.`);
+      throw new Error('Upload failed');
     }
-    publish({ phase: 'queueing', ratio: 1 });
+    await publish({ phase: 'queueing', ratio: 1 });
+    phase = 'completion';
     const result = await apiFetch<UploadCompleteResponse>('/uploads/complete', {
       method: 'POST',
       ...context,
       body: { uploadId: session.uploadId },
     });
     if (!result.queued) {
-      throw new Error('Your files uploaded, but processing is unavailable. Retry to submit this document.');
+      throw new Error(
+        'Your files uploaded, but processing is unavailable. Retry to submit this document.',
+      );
     }
-    publish({ phase: 'done', ratio: 1, result });
+    await publish({ phase: 'done', ratio: 1, result });
     return result;
   } catch (error) {
-    publish({ phase: 'failed', ratio: uploadedRatio() });
-    throw new UploadSourcesError(error instanceof Error ? error.message : 'Upload failed. Try again.', session);
+    if (!failures.length)
+      failures.push({ error, phase, sourceIndex: null, sourceId: null });
+    await publish({ phase: 'failed', ratio: uploadedRatio() }).catch(
+      () => undefined,
+    );
+    throw new UploadSourcesError('Upload failed', session, error, failures);
   }
 }

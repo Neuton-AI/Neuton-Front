@@ -144,7 +144,20 @@
   }
 }
 /* Keep offline feedback in document flow, clear of the fixed capture controls. */
-.sync-status { position: relative; z-index: 60; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: #fff1cc; color: #493807; font: 13px/1.5 Inter, sans-serif; }
-.sync-status button { text-decoration: underline; font-weight: 600; }
-body:has(.sync-status) [role='dialog'] { max-height: calc(100dvh - var(--sync-status-height, 0px) - 8px); }
-.sync-status + main { height: calc(100dvh - var(--sync-status-height, 0px)); }
+.sync-popup { position: fixed; top: calc(22px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 90; max-width: calc(100vw - 32px); font: 11px/14px Inter, sans-serif; color: #141413; }
+.sync-popup__pill { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 26px; height: 26px; padding: 1px; background: #fff; border: 1px solid #e6dfd8; border-radius: 999px; box-shadow: 0 8px 20px #14141324, 0 2px 6px #1414131a; }
+.sync-popup__pill--opened { width: max-content; max-width: calc(100vw - 32px); min-height: 28px; height: auto; padding: 4px 14px 4px 4px; }
+.sync-popup__pill strong { white-space: nowrap; font-weight: 600; }
+.sync-popup__disc { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: #e6e0d3; color: #6c6a64; font-size: 15px; font-weight: 700; }
+.sync-popup__pill--opened .sync-popup__disc { width: 18px; height: 18px; }
+.sync-popup--error .sync-popup__disc { background: #c6454524; color: #c64545; }
+.sync-popup--success .sync-popup__disc { background: #5db87238; color: #2f8f4e; }
+.sync-popup__message { color: #3d3d3a; }
+.sync-popup--error .sync-popup__message { color: #c64545; }
+.sync-popup__count { position: absolute; top: -6px; right: -8px; min-width: 14px; padding: 1px 3px; border-radius: 8px; background: #c64545; color: white; font-size: 9px; }
+.sync-popup__dots { letter-spacing: 1px; animation: sync-pulse 1.2s ease-in-out infinite; }
+@keyframes sync-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .sync-popup__dots { animation: none; } }
+
+.sync-popup__actions { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 5px; color: #6c6a64; font-size: 10px; }
+.sync-popup__actions button, .sync-popup__actions a { padding: 3px; text-decoration: underline; }

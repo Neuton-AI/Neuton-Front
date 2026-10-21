@@ -8,6 +8,7 @@ const STORES = [
   'scans',
   'blobs',
   'settings',
+  'syncErrors',
 ] as const;
 type StoreName = (typeof STORES)[number];
 let opening: Promise<IDBDatabase> | undefined;
@@ -29,7 +30,7 @@ export function changed() {
 }
 export function database() {
   opening ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 2);
+    const request = indexedDB.open(DATABASE, 3);
     request.onupgradeneeded = () => {
       for (const name of STORES) {
         if (request.result.objectStoreNames.contains(name)) continue;
@@ -50,8 +51,7 @@ export function database() {
       opening = undefined;
       reject(request.error);
     };
-    request.onblocked = () =>
-      reject(new Error('Close other Neuton tabs and retry local storage.'));
+    request.onblocked = () => reject(new Error('Storage blocked'));
   });
   return opening;
 }
@@ -84,11 +84,6 @@ export async function transaction<T>(
       /* Already aborted or committed. */
     }
     await completed.catch(() => undefined);
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      throw new Error(
-        'Device storage is full. Export pending work from the sync banner, free device space, then retry. Your new change was not saved.',
-      );
-    }
     throw error;
   }
 }
