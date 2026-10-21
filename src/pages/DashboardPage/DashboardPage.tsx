@@ -68,8 +68,8 @@ export function DashboardPage() {
     <Layout
       className="shell bg-[#FAF9F5]"
       mainContent={
-        <div className="flex-1 space-y-3 px-4 pb-32 pt-[max(var(--safe-top)+44px,44px)]">
-          <header className="flex flex-col gap-0.5 pt-2">
+        <div className="flex-1 space-y-3 px-4 pb-32">
+          <header className="page-header screen-header -mx-4 flex flex-col gap-0.5 px-4">
             <p className="text-[12px] font-medium uppercase leading-[17px] tracking-[1.5px] text-[#CC785C]">
               {dateLabel}
             </p>

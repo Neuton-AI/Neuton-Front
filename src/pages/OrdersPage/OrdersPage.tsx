@@ -33,10 +33,8 @@ export function OrdersPage() {
     <Layout
       className="shell"
       mainContent={
-        <div className="flex-1 pb-44 pt-[max(var(--safe-top)+44px,44px)]">
-          <div className="px-4">
-            <PageHeader eyebrow="YOUR SALES" title="Orders" />
-          </div>
+        <div className="flex-1 pb-44">
+          <PageHeader eyebrow="YOUR SALES" title="Orders" className="screen-header px-4" />
 
           <div
             role="tablist"

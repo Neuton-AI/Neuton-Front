@@ -36,10 +36,8 @@ export function CatalogPage() {
     <Layout
       className="shell"
       mainContent={
-        <div className="flex-1 pb-32 pt-[max(var(--safe-top)+44px,44px)]">
-          <div className="px-4">
-            <PageHeader eyebrow={shop?.name} title="Catalog" />
-          </div>
+        <div className="flex-1 pb-32">
+          <PageHeader eyebrow={shop?.name} title="Catalog" className="screen-header px-4" />
 
           <div className="no-scrollbar mt-4 overflow-x-auto px-4">
             <div

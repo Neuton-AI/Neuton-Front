@@ -55,6 +55,15 @@
     @apply text-eyebrow font-medium uppercase text-ink-muted;
   }
 
+  .page-header {
+    @apply sticky top-0 z-20 bg-surface-canvas pt-2 pb-2;
+  }
+
+  .screen-header {
+    /* Half the previous 44px page inset + 8px header padding. */
+    padding-top: calc(var(--safe-top) + 26px);
+  }
+
   .card {
     @apply rounded-card bg-surface-card;
   }

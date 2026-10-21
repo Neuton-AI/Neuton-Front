@@ -30,8 +30,9 @@ export function ProfilePage() {
     <Layout
       className="shell"
       mainContent={
-        <div className="flex-1 px-4 pb-32 pt-[max(var(--safe-top)+44px,44px)]">
+        <div className="flex-1 px-4 pb-32">
           <PageHeader
+            className="screen-header -mx-4 px-4"
             eyebrow="Account & shop"
             title="Profile"
             action={
