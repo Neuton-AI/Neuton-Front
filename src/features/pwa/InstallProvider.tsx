@@ -26,9 +26,10 @@ export function InstallProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const display = window.matchMedia('(display-mode: standalone)');
+    const fullscreen = window.matchMedia('(display-mode: fullscreen)');
     const updateDisplay = () =>
       setInstalled(
-        display.matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
+        display.matches || fullscreen.matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
       );
     updateDisplay();
     // iPadOS can identify itself as macOS. Other iOS browsers get Safari guidance.
@@ -51,10 +52,12 @@ export function InstallProvider({ children }: { children: ReactNode }) {
     window.addEventListener('beforeinstallprompt', beforeInstall);
     window.addEventListener('appinstalled', afterInstall);
     display.addEventListener('change', updateDisplay);
+    fullscreen.addEventListener('change', updateDisplay);
     return () => {
       window.removeEventListener('beforeinstallprompt', beforeInstall);
       window.removeEventListener('appinstalled', afterInstall);
       display.removeEventListener('change', updateDisplay);
+      fullscreen.removeEventListener('change', updateDisplay);
     };
   }, []);
 
