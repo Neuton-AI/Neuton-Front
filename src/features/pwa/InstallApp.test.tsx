@@ -85,12 +85,12 @@ describe('PWA installation', () => {
     expect(screen.queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
   });
 
-  it('does not prompt in standalone mode', () => {
-    vi.mocked(window.matchMedia).mockReturnValue({
-      matches: true,
+  it.each(['standalone', 'fullscreen'])('does not prompt in %s mode', (mode) => {
+    vi.mocked(window.matchMedia).mockImplementation((query) => ({
+      matches: query === `(display-mode: ${mode})`,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-    } as unknown as MediaQueryList);
+    } as unknown as MediaQueryList));
     renderInstall();
     offerInstall();
     expect(screen.queryByRole('button', { name: /install/i })).not.toBeInTheDocument();

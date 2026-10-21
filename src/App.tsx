@@ -3,6 +3,7 @@ import { useAuth } from '@/features/auth/supabase';
 import { AuthPage } from '@/pages/AuthPage/AuthPage';
 import { LandingPage } from '@/pages/LandingPage/LandingPage';
 import { SyncStatus } from '@/features/sync/SyncStatus';
+import { useAppChrome } from '@/features/pwa/useAppChrome';
 import { Suspense, lazy, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -63,6 +64,7 @@ const RecipeEditPage = lazy(() =>
 );
 
 export function App() {
+  useAppChrome();
   return (
     <>
       <SyncStatus />

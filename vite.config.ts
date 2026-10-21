@@ -16,7 +16,7 @@ export default defineConfig({
         description: 'Your shop, costs and real profit in one place.',
         start_url: '/',
         scope: '/',
-        display: 'standalone',
+        display: 'fullscreen',
         background_color: '#FAF9F5',
         theme_color: '#FAF9F5',
         icons: [
