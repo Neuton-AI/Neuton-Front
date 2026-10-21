@@ -70,7 +70,6 @@ describe('sync popup', () => {
   });
   it.each([
     ['success', 'Upload succeeded'],
-    ['progress', 'In progress'],
   ] as const)('announces %s and retains a compact toggle', (tone, message) => {
     render(
       <MemoryRouter>
@@ -80,7 +79,7 @@ describe('sync popup', () => {
           message={message}
           errors={[]}
           pending={0}
-          processing={tone === 'progress' ? 1 : 0}
+          processing={0}
           online
           opened={false}
           setOpened={() => {}}

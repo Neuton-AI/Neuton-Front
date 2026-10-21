@@ -5,7 +5,7 @@ import type { SyncError } from './errors';
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 type Props = {
   rootRef?: Ref<HTMLElement>;
-  tone: 'error' | 'progress' | 'success';
+  tone: 'error' | 'success';
   title: string;
   message: string;
   errors: SyncError[];
@@ -87,7 +87,7 @@ export function SyncPopup({
               />
               <circle cx="10" cy="16" r="1.7" fill="currentColor" />
             </svg>
-          ) : tone === 'success' ? (
+          ) : (
             <svg width="10" height="10" viewBox="0 0 20 20" fill="none">
               <path
                 d="m4.5 10.5 4 4 7-8.5"
@@ -97,8 +97,6 @@ export function SyncPopup({
                 strokeLinejoin="round"
               />
             </svg>
-          ) : (
-            <span className="sync-popup__dots">•••</span>
           )}
         </span>
         {opened && (

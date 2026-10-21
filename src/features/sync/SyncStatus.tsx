@@ -153,35 +153,20 @@ export function SyncStatus() {
   if (!token || !activeShopId) return null;
   const current = snapshot?.scope === scopeKey ? snapshot : undefined;
   const errors = current?.errors ?? [];
-  const busy =
-    current?.activity?.running ||
-    (current?.pending ?? 0) > 0 ||
-    (current?.processing ?? 0) > 0;
   const succeeded =
     current?.activity?.completedAt &&
     !current?.activity?.running &&
     Date.now() - current.activity.completedAt < 8000;
-  if (!errors.length && !busy && online && !succeeded && !localMessage)
+  if (!errors.length && online && !succeeded && !localMessage)
     return null;
-  const tone =
-    errors.length || localMessage
-      ? 'error'
-      : online && succeeded
-        ? 'success'
-        : !online || busy
-          ? 'progress'
-          : 'success';
+  const tone = errors.length || localMessage || !online ? 'error' : 'success';
   const first = errors[0];
   const message =
     localMessage ||
     first?.message ||
     (!online
       ? 'Connection unavailable'
-      : succeeded
-        ? current?.activity?.message || 'Sync succeeded'
-        : busy
-          ? 'In progress'
-          : current?.activity?.message || 'Sync succeeded');
+      : current?.activity?.message || 'Sync succeeded');
   const title = first
     ? `${label(first.entity)} · ${label(first.operation)}`
     : current?.activity
