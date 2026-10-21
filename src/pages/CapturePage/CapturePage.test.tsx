@@ -42,8 +42,6 @@ const model = (): CapturePageModel => ({
   busy: false,
   locked: false,
   error: null,
-  progress: null,
-  uploadSession: null,
   fileInputRef: createRef<HTMLInputElement>(),
   galleryInputRef: createRef<HTMLInputElement>(),
   nativeCameraInputRef: createRef<HTMLInputElement>(),
@@ -199,38 +197,17 @@ it('offers gallery, file explorer and camera and accepts multiple files', async 
   expect(state.onPick).toHaveBeenCalledWith(files);
 });
 
-it('shows file fallback and partial upload failures with a retry action', () => {
+it('retains the file preview and allows resubmission after a local save failure', () => {
   const current = source('document', 'application/pdf');
   vi.mocked(useCapturePage).mockReturnValue({
     ...model(),
     current,
     total: 1,
-    locked: true,
-    error: 'Upload rejected',
-    progress: {
-      kind: 'receipt',
-      uploadId: 'upload',
-      clientRequestId: 'request',
-      receiptId: 'receipt',
-      recipeId: null,
-      phase: 'failed',
-      ratio: 0,
-      sources: [
-        {
-          file: current.file,
-          status: 'failed',
-          error: 'Offline',
-          presign: null,
-        },
-      ],
-    },
+    error: 'Device storage is full',
   });
   render(<CapturePage />);
   expect(screen.getByText('document.pdf')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: 'Retake' })).toBeDisabled();
-  expect(screen.getByRole('alert')).toHaveTextContent('Upload rejected');
-  expect(
-    screen.getByText(/document.pdf — failed: Offline/),
-  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Retake' })).toBeEnabled();
+  expect(screen.getByRole('alert')).toHaveTextContent('Device storage is full');
 });

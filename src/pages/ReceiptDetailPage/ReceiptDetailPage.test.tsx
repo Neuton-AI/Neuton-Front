@@ -241,3 +241,6 @@ describe('ReceiptDetailPage visual-only actions', () => {
     expect(screen.getByText('No line items were extracted.')).toBeInTheDocument();
   });
 });
+
+// Keep these screen contracts independent of persistence; sync integration is exercised separately.
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

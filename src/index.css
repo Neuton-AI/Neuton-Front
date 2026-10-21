@@ -128,3 +128,8 @@
     transform: none;
   }
 }
+/* Keep offline feedback in document flow, clear of the fixed capture controls. */
+.sync-status { position: relative; z-index: 60; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: #fff1cc; color: #493807; font: 13px/1.5 Inter, sans-serif; }
+.sync-status button { text-decoration: underline; font-weight: 600; }
+body:has(.sync-status) [role='dialog'] { max-height: calc(100dvh - var(--sync-status-height, 0px) - 8px); }
+.sync-status + main { height: calc(100dvh - var(--sync-status-height, 0px)); }

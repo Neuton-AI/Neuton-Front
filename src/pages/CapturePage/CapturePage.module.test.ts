@@ -9,10 +9,7 @@ vi.mock(
   "@/features/auth/supabase",
   async () => (await import("@/test/auth")).authMock,
 );
-vi.mock("@/features/uploads/upload", async (original) => ({
-  ...(await original<typeof import("@/features/uploads/upload")>()),
-  uploadSources: boundary.upload,
-}));
+vi.mock("@/features/sync/documentsApi", () => ({ saveScan: boundary.upload }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useNavigate: () => boundary.navigate,
@@ -247,9 +244,8 @@ describe("capture collection", () => {
       expect(boundary.upload).toHaveBeenCalledWith(
         files,
         kind,
-        expect.objectContaining({
-          context: { token: "token-1", shopId: "shop-1" },
-        }),
+        { token: "token-1", shopId: "shop-1" },
+        "00000000-0000-4000-8000-000000000001",
       );
       expect(boundary.navigate).toHaveBeenCalled();
     },
@@ -305,6 +301,7 @@ describe("capture collection", () => {
       [second, first],
       "receipt",
       expect.anything(),
+      undefined,
     );
   });
   it("native picker cancellation exits replacement mode", () => {

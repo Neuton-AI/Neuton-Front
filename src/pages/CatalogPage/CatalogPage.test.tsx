@@ -252,3 +252,6 @@ describe('CatalogPage recipes tab incomplete cost', () => {
     ).toBeInTheDocument();
   });
 });
+
+// Keep these screen contracts independent of persistence; sync integration is exercised separately.
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

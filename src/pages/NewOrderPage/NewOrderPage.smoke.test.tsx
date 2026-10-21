@@ -23,3 +23,5 @@ it('loads a recipe, prices its quantity and opens the saved order through real H
   await user.click(save);
   expect(await screen.findByRole('heading', { name: 'Saved order' })).toBeInTheDocument();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

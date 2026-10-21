@@ -9,7 +9,7 @@ import {
   type Recipe,
   type RecipeUpdate,
 } from '@/features/recipes/types';
-import { apiFetch } from '@/lib/api';
+import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, Token } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {

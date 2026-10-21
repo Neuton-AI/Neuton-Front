@@ -233,3 +233,5 @@ describe('deep-link round trip', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/orders/o-123'));
   });
 });
+
+vi.mock('@/features/sync/SyncStatus', () => ({ SyncStatus: () => null }));

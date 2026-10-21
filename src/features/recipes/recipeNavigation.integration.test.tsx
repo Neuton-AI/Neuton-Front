@@ -175,3 +175,5 @@ it('cancels and completes ingredient linking through the real pages without accu
   await user.click(screen.getByRole('button', { name: 'Browser back' }));
   expect(screen.getByLabelText('Route').textContent).toBe(catalog);
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

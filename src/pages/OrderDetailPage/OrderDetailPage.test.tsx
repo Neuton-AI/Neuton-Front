@@ -268,3 +268,6 @@ describe('OrderDetailPage cancellation', () => {
     expect(screen.queryByRole('button', { name: 'Delete order' })).toBeNull();
   });
 });
+
+// Keep these screen contracts independent of persistence; sync integration is exercised separately.
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

@@ -34,6 +34,7 @@ type RequestOptions = {
   token?: string | null;
   shopId?: string | null;
   signal?: AbortSignal;
+  sync?: { id: string; updatedAt: number };
 };
 
 /**
@@ -69,12 +70,16 @@ function readError(payload: unknown, status: number): { message: string; code?: 
 
 export async function apiFetch<T>(
   path: string,
-  { method = 'GET', body, token, shopId, signal }: RequestOptions = {},
+  { method = 'GET', body, token, shopId, signal, sync }: RequestOptions = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   if (shopId) headers['x-shop-id'] = shopId;
+  if (sync) {
+    headers['x-sync-id'] = sync.id;
+    headers['x-sync-version'] = String(sync.updatedAt);
+  }
   const traceId = faro.api.getTraceContext()?.trace_id;
   if (traceId) headers['x-trace-id'] = traceId;
 

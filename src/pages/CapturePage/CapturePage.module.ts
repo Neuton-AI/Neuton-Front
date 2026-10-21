@@ -2,10 +2,9 @@ import { useAuth, useShopMemberships } from "@/features/auth/supabase";
 import { type MediaKind } from "@/features/uploads/types";
 import {
   MAX_UPLOAD_SOURCES,
-  uploadSources,
   validateUploadFiles,
-  type UploadSession,
 } from "@/features/uploads/upload";
+import { saveScan } from "@/features/sync/documentsApi";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CAMERA_VIDEO_CONSTRAINTS, capturePhoto } from "./cameraCapture";
@@ -38,9 +37,6 @@ export function useCapturePage() {
     collectionRef.current = next;
     setCollection(next);
   };
-  const [uploadSession, setUploadSession] = useState<UploadSession | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -85,12 +81,11 @@ export function useCapturePage() {
   );
   const total = collection.sources.length;
   const reviewSources = reviewIncludesCurrent ? collection.sources : stacked;
-  const locked = busy || adding || capturing || uploadSession !== null;
+  const locked = busy || adding || capturing;
   const editingLocked = () =>
     busyRef.current ||
     addingRef.current ||
-    capturingRef.current ||
-    uploadSession !== null;
+    capturingRef.current;
 
   useEffect(() => {
     alive.current = true;
@@ -160,8 +155,7 @@ export function useCapturePage() {
     if (
       !picked?.length ||
       busyRef.current ||
-      addingRef.current ||
-      uploadSession
+      addingRef.current
     )
       return;
     captureVersion.current += 1;
@@ -401,15 +395,11 @@ export function useCapturePage() {
     setBusy(true);
     setError(null);
     try {
-      await uploadSources(
+      await saveScan(
         collectionRef.current.sources.map((source) => source.file),
         kind,
-        {
-          context: { token, shopId: activeShopId },
-          session: uploadSession,
-          onProgress: setUploadSession,
-          orderId,
-        },
+        { token, shopId: activeShopId },
+        orderId,
       );
       navigate(kind === "receipt" ? "/catalog?tab=receipts" : "/catalog");
     } catch (cause) {
@@ -435,8 +425,6 @@ export function useCapturePage() {
     capturing,
     locked,
     error,
-    uploadSession,
-    progress: uploadSession,
     videoRef,
     previewRef,
     fileInputRef,

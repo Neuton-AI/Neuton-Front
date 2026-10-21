@@ -14,3 +14,5 @@ it('shows the real empty state through page, module, query and HTTP for every se
   expect(await screen.findByRole('heading', { name: 'No orders yet' })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /Maya/ })).toBeNull();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

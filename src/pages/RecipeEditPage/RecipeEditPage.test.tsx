@@ -342,3 +342,5 @@ it('deletes through the existing delete endpoint after confirmation', async () =
   await user.click(await screen.findByRole('button', { name: 'Delete recipe' }));
   expect(await screen.findByText('Catalog destination')).toBeInTheDocument();
 });
+
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));

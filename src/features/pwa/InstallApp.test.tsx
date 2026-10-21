@@ -33,9 +33,11 @@ beforeEach(() => {
 });
 
 describe('PWA installation', () => {
-  it('offers no dead install action on unsupported browsers', () => {
+  it('keeps the Profile button visible without a native prompt and opens browser instructions', () => {
     renderInstall();
-    expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Install Neuton' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Install app' }));
+    expect(screen.getByRole('dialog', { name: 'Install Neuton' })).toHaveTextContent('browser menu');
   });
 
   it('captures the browser event and consumes it once even with repeated clicks', async () => {
@@ -45,9 +47,7 @@ describe('PWA installation', () => {
     const button = screen.getByRole('button', { name: 'Install app' });
     fireEvent.click(button);
     fireEvent.click(button);
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(button).toBeEnabled());
     expect(prompt).toHaveBeenCalledTimes(1);
   });
 
@@ -113,6 +113,6 @@ describe('PWA installation', () => {
     prompt.mockRejectedValue(new Error('Browser refused'));
     fireEvent.click(screen.getByRole('button', { name: 'Install app' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('browser menu');
-    expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Install app' })).toBeEnabled();
   });
 });

@@ -72,7 +72,7 @@ export function InstallProvider({ children }: { children: ReactNode }) {
     setError(null);
     const event = prompt.current;
     if (!event) {
-      if (ios) setInstructions(true);
+      setInstructions(true);
       return;
     }
     // Native prompt events may only be used once.
@@ -92,12 +92,13 @@ export function InstallProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const canInstall = !installed && (available || ios);
+  // Profile is a persistent entry point, even before the browser offers a native prompt.
+  const canInstall = !installed;
   return (
     <InstallContext.Provider
       value={{
         canInstall,
-        showPopover: canInstall && !dismissed,
+        showPopover: canInstall && (available || ios) && !dismissed,
         busy,
         error,
         install,
@@ -121,8 +122,9 @@ export function InstallProvider({ children }: { children: ReactNode }) {
         <div className="space-y-4 p-5">
           <h2 className="font-display text-title text-ink">Install Neuton</h2>
           <p className="text-body text-ink-muted">
-            In Safari, tap Share, then Add to Home Screen and Add. If you are using another browser,
-            open this page in Safari first.
+            {ios
+              ? 'In Safari, tap Share, then Add to Home Screen and Add. If you are using another browser, open this page in Safari first.'
+              : 'Open your browser menu and choose Install app or Add to Home Screen. If neither option appears, use a browser that supports installing web apps.'}
           </p>
           <button
             type="button"

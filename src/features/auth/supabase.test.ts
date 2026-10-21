@@ -14,6 +14,7 @@ const ACTIVE_SHOP_KEY = 'neuton.activeShopId';
 
 const state = vi.hoisted(() => ({
   rows: [] as Array<{ shop_id: string; role: string }>,
+  offline: false,
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -29,7 +30,7 @@ vi.mock('@supabase/supabase-js', () => ({
             ...row,
             shops: { id: row.shop_id, name: 'testShop', currency: 'USD' },
           })),
-          error: null,
+          error: state.offline ? new Error('Network unavailable') : null,
         }),
       }),
     }),
@@ -62,6 +63,7 @@ async function renderMemberships(userId = 'u1') {
 
 beforeEach(() => {
   state.rows = [];
+  state.offline = false;
   localStorage.clear();
 });
 
@@ -72,6 +74,15 @@ afterEach(() => {
 });
 
 describe('useShopMemberships active shop persistence', () => {
+  it('restores only this user\'s cached shops when reopening offline', async () => {
+    state.offline = true;
+    localStorage.setItem('neuton.memberships:u1', JSON.stringify([{ shopId: 'saved-shop', role: 'owner', shops: { id: 'saved-shop', name: 'testShop' } }]));
+    const result = await renderMemberships();
+    expect(result.current.activeShopId).toBe('saved-shop');
+    const other = await renderMemberships('u2');
+    expect(other.current.activeShopId).toBeNull();
+    expect(other.current.memberships).toEqual([]);
+  });
   it('rewrites a stale stored id to the first valid membership', async () => {
     state.rows = [member('valid-shop')];
     localStorage.setItem(ACTIVE_SHOP_KEY, 'foreign-shop');
