@@ -9,11 +9,12 @@ type PageHeaderProps = {
   action?: ReactNode;
   /** Shows a back chevron; pass the handler rather than building the button here. */
   onBack?: () => void;
+  className?: string;
 };
 
-export function PageHeader({ eyebrow, title, action, onBack }: PageHeaderProps) {
+export function PageHeader({ eyebrow, title, action, onBack, className = '' }: PageHeaderProps) {
   return (
-    <header className="flex flex-col gap-0.5 pt-2">
+    <header className={`page-header flex flex-col gap-0.5 ${className}`}>
       <div className="flex items-start justify-between gap-3">
         {onBack ? (
           <button
