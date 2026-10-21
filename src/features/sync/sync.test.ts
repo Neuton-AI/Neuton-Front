@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api';
 import { documentFetch, saveScan } from './documentsApi';
 import { syncDocuments } from './engine';
+import { errorsFor, recordError, writeContext } from './errors';
 import * as store from './store';
 import { documentKey, scopeFor, type LocalDocument } from './types';
 
@@ -38,7 +39,15 @@ beforeEach(async () => {
     configurable: true,
   });
   await store.transaction(
-    ['documents', 'writes', 'pulls', 'scans', 'blobs', 'settings'],
+    [
+      'documents',
+      'writes',
+      'pulls',
+      'scans',
+      'blobs',
+      'settings',
+      'syncErrors',
+    ],
     (tx) => {
       for (const name of [
         'documents',
@@ -47,6 +56,7 @@ beforeEach(async () => {
         'scans',
         'blobs',
         'settings',
+        'syncErrors',
       ])
         tx.objectStore(name).clear();
       tx.objectStore('documents').put(original);
@@ -58,6 +68,187 @@ const online = () =>
     value: true,
     configurable: true,
   });
+
+describe('classified queue recovery', () => {
+  it('reports a background processing failure without presenting its technical message as success', async () => {
+    online();
+    api.fetch.mockImplementation(async (path: string) =>
+      path === '/sync/check'
+        ? { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 200 }] }
+        : {
+            recipe: {
+              id,
+              status: 'failed',
+              errorMessage: 'Private processing details',
+            },
+          },
+    );
+    await syncDocuments(scope, context);
+    expect(
+      (await errorsFor(scope.key)).filter((row) => row.state === 'unresolved'),
+    ).toMatchObject([
+      {
+        entity: 'recipe',
+        operation: 'upload',
+        phase: 'processing',
+        message: 'Scan failed',
+        retryable: false,
+      },
+    ]);
+    api.fetch.mockImplementation(async (path: string) =>
+      path === '/sync/check'
+        ? { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 300 }] }
+        : { recipe: { id, status: 'unverified' } },
+    );
+    await syncDocuments(scope, context);
+    expect(
+      (await errorsFor(scope.key)).filter((row) => row.state === 'unresolved'),
+    ).toEqual([]);
+  });
+  async function queueEdit(
+    documentId = id,
+    kind: 'recipe' | 'receipt' = 'recipe',
+  ) {
+    if (documentId !== id)
+      await store.transaction(['documents'], (tx) => {
+        tx.objectStore('documents').put({
+          ...original,
+          key: documentKey(scope, kind, documentId),
+          id: documentId,
+          kind,
+          data: { id: documentId },
+          updatedAt: 100,
+        });
+      });
+    await documentFetch(`/${kind}s/${documentId}`, {
+      ...context,
+      method: 'PATCH',
+      body: { name: 'Changed' },
+    });
+  }
+  function compareAndPush(fail: (path: string) => unknown) {
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/sync/check')
+        return {
+          toPush: (await store.writes(scope.key)).map((write) => ({
+            kind: write.path.startsWith('/receipts') ? 'receipt' : 'recipe',
+            id: write.path.split('/')[2],
+            updatedAt: write.updatedAt,
+          })),
+          toPull: [],
+        };
+      const error = fail(path);
+      if (error) throw error;
+      return {};
+    });
+  }
+  it('pauses a denied recipe while allowing an independent receipt, then retries explicitly', async () => {
+    await queueEdit();
+    await queueEdit('receipt-two', 'receipt');
+    compareAndPush((path) =>
+      path.includes(id) ? new ApiError('private denial', 403) : undefined,
+    );
+    online();
+    await expect(syncDocuments(scope, context)).rejects.toThrow(
+      'private denial',
+    );
+    expect(await store.writes(scope.key)).toHaveLength(1);
+    expect(
+      (await errorsFor(scope.key)).filter((row) => row.state === 'unresolved'),
+    ).toMatchObject([
+      {
+        entity: 'recipe',
+        operation: 'edit',
+        category: 'permission_denied',
+        message: 'Permission denied',
+      },
+    ]);
+    const before = api.fetch.mock.calls.filter(([path]) =>
+      path.includes(id),
+    ).length;
+    await syncDocuments(scope, context);
+    expect(
+      api.fetch.mock.calls.filter(([path]) => path.includes(id)),
+    ).toHaveLength(before);
+    compareAndPush(() => undefined);
+    await syncDocuments(scope, context, { force: true });
+    expect(await store.writes(scope.key)).toEqual([]);
+    expect(
+      (await errorsFor(scope.key)).filter((row) => row.state === 'unresolved'),
+    ).toEqual([]);
+  });
+  it('pauses authenticated work after 401 until a refreshed session arrives', async () => {
+    await queueEdit();
+    await queueEdit('receipt-two', 'receipt');
+    compareAndPush(() => new ApiError('expired', 401));
+    online();
+    await expect(syncDocuments(scope, context)).rejects.toThrow('expired');
+    const calls = api.fetch.mock.calls.length;
+    await syncDocuments(scope, context);
+    expect(api.fetch).toHaveBeenCalledTimes(calls);
+    expect(await store.writes(scope.key)).toHaveLength(2);
+    compareAndPush(() => undefined);
+    await syncDocuments(scope, { ...context, token: token + '-refreshed' });
+    expect(await store.writes(scope.key)).toEqual([]);
+  });
+  it('backs off transient failures without accumulating duplicates', async () => {
+    await queueEdit();
+    compareAndPush(() => new ApiError('limited', 429, undefined, 90_000));
+    online();
+    await expect(syncDocuments(scope, context)).rejects.toThrow('limited');
+    await syncDocuments(scope, context);
+    expect(
+      api.fetch.mock.calls.filter(([path]) => path.includes(id)),
+    ).toHaveLength(1);
+    const [error] = await errorsFor(scope.key);
+    expect(error.attempts).toBe(1);
+    expect(error.nextRetryAt! - error.lastOccurrence).toBe(90_000);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(error.nextRetryAt! + 1);
+    await expect(syncDocuments(scope, context)).rejects.toThrow('limited');
+    clock.mockRestore();
+    expect(await errorsFor(scope.key)).toHaveLength(1);
+    expect((await errorsFor(scope.key))[0].attempts).toBe(2);
+  });
+  it('does not resolve a newer failed mutation when acknowledging an older revision', async () => {
+    await queueEdit();
+    await queueEdit();
+    const [older, newer] = (await store.writes(scope.key)).sort(
+      (a, b) => a.updatedAt - b.updatedAt,
+    );
+    await recordError(
+      new ApiError('newer denied', 403),
+      writeContext(scope, newer),
+    );
+    compareAndPush(() => undefined);
+    online();
+    await syncDocuments(scope, context);
+    expect((await store.writes(scope.key)).map((row) => row.id)).toEqual([
+      newer.id,
+    ]);
+    expect(
+      (await errorsFor(scope.key)).filter(
+        (row) => row.state === 'unresolved',
+      )[0].operationId,
+    ).toBe(newer.id);
+    expect(
+      (await store.writes(scope.key)).some((row) => row.id === older.id),
+    ).toBe(false);
+  });
+  it('keeps cancellation, version negotiation and pull tombstones out of user errors', async () => {
+    await queueEdit();
+    api.fetch.mockImplementation(async (path: string) =>
+      path === '/sync/check'
+        ? { toPush: [{ kind: 'recipe', id, updatedAt: 100 }], toPull: [] }
+        : { syncConflict: true },
+    );
+    online();
+    await syncDocuments(scope, context);
+    expect(await errorsFor(scope.key)).toEqual([]);
+    api.fetch.mockRejectedValue(new DOMException('cancel', 'AbortError'));
+    await syncDocuments(scope, context);
+    expect(await errorsFor(scope.key)).toEqual([]);
+  });
+});
 
 describe('local-first persistence and synchronization', () => {
   it('renders stored data while the network never resolves, and isolates users and shops', async () => {
@@ -320,7 +511,7 @@ describe('local-first persistence and synchronization', () => {
         method: 'PATCH',
         body: { name: 'Unsaved' },
       }),
-    ).rejects.toThrow('Device storage is full');
+    ).rejects.toThrow('Storage full');
     mock.mockRestore();
     expect((await store.get<LocalDocument>('documents', key))?.data.name).toBe(
       'Original',
@@ -363,10 +554,10 @@ describe('local-first persistence and synchronization', () => {
     vi.stubGlobal('fetch', upload);
     online();
     await expect(syncDocuments(scope, context)).rejects.toThrow(
-      'Response lost',
+      'Upload failed',
     );
     expect(await store.scans(scope.key)).toHaveLength(1);
-    await syncDocuments(scope, context);
+    await syncDocuments(scope, context, { force: true });
     expect(upload).toHaveBeenCalledTimes(1);
     expect(
       api.fetch.mock.calls.find(([path]) => path === '/uploads/presign')?.[1]

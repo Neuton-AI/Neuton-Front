@@ -12,16 +12,17 @@
 
 import { faro } from '@grafana/faro-web-sdk';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000').replace(
-  /\/$/,
-  '',
-);
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
+).replace(/\/$/, '');
 
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly retryAfterMs?: number,
+    readonly traceId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -43,9 +44,13 @@ type RequestOptions = {
  * future endpoint change degrades to a real message instead of the string
  * `[object Object]`.
  */
-function readError(payload: unknown, status: number): { message: string; code?: string } {
+function readError(
+  payload: unknown,
+  status: number,
+): { message: string; code?: string } {
   const fallback = `Request failed (${status})`;
-  if (typeof payload !== 'object' || payload === null) return { message: fallback };
+  if (typeof payload !== 'object' || payload === null)
+    return { message: fallback };
 
   const top = payload as { message?: unknown; error?: unknown; code?: unknown };
   const topCode = typeof top.code === 'string' ? top.code : undefined;
@@ -92,8 +97,12 @@ export async function apiFetch<T>(
       signal,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    throw new ApiError('Cannot reach the server. Check your connection and try again.', 0);
+    if (error instanceof DOMException && error.name === 'AbortError')
+      throw error;
+    throw new ApiError(
+      'Cannot reach the server. Check your connection and try again.',
+      0,
+    );
   }
 
   if (response.status === 204) return undefined as T;
@@ -112,7 +121,21 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     const { message, code } = readError(payload, response.status);
-    throw new ApiError(message, response.status, code);
+    const retryAfter = response.headers.get('Retry-After');
+    const seconds = retryAfter === null ? NaN : Number(retryAfter);
+    const retryAfterMs =
+      retryAfter === null
+        ? undefined
+        : Number.isFinite(seconds)
+          ? Math.max(0, seconds * 1000)
+          : Math.max(0, Date.parse(retryAfter) - Date.now());
+    throw new ApiError(
+      message,
+      response.status,
+      code,
+      Number.isFinite(retryAfterMs) ? retryAfterMs : undefined,
+      response.headers.get('x-trace-id') ?? traceId,
+    );
   }
 
   return payload as T;
