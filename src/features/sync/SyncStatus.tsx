@@ -135,7 +135,6 @@ export function SyncStatus() {
     });
     void refresh();
     sync();
-    const timer = window.setInterval(sync, 30_000);
     const displayTimer = window.setInterval(() => {
       void refresh();
     }, 1000);
@@ -145,7 +144,6 @@ export function SyncStatus() {
     return () => {
       active = false;
       unsubscribe();
-      clearInterval(timer);
       clearInterval(displayTimer);
       window.removeEventListener('online', sync);
       window.removeEventListener('offline', sync);
