@@ -208,7 +208,7 @@ export function CatalogPage() {
                     <div className="h-[18px] shrink-0" aria-hidden="true" />
                     <p className="truncate text-label font-medium text-ink-muted">{item.name}</p>
                     <p className="truncate text-[22px] font-medium leading-[1.3] text-ink">
-                      {formatQuantity(item.currentQuantity, item.unit)}
+                      {formatQuantity(item.baseUnitAmount, item.baseUnit)}
                     </p>
                   </div>
                 ))

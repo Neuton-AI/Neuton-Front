@@ -97,6 +97,24 @@ beforeEach(() => {
   api.apiFetch.mockReset();
 });
 
+describe('CatalogPage inventory tab', () => {
+  it('shows total base stock rather than labeling package counts as grams', async () => {
+    api.apiFetch.mockResolvedValue({ items: [
+      { id: 'margarine', name: 'Margarine', currentQuantity: '8.000', unit: 'g', baseUnitAmount: '1600.000', baseUnit: 'g' },
+      { id: 'cornflour', name: 'Cornflour', currentQuantity: '2.000', unit: 'g', baseUnitAmount: '1000.000', baseUnit: 'g' },
+      { id: 'lemon', name: 'Lemon', currentQuantity: '0.925', unit: 'kg', baseUnitAmount: '925.000', baseUnit: 'g' },
+      { id: 'empty', name: 'Empty stock', currentQuantity: '8.000', unit: 'unit', baseUnitAmount: '0.000', baseUnit: 'g' },
+    ] });
+    renderWithRouter(<CatalogPage />, { route: '/catalog?tab=inventory' });
+    expect(await screen.findByText('1600 g')).toBeInTheDocument();
+    expect(screen.getByText('1000 g')).toBeInTheDocument();
+    expect(screen.getByText('925 g')).toBeInTheDocument();
+    expect(screen.getByText('0 g')).toBeInTheDocument();
+    expect(screen.queryByText('8 g')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 g')).not.toBeInTheDocument();
+  });
+});
+
 describe('CatalogPage receipts tab', () => {
   it.each<ReceiptStatus>(['pending', 'processing', 'failed', 'unverified', 'verified'])(
     'renders a %s receipt row as a link to its detail sheet',
