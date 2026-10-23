@@ -147,6 +147,8 @@ export function useDeleteRecipe(
 export function useUpdateRecipe(token: Token, shopId: ShopId) {
   const queryClient = useQueryClient();
   return useMutation({
+    // documentFetch saves to IndexedDB first; its sync engine owns network retries.
+    networkMode: 'always',
     mutationFn: ({ id, body }: { id: string; body: RecipeUpdate }) =>
       apiFetch<{ recipe: Omit<Recipe, 'costing'> }>(`/recipes/${id}`, {
         method: 'PATCH',
