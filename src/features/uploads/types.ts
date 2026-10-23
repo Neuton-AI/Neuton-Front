@@ -1,19 +1,13 @@
-export type PresignResponse = {
-  uploadUrl: string;
-  storagePath: string;
-  receiptId: string | null;
-  method: 'PUT';
-  expiresIn: number;
-};
-
 export type UploadCompleteResponse = {
-  uploadId?: string;
+  uploadId: string;
   receiptId: string | null;
   recipeId: string | null;
   queued: boolean;
   jobId: string | null;
   reason?: string;
 };
+
+export type UploadContext = { token: string | null; shopId: string | null };
 
 export type PresignedUploadSource = {
   sourceId: string;
