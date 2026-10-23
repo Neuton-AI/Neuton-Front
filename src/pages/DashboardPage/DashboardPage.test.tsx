@@ -129,6 +129,15 @@ afterEach(() => {
 });
 
 describe('DashboardPage profit chart', () => {
+  it.each(['7D', '30D', '90D', '1Y'] as const)(
+    'labels revenue and expense figures with the selected %s period', async (tab) => {
+      await renderDashboard();
+      await userEvent.setup().click(screen.getByRole('tab', { name: tab }));
+      expect(await screen.findByText(`Gross income · ${tab}`)).toBeInTheDocument();
+      expect(screen.getByText(`Operational · ${tab}`)).toBeInTheDocument();
+    },
+  );
+
   it.each([
     ['7D', 7],
     ['30D', 30],

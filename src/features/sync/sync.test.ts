@@ -7,6 +7,10 @@ import { syncDocuments } from './engine';
 import { errorsFor, recordError, writeContext } from './errors';
 import * as store from './store';
 import { documentKey, scopeFor, type LocalDocument } from './types';
+import { useUpdateRecipe } from '@/features/recipes/recipesApi';
+import { renderHookWithProviders } from '@/test/render';
+import { act, waitFor } from '@testing-library/react';
+import { onlineManager } from '@tanstack/react-query';
 
 vi.unmock('./documentsApi');
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
@@ -68,6 +72,32 @@ const online = () =>
     value: true,
     configurable: true,
   });
+
+it('recipe Save completes offline and persists a pending edit before reconnect', async () => {
+  onlineManager.setOnline(false);
+  const { result, queryClient } = renderHookWithProviders(() =>
+    useUpdateRecipe(context.token, context.shopId),
+  );
+  const body = {
+    name: 'Saved offline', imageUrl: null, prepTimeMinutes: 5,
+    yieldQuantity: 1, yieldUnit: 'portion', allergens: [], steps: [], ingredients: [],
+  };
+  try {
+    act(() => result.current.mutate({ id, body }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.isPaused).toBe(false);
+    expect(await store.get('documents', key)).toMatchObject({
+      data: { name: 'Saved offline' }, syncStatus: 'pending-push',
+    });
+    expect(await store.writes(scope.key)).toMatchObject([
+      { path: `/recipes/${id}`, method: 'PATCH', body },
+    ]);
+    expect(api.fetch).not.toHaveBeenCalled();
+  } finally {
+    queryClient.clear();
+    onlineManager.setOnline(true);
+  }
+});
 
 describe('classified queue recovery', () => {
   it('reports a background processing failure without presenting its technical message as success', async () => {

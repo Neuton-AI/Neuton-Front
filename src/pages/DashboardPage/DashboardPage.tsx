@@ -149,7 +149,7 @@ export function DashboardPage() {
               className="flex-1"
               labelClassName="text-ink-muted opacity-100"
               value={formatMoney(summary?.revenue, currency)}
-              sub="Gross income · 30d"
+              sub={`Gross income · ${periodLabel}`}
             />
             <StatCard
               label="Expenses"
@@ -157,7 +157,7 @@ export function DashboardPage() {
               className="flex-1"
               labelClassName="text-ink-muted opacity-100"
               value={formatMoney(summary?.expenses, currency)}
-              sub="Operational · 30d"
+              sub={`Operational · ${periodLabel}`}
             />
           </div>
 

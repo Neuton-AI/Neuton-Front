@@ -5,7 +5,7 @@ import {
   type PresignedUploadSource,
   type UploadCompleteResponse,
 } from './types';
-import type { UploadContext } from './upload';
+import type { UploadContext } from './types';
 import { apiFetch, ApiError } from '@/lib/api';
 
 export const MAX_UPLOAD_SOURCES = 4;

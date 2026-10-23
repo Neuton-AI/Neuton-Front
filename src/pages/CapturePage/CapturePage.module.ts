@@ -3,7 +3,7 @@ import { type MediaKind } from "@/features/uploads/types";
 import {
   MAX_UPLOAD_SOURCES,
   validateUploadFiles,
-} from "@/features/uploads/upload";
+} from "@/features/uploads/uploadSources";
 import { saveScan } from "@/features/sync/documentsApi";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
