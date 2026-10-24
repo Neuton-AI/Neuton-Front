@@ -8,9 +8,14 @@ import { http, HttpResponse } from 'msw';
 import type { FormEvent } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNewOrderPage } from './NewOrderPage.module';
+import { buildRecipe } from '@/test/factories/recipes.factory';
+import { recipesKeys } from '@/features/recipes/keys';
 
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('@/features/auth/supabase', async () => (await import('@/test/auth')).authMock);
+vi.mock('@/features/sync/documentsApi', async () => ({
+  documentFetch: (await import('@/lib/api')).apiFetch,
+}));
 vi.mock('react-router-dom', async (original) => ({
   ...(await original<typeof import('react-router-dom')>()),
   useNavigate: () => navigate,
@@ -22,6 +27,55 @@ beforeEach(() => {
 });
 
 describe('useNewOrderPage', () => {
+  it('blocks incomplete selections and refreshes eligibility after completion', async () => {
+    let complete = false;
+    let quotes = 0;
+    const recipe = buildRecipe({ status: 'verified' });
+    server.use(
+      http.get(apiPath('/recipes'), () =>
+        HttpResponse.json({
+          recipes: [
+            {
+              ...recipe,
+              costing: {
+                ...recipe.costing,
+                costComplete: complete,
+                linkedCount: complete ? 1 : 0,
+                totalCount: 1,
+              },
+            },
+          ],
+        }),
+      ),
+      http.get(apiPath('/recipes/orderable'), () =>
+        HttpResponse.json({
+          recipes: complete ? [buildOrderableRecipe()] : [],
+        }),
+      ),
+      http.post(apiPath('/orders/quote'), () => {
+        quotes++;
+        return HttpResponse.json(buildQuote());
+      }),
+    );
+    const { result, queryClient } = renderHookWithProviders(() => useNewOrderPage());
+    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
+    act(() => result.current.changeQuantity(result.current.recipes[0]!, 1));
+    expect(result.current.lines).toEqual([]);
+    expect(quotes).toBe(0);
+    complete = true;
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: recipesKeys.recipes('shop-1'),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: recipesKeys.orderableRecipes('shop-1'),
+      });
+    });
+    await waitFor(() => expect(result.current.recipes[0]?.costComplete).not.toBe(false));
+    act(() => result.current.changeQuantity(result.current.recipes[0]!, 1));
+    await waitFor(() => expect(result.current.quote).not.toBeNull());
+    expect(quotes).toBe(1);
+  });
   it('loads recipes, clamps quantities at zero, and removes the last line', async () => {
     const { result } = renderHookWithProviders(() => useNewOrderPage());
     await waitFor(() => expect(result.current.recipes).toHaveLength(1));
@@ -60,7 +114,10 @@ describe('useNewOrderPage', () => {
     server.use(
       http.post(apiPath('/orders'), async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ order: { id: 'saved' }, totals: { netProfit: 1 } });
+        return HttpResponse.json({
+          order: { id: 'saved' },
+          totals: { netProfit: 1 },
+        });
       }),
     );
     const { result } = renderHookWithProviders(() => useNewOrderPage());
@@ -78,7 +135,9 @@ describe('useNewOrderPage', () => {
       items: [{ recipeId: 'rp-1', quantity: 1 }],
       deliveryDistanceKm: 0,
     });
-    expect(navigate).toHaveBeenCalledWith('/orders/saved', { state: { fresh: true } });
+    expect(navigate).toHaveBeenCalledWith('/orders/saved', {
+      state: { fresh: true },
+    });
   });
   it('surfaces recipe, quote, and save failures without losing the draft', async () => {
     server.use(
@@ -100,6 +159,7 @@ describe('useNewOrderPage', () => {
   });
   it('rejects empty, anonymous, and invalid-distance submissions', async () => {
     const { result } = renderHookWithProviders(() => useNewOrderPage());
+    await waitFor(() => expect(result.current.loading).toBe(false));
     await act(() => result.current.submit(event));
     act(() => {
       result.current.changeQuantity(buildOrderableRecipe(), 1);

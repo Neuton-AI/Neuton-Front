@@ -3,12 +3,18 @@ import { validateFields } from '@/components/FormFields/schema';
 import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
 import { useCreateOrder, useOrderQuote } from '@/features/orders/ordersApi';
 import type { OrderableRecipe } from '@/features/orders/types';
-import { useOrderableRecipes } from '@/features/recipes/recipesApi';
+import { useOrderableRecipes, useRecipes } from '@/features/recipes/recipesApi';
+import { ingredientLinkSummary } from '@/features/recipes/selectors';
 import { toNumber } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 type DraftLine = { recipe: OrderableRecipe; quantity: number };
+export type NewOrderRecipe = Omit<OrderableRecipe, 'unitCost' | 'retailPrice'> & {
+  unitCost: number | null;
+  retailPrice: number | null;
+  costComplete?: boolean;
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 export function useNewOrderPage() {
@@ -20,7 +26,7 @@ export function useNewOrderPage() {
 
   const navigate = useNavigate();
 
-  const [lines, setLines] = useState<DraftLine[]>([]);
+  const [draftLines, setLines] = useState<DraftLine[]>([]);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -35,21 +41,44 @@ export function useNewOrderPage() {
   const currency = shop?.currency ?? 'USD';
 
   const recipesQuery = useOrderableRecipes(token, activeShopId);
+  const catalogQuery = useRecipes(token, activeShopId);
 
-  const recipes = recipesQuery.data?.recipes ?? [];
+  const orderable = recipesQuery.data?.recipes ?? [];
+  const incompleteRecipes = (catalogQuery.data?.recipes ?? []).filter(
+    (recipe) =>
+      recipe.isActive &&
+      recipe.status === 'verified' &&
+      ingredientLinkSummary(recipe.costing).incomplete,
+  );
+  const incompleteIds = new Set(incompleteRecipes.map((recipe) => recipe.id));
+  const eligibleRecipes = orderable.filter((recipe) => !incompleteIds.has(recipe.id));
+  const lines = draftLines.filter((line) =>
+    eligibleRecipes.some((recipe) => recipe.id === line.recipe.id),
+  );
+  const recipes: NewOrderRecipe[] = [
+    ...eligibleRecipes,
+    ...incompleteRecipes.map((recipe) => ({
+      id: recipe.id,
+      name: recipe.name,
+      imageUrl: recipe.imageUrl,
+      yieldQuantity: recipe.yieldQuantity,
+      yieldUnit: recipe.yieldUnit,
+      unitCost: null,
+      retailPrice: null,
+      costComplete: false,
+    })),
+  ];
 
-  const loading = recipesQuery.isLoading;
+  const loading = recipesQuery.isLoading || catalogQuery.isLoading;
 
-  const itemsError = recipesQuery.error
-    ? recipesQuery.error instanceof Error
-      ? recipesQuery.error.message
+  const recipeError = recipesQuery.error ?? catalogQuery.error;
+  const itemsError = recipeError
+    ? recipeError instanceof Error
+      ? recipeError.message
       : 'Could not load recipes.'
     : submitError;
 
-  const items = useMemo(
-    () => lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
-    [lines],
-  );
+  const items = lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity }));
 
   const itemsKey = JSON.stringify(items);
 
@@ -64,15 +93,19 @@ export function useNewOrderPage() {
   const debouncedDistanceKm = useDebouncedValue(deliveryDistanceKm, 250);
 
   const quoteQuery = useOrderQuote(token, activeShopId, {
-    items: JSON.parse(debouncedItemsKey) as { recipeId: string; quantity: number }[],
+    items: JSON.parse(debouncedItemsKey) as {
+      recipeId: string;
+      quantity: number;
+    }[],
     distanceKm: toNumber(debouncedDistanceKm),
-    enabled: lines.length > 0,
+    enabled: items.length > 0 && debouncedItemsKey === itemsKey,
   });
 
-  const quote = lines.length > 0 ? (quoteQuery.data ?? null) : null;
+  const quote =
+    items.length > 0 && debouncedItemsKey === itemsKey ? (quoteQuery.data ?? null) : null;
 
   const quoteError =
-    lines.length === 0
+    items.length === 0
       ? null
       : quoteQuery.error
         ? quoteQuery.error instanceof Error
@@ -87,7 +120,10 @@ export function useNewOrderPage() {
   const quantityOf = (recipeId: string) =>
     lines.find((line) => line.recipe.id === recipeId)?.quantity ?? 0;
 
-  const changeQuantity = (recipe: OrderableRecipe, delta: number) => {
+  const changeQuantity = (recipe: NewOrderRecipe, delta: number) => {
+    if (recipe.costComplete === false || incompleteIds.has(recipe.id)) return;
+    const eligible = eligibleRecipes.find((item) => item.id === recipe.id);
+    if (!eligible) return;
     setLines((current) => {
       const existing = current.find((line) => line.recipe.id === recipe.id);
       const next = Math.max(0, (existing?.quantity ?? 0) + delta);
@@ -98,13 +134,19 @@ export function useNewOrderPage() {
           line.recipe.id === recipe.id ? { ...line, quantity: next } : line,
         );
       }
-      return [...current, { recipe, quantity: next }];
+      return [...current, { recipe: eligible, quantity: next }];
     });
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!token || !activeShopId || lines.length === 0 || createOrder.isPending) return;
+    if (
+      !token ||
+      !activeShopId ||
+      items.length === 0 ||
+      createOrder.isPending
+    )
+      return;
 
     const validationError = Object.values(validateFields(fields, formValues))[0];
     if (validationError) {
@@ -118,7 +160,7 @@ export function useNewOrderPage() {
         orderDate: new Date(`${orderDate}T12:00:00`).toISOString(),
         destinationAddress: destinationAddress.trim() || null,
         deliveryDistanceKm: toNumber(deliveryDistanceKm),
-        items: lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity })),
+        items,
       });
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
@@ -128,7 +170,12 @@ export function useNewOrderPage() {
   const createOrderPending = createOrder.isPending;
   const handleBack = () => navigate('/orders');
 
-  const formValues = { customerName, orderDate, destinationAddress, deliveryDistanceKm };
+  const formValues = {
+    customerName,
+    orderDate,
+    destinationAddress,
+    deliveryDistanceKm,
+  };
   const fields: readonly FormField<typeof formValues>[] = [
     {
       kind: 'input',

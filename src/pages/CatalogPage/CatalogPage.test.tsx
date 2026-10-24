@@ -265,6 +265,7 @@ describe('CatalogPage recipes tab incomplete cost', () => {
     renderWithRouter(<CatalogPage />, { route: '/catalog' });
 
     expect(await screen.findByText('No price yet')).toBeInTheDocument();
+    expect(screen.getByText('Incomplete')).toBeInTheDocument();
     expect(
       await screen.findByText('2 of 4 ingredients linked — cost incomplete'),
     ).toBeInTheDocument();
