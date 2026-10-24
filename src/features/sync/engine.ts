@@ -386,7 +386,21 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
       const current = (await store.result(docs.get(key))) as
         LocalDocument | undefined;
       tx.objectStore('pulls').delete(key);
-      if (current && !deleted && current.updatedAt > meta.updatedAt) return;
+      const placeholder = current?.localOnly === true;
+      if (
+        current &&
+        !placeholder &&
+        !deleted &&
+        current.updatedAt > meta.updatedAt
+      )
+        return;
+      if (
+        placeholder &&
+        current &&
+        !deleted &&
+        (data.status === 'pending' || data.status === 'processing')
+      )
+        data = { ...current.data, ...data };
       docs.put({
         key,
         scope: scope.key,
@@ -521,8 +535,7 @@ async function pushScan(
       },
     });
   }
-  await store.transaction(['documents', 'scans', 'blobs'], (tx) => {
-    tx.objectStore('documents').delete(scan.documentKey);
+  await store.transaction(['scans', 'blobs'], (tx) => {
     tx.objectStore('scans').delete(scan.key);
     tx.objectStore('blobs').delete(scan.key);
   });

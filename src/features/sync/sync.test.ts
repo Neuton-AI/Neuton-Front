@@ -597,3 +597,313 @@ describe('local-first persistence and synchronization', () => {
     expect(await store.get('blobs', scan.key)).toBeUndefined();
   });
 });
+
+describe('upload document continuity', () => {
+  async function queueScan(kind: 'receipt' | 'recipe' | 'product') {
+    await saveScan(
+      [new File(['scan'], 'scan.jpg', { type: 'image/jpeg' })],
+      kind,
+      context,
+    );
+    const [scan] = await store.scans(scope.key);
+    return scan;
+  }
+
+  const documentKind = (kind: 'receipt' | 'recipe' | 'product') =>
+    kind === 'product' ? 'recipe' : kind;
+
+  it.each(['receipt', 'recipe', 'product'] as const)(
+    'keeps the local %s card until extracted server data replaces it in place',
+    async (kind) => {
+      const scan = await queueScan(kind);
+      const storedKind = documentKind(kind);
+      const collection = storedKind === 'receipt' ? 'receipts' : 'recipes';
+      let seenDuringCheck = false;
+      api.fetch.mockImplementation(async (path: string) => {
+        if (path === '/uploads/complete') return { queued: true };
+        if (path === '/sync/check') {
+          const during = await store.get<LocalDocument>(
+            'documents',
+            scan.documentKey,
+          );
+          expect(during?.deleted).toBe(false);
+          expect(during?.id).toBe(scan.id);
+          expect(during?.data.name).toBe('scan.jpg');
+          seenDuringCheck = true;
+          return {
+            toPush: [],
+            toPull: [{ kind: storedKind, id: scan.id, updatedAt: 50 }],
+          };
+        }
+        if (path === `/${collection}/${scan.id}`) {
+          return {
+            [storedKind]: {
+              id: scan.id,
+              name: 'Extracted',
+              status: 'unverified',
+              items: [{ name: 'Milk' }],
+            },
+          };
+        }
+        throw new Error(path);
+      });
+      online();
+      await syncDocuments(scope, context);
+      const saved = await store.get<LocalDocument>(
+        'documents',
+        scan.documentKey,
+      );
+      expect(seenDuringCheck).toBe(true);
+      expect(saved).toMatchObject({
+        id: scan.id,
+        kind: storedKind,
+        deleted: false,
+        data: { id: scan.id, name: 'Extracted', status: 'unverified' },
+      });
+      expect(saved?.localOnly).toBeUndefined();
+      expect(
+        (await store.documents(scope.key)).filter((row) => row.id === scan.id),
+      ).toHaveLength(1);
+      expect(await store.scans(scope.key)).toEqual([]);
+      expect(await store.get('blobs', scan.key)).toBeUndefined();
+    },
+  );
+
+  it('updates pending processing on the same card and preserves local fields the server omits', async () => {
+    const scan = await queueScan('receipt');
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/uploads/complete') return { queued: true };
+      if (path === '/sync/check')
+        return {
+          toPush: [],
+          toPull: [{ kind: 'receipt', id: scan.id, updatedAt: 50 }],
+        };
+      return {
+        receipt: { id: scan.id, status: 'processing', progressMessage: 'Reading' },
+      };
+    });
+    online();
+    await syncDocuments(scope, context);
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({
+      id: scan.id,
+      deleted: false,
+      data: { name: 'scan.jpg', status: 'processing', progressMessage: 'Reading' },
+    });
+  });
+
+  it('keeps a failed extraction on the same card', async () => {
+    const scan = await queueScan('recipe');
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/uploads/complete') return { queued: true };
+      if (path === '/sync/check')
+        return {
+          toPush: [],
+          toPull: [{ kind: 'recipe', id: scan.id, updatedAt: 50 }],
+        };
+      return {
+        recipe: { id: scan.id, name: 'Unreadable', status: 'failed', errorMessage: 'Try again' },
+      };
+    });
+    online();
+    await syncDocuments(scope, context);
+    const saved = await store.get<LocalDocument>('documents', scan.documentKey);
+    expect(saved?.deleted).toBe(false);
+    expect(saved?.data).toMatchObject({
+      name: 'Unreadable',
+      status: 'failed',
+      errorMessage: 'Try again',
+    });
+  });
+
+  it('retains the placeholder when replacement is delayed, then replaces it without a duplicate', async () => {
+    const scan = await queueScan('receipt');
+    let ready = false;
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/uploads/complete') return { queued: true };
+      if (path === '/sync/check')
+        return {
+          toPush: [],
+          toPull: ready
+            ? [{ kind: 'receipt', id: scan.id, updatedAt: 50 }]
+            : [],
+        };
+      return { receipt: { id: scan.id, name: 'Extracted later', status: 'unverified' } };
+    });
+    online();
+    await syncDocuments(scope, context);
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({
+      localOnly: true,
+      deleted: false,
+      data: { name: 'scan.jpg', status: 'pending' },
+    });
+    expect(await store.scans(scope.key)).toEqual([]);
+    expect(await store.get('blobs', scan.key)).toBeUndefined();
+    ready = true;
+    await syncDocuments(scope, context);
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({
+      id: scan.id,
+      data: { name: 'Extracted later' },
+    });
+    expect(
+      (await store.documents(scope.key)).filter((row) => row.id === scan.id),
+    ).toHaveLength(1);
+  });
+
+  it('keeps the last saved card when the metadata check fails', async () => {
+    const scan = await queueScan('receipt');
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/uploads/complete') return { queued: true };
+      throw new ApiError('metadata failed', 0);
+    });
+    online();
+    await expect(syncDocuments(scope, context)).rejects.toThrow(
+      'metadata failed',
+    );
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({
+      deleted: false,
+      data: { name: 'scan.jpg' },
+    });
+    expect(await store.scans(scope.key)).toEqual([]);
+  });
+
+  it('keeps the last saved card when the server document download fails', async () => {
+    const scan = await queueScan('recipe');
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/uploads/complete') return { queued: true };
+      if (path === '/sync/check')
+        return {
+          toPush: [],
+          toPull: [
+            { kind: 'recipe', id: scan.id, updatedAt: Date.now() + 1000 },
+          ],
+        };
+      throw new ApiError('Connection dropped during pull', 0);
+    });
+    online();
+    await expect(syncDocuments(scope, context)).rejects.toThrow(
+      'Connection dropped during pull',
+    );
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({ deleted: false, data: { name: 'scan.jpg' } });
+    expect(await store.rows('pulls', scope.key)).toHaveLength(1);
+  });
+
+  it('keeps the last saved card when replacing it in IndexedDB fails', async () => {
+    const scan = await queueScan('product');
+    api.fetch.mockImplementation(async (path: string) => {
+      if (path === '/uploads/complete') return { queued: true };
+      if (path === '/sync/check')
+        return {
+          toPush: [],
+          toPull: [
+            { kind: 'recipe', id: scan.id, updatedAt: Date.now() + 1000 },
+          ],
+        };
+      return {
+        recipe: { id: scan.id, name: 'Saved', status: 'unverified' },
+      };
+    });
+    const put = IDBObjectStore.prototype.put;
+    const mock = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementation(function (
+        this: IDBObjectStore,
+        ...args: Parameters<typeof put>
+      ) {
+        if (
+          this.name === 'documents' &&
+          (args[0] as LocalDocument | undefined)?.data?.status === 'unverified'
+        )
+          throw new DOMException('No space', 'QuotaExceededError');
+        return put.apply(this, args);
+      });
+    online();
+    await expect(syncDocuments(scope, context)).rejects.toThrow('No space');
+    mock.mockRestore();
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({
+      deleted: false,
+      localOnly: true,
+      data: { name: 'scan.jpg', status: 'pending' },
+    });
+  });
+
+  it('keeps the placeholder across an offline transition and a reload from IndexedDB', async () => {
+    const scan = await queueScan('receipt');
+    await syncDocuments(scope, context);
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({ data: { name: 'scan.jpg' }, deleted: false });
+    expect(await store.get<LocalDocument>('documents', scan.documentKey)).toMatchObject({
+      id: scan.id,
+    });
+  });
+
+  it('does not report placeholders as owned documents, so a missing server row is not a deletion', async () => {
+    const scan = await queueScan('receipt');
+    api.fetch.mockImplementation(
+      async (path: string, options?: { body?: { documents?: { id: string }[] } }) => {
+        if (path === '/uploads/complete') return { queued: true };
+        if (path === '/sync/check') {
+          expect(
+            options?.body?.documents?.some((row) => row.id === scan.id),
+          ).toBe(false);
+          return { toPush: [], toPull: [] };
+        }
+        throw new Error(path);
+      },
+    );
+    online();
+    await syncDocuments(scope, context);
+    expect(
+      (await store.get<LocalDocument>('documents', scan.documentKey))?.deleted,
+    ).toBe(false);
+  });
+
+  it('still refuses to overwrite a newer local edit with an older server snapshot', async () => {
+    await store.transaction(['documents'], (tx) => {
+      tx.objectStore('documents').put({
+        ...original,
+        updatedAt: 500,
+        data: { ...original.data, name: 'Edited locally' },
+      });
+    });
+    online();
+    api.fetch.mockImplementation(async (path: string) =>
+      path === '/sync/check'
+        ? { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 200 }] }
+        : { recipe: { id, name: 'Stale server' } },
+    );
+    await syncDocuments(scope, context);
+    expect((await store.get<LocalDocument>('documents', key))?.data.name).toBe(
+      'Edited locally',
+    );
+  });
+
+  it('does not let another account sync remove this shop card', async () => {
+    const scan = await queueScan('receipt');
+    const otherToken = `header.${btoa(JSON.stringify({ sub: 'user-two' }))}.signature`;
+    online();
+    api.fetch.mockResolvedValue({
+      toPush: [],
+      toPull: [{ kind: 'receipt', id: scan.id, updatedAt: 50, deleted: true }],
+    });
+    await syncDocuments(
+      scopeFor(otherToken, 'shop-two'),
+      { token: otherToken, shopId: 'shop-two' },
+    );
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({ deleted: false, data: { name: 'scan.jpg' } });
+  });
+});
