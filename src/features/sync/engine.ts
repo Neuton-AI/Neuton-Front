@@ -52,7 +52,8 @@ export function syncDocuments(
   authenticatedTokens.set(scope.key, context.token);
   const run = synchronize(
     scope,
-    { ...context, signal: undefined },
+    // A caller may be saving a PATCH; sync downloads must start as GETs.
+    { token: context.token, shopId: context.shopId },
     options.force ?? false,
     reauthenticated,
   ).finally(() => {
@@ -267,7 +268,22 @@ async function transfer(
       const saved = await attempt(
         { ...identity, phase: 'local-persistence' },
         async () => {
-          await store.transaction(['writes'], (tx) => {
+          await store.transaction(['writes', 'documents', 'pulls'], async (tx) => {
+            const current = await store.result(
+              tx.objectStore('documents').get(write.documentKey),
+            ) as LocalDocument | undefined;
+            // Recipe PATCH returns the saved row without calculated ingredient costs.
+            // Fetch the enriched detail even when revision negotiation now reports equality.
+            if (current?.kind === 'recipe' && !current.deleted &&
+                write.method === 'PATCH') {
+              tx.objectStore('pulls').put({
+                key: current.key,
+                scope: scope.key,
+                kind: current.kind,
+                id: current.id,
+                updatedAt: write.updatedAt,
+              } satisfies PendingPull);
+            }
             tx.objectStore('writes').delete(write.key);
           });
         },
