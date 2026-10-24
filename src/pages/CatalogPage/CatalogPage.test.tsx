@@ -191,7 +191,7 @@ describe('CatalogPage receipts tab', () => {
       }),
     ]);
 
-    const row = await screen.findByRole('link', { name: /Unnamed receipt/ });
+    const row = await screen.findByRole('link', { name: /Unknown merchant/ });
 
     expect(row).toHaveAttribute('href', '/catalog/receipts/rc-pending');
   });
