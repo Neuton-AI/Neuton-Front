@@ -18,6 +18,9 @@ type IngredientDraft = {
   rawMaterialName: string;
   quantity: string;
   rawSrcUnit: string;
+  baseUnit?: string | null;
+  baseUnitAmount?: string | null;
+  baseUnitRatio?: number;
   inventoryItemId: string | null;
   generalPriceId: string | null;
   linked?: boolean;
@@ -48,6 +51,12 @@ function recipeDraft(recipe: Recipe): Draft {
       rawMaterialName: ingredient.rawMaterialName ?? ingredient.rawName ?? ingredient.name,
       quantity: String(ingredient.quantity),
       rawSrcUnit: ingredient.rawSrcUnit,
+      baseUnit: ingredient.baseUnit,
+      baseUnitAmount: ingredient.baseUnitAmount,
+      baseUnitRatio:
+        ingredient.baseUnitAmount != null && ingredient.quantity > 0
+          ? Number(ingredient.baseUnitAmount) / ingredient.quantity
+          : undefined,
       inventoryItemId: ingredient.inventoryItemId ?? null,
       generalPriceId: ingredient.generalPriceId ?? null,
       linked: ingredient.linked,
@@ -153,7 +162,19 @@ export function useRecipeEditPage() {
                     generalPriceId: null,
                     linked: false,
                   }
-                : { ...row, [field]: value };
+                : {
+                    ...row,
+                    [field]: value,
+                    baseUnit: field === 'rawSrcUnit' ? null : row.baseUnit,
+                    baseUnitRatio: field === 'rawSrcUnit' ? undefined : row.baseUnitRatio,
+                    baseUnitAmount:
+                      field === 'quantity' &&
+                      row.baseUnitRatio != null &&
+                      Number.isFinite(Number(value)) &&
+                      Number(value) > 0
+                        ? String(row.baseUnitRatio * Number(value))
+                        : null,
+                  };
             }),
           }
         : current,
@@ -220,13 +241,8 @@ export function useRecipeEditPage() {
   function openScanner(key: string) {
     if (!canManage || busy) return;
     const row = draft?.ingredients.find((ingredient) => ingredient.key === key);
-    if (
-      !row ||
-      !row.rawMaterialName.trim() ||
-      !row.rawSrcUnit.trim() ||
-      Number(row.quantity) <= 0
-    ) {
-      setError('Enter the ingredient name, amount and unit before scanning.');
+    if (!row || !row.rawMaterialName.trim()) {
+      setError('Enter the ingredient name before linking a product.');
       return;
     }
     scanRequest.current += 1;
@@ -262,6 +278,9 @@ export function useRecipeEditPage() {
                       rawMaterialName: price.rawMaterialName,
                       quantity: ingredient.quantity,
                       rawSrcUnit: ingredient.rawSrcUnit,
+                      baseUnit: ingredient.baseUnit,
+                      baseUnitAmount: ingredient.baseUnitAmount,
+                      baseUnitRatio: ingredient.baseUnitRatio,
                       inventoryItemId: null,
                       generalPriceId: price.id,
                       linked: true,
@@ -281,21 +300,17 @@ export function useRecipeEditPage() {
     }
   }
 
-  async function linkManualProduct(
-    value: Pick<ManualProductInput, 'name' | 'price' | 'packageSize' | 'packageUnit'>,
-  ) {
+  async function linkManualProduct(value: Omit<ManualProductInput, 'rawMaterialName'>) {
     const row = draft?.ingredients.find((ingredient) => ingredient.key === scanKey);
     if (!row || !canManage || manual.isPending || !token || !activeShopId) return;
     const request = ++scanRequest.current;
     setScanError(null);
     try {
-      const { product } = await manual.mutateAsync({
+      const { product, usage } = await manual.mutateAsync({
         id,
         body: {
           ...value,
           rawMaterialName: row.rawMaterialName,
-          quantity: Number(row.quantity),
-          rawSrcUnit: row.rawSrcUnit,
         },
       });
       if (request !== scanRequest.current) return;
@@ -309,8 +324,13 @@ export function useRecipeEditPage() {
                       ...ingredient,
                       rawName: product.name,
                       rawMaterialName: product.rawMaterialName,
-                      inventoryItemId: product.id,
-                      generalPriceId: null,
+                      quantity: String(usage.baseUnitAmount),
+                      rawSrcUnit: usage.baseUnit,
+                      baseUnit: usage.baseUnit,
+                      baseUnitAmount: String(usage.baseUnitAmount),
+                      baseUnitRatio: 1,
+                      inventoryItemId: null,
+                      generalPriceId: product.id,
                       linked: true,
                     }
                   : ingredient,
@@ -364,7 +384,15 @@ export function useRecipeEditPage() {
           instruction: instruction.trim(),
         })),
       ingredients: draft.ingredients.map(
-        ({ key: _key, linked: _linked, quantity, ...ingredient }) => ({
+        ({
+          key: _key,
+          linked: _linked,
+          baseUnit: _base,
+          baseUnitAmount: _amount,
+          baseUnitRatio: _ratio,
+          quantity,
+          ...ingredient
+        }) => ({
           ...ingredient,
           quantity: Number(quantity),
         }),

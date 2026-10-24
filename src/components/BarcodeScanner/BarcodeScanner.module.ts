@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { ProductDetails } from './ManualProductForm';
+import type { RecipeUsageContext } from '@/features/recipes/measurementUnits';
 
 export type BarcodeScannerProps = {
   onDetected: (barcode: string) => void;
@@ -9,9 +10,7 @@ export type BarcodeScannerProps = {
   onManualSave?: (details: ProductDetails) => void;
   ingredient?: {
     rawMaterialName: string;
-    quantity: string;
-    rawSrcUnit: string;
-  };
+  } & RecipeUsageContext;
   currency?: string;
   paused?: boolean;
   onModeChange?: () => void;
