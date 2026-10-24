@@ -191,7 +191,7 @@ describe('CatalogPage receipts tab', () => {
       }),
     ]);
 
-    const row = await screen.findByRole('link', { name: /Unnamed receipt/ });
+    const row = await screen.findByRole('link', { name: /Unknown merchant/ });
 
     expect(row).toHaveAttribute('href', '/catalog/receipts/rc-pending');
   });
@@ -265,6 +265,7 @@ describe('CatalogPage recipes tab incomplete cost', () => {
     renderWithRouter(<CatalogPage />, { route: '/catalog' });
 
     expect(await screen.findByText('No price yet')).toBeInTheDocument();
+    expect(screen.getByText('Incomplete')).toBeInTheDocument();
     expect(
       await screen.findByText('2 of 4 ingredients linked — cost incomplete'),
     ).toBeInTheDocument();

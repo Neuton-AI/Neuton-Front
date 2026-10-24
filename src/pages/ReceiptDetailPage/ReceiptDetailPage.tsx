@@ -5,6 +5,7 @@ import { formatDate, formatMoney, formatQuantity } from '@/lib/format';
 import { useReceiptDetailPage } from './ReceiptDetailPage.module';
 import { ReceiptDetailStatus, ReceiptStatusIcon } from './ReceiptDetailStatus';
 import { SignedScan } from './SignedScan/SignedScan';
+import { ReceiptMerchantEditor } from './ReceiptMerchantEditor';
 
 const actionClassName =
   'inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-card text-body font-semibold';
@@ -43,20 +44,30 @@ export function ReceiptDetailPage() {
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="text-eyebrow font-medium uppercase text-ink-muted">Receipt</p>
                 <h1 className="break-words font-display text-card-value text-ink">
-                  {receipt.merchantName ?? 'Unnamed merchant'}
+                  {receipt.merchantName?.trim() || 'Unknown merchant'}
                 </h1>
                 <p className="text-label font-medium text-ink-muted">
-                  {formatDate(receipt.receiptDate ?? receipt.createdAt)} · {receipt.items.length}{' '}
-                  {receipt.items.length === 1 ? 'item' : 'items'}
+                  {receipt.receiptDate ? formatDate(receipt.receiptDate) : 'Date unavailable'} ·{' '}
+                  {receipt.items.length} {receipt.items.length === 1 ? 'item' : 'items'}
                 </p>
               </div>
               <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-0.5">
                 <p className="text-eyebrow font-medium uppercase text-ink-muted">Total</p>
                 <p className="break-all text-right font-display text-card-value text-brand-primary">
-                  {formatMoney(receipt.totalAmount, receiptCurrency)}
+                  {receipt.totalAmount != null && receipt.totalAmount !== ''
+                    ? formatMoney(receipt.totalAmount, receiptCurrency)
+                    : '—'}
                 </p>
               </div>
             </div>
+            {canVerify && (receipt.status === 'unverified' || isVerified) ? (
+              <ReceiptMerchantEditor
+                key={`${receipt.id}:${receipt.merchantName}`}
+                receipt={receipt}
+                token={token}
+                shopId={activeShopId}
+              />
+            ) : null}
             {failureMessage ? <InlineNotice tone="error">{failureMessage}</InlineNotice> : null}
             <section
               aria-labelledby="receipt-line-items"
@@ -125,6 +136,9 @@ export function ReceiptDetailPage() {
             </section>
             <div className="shrink-0">
               <SheetSection title="Original scan">
+                {receipt.originalFilename ? (
+                  <p className="break-all text-label text-ink-muted">{receipt.originalFilename}</p>
+                ) : null}
                 <div className="flex h-[150px] items-center justify-center overflow-hidden rounded-card bg-surface-cream-strong">
                   {receipt.storagePath ? (
                     <SignedScan

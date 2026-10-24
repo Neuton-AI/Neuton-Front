@@ -83,6 +83,37 @@ beforeEach(() => {
   state.role = 'owner';
 });
 
+it('saves a merchant correction during review and retains the filename in details', async () => {
+  const user = userEvent.setup();
+  let detail = buildReceiptDetail({
+    status: 'unverified',
+    merchantName: ' ',
+    originalFilename: 'builder.png',
+  });
+  api.apiFetch.mockImplementation(
+    async (path: string, options?: { method?: string; body?: { merchantName: string } }) => {
+      if (path.startsWith('/uploads/')) return { url: 'https://cdn.test/rc-1.png', expiresIn: 60 };
+      if (options?.method === 'PATCH')
+        detail = { ...detail, merchantName: options.body!.merchantName };
+      return { receipt: detail };
+    },
+  );
+  renderDetail();
+  expect(await screen.findByRole('heading', { name: 'Unknown merchant' })).toBeInTheDocument();
+  expect(screen.getByText('builder.png')).toBeInTheDocument();
+  await user.type(screen.getByRole('textbox', { name: 'Merchant name' }), '  Market  ');
+  await user.click(screen.getByRole('button', { name: 'Save merchant' }));
+  expect(await screen.findByRole('heading', { name: 'Market' })).toBeInTheDocument();
+  expect(api.apiFetch).toHaveBeenCalledWith(
+    '/receipts/rc-1',
+    expect.objectContaining({
+      method: 'PATCH',
+      body: { merchantName: 'Market' },
+    }),
+  );
+  expect(screen.getByText('Unverified')).toBeInTheDocument();
+});
+
 /** The sheet reads `:id` off the route, so it needs a real route to mount on. */
 function renderDetail() {
   return renderWithRouter(
@@ -243,4 +274,6 @@ describe('ReceiptDetailPage visual-only actions', () => {
 });
 
 // Keep these screen contracts independent of persistence; sync integration is exercised separately.
-vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
+vi.mock('@/features/sync/documentsApi', async () => ({
+  documentFetch: (await import('@/lib/api')).apiFetch,
+}));

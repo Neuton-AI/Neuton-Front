@@ -167,7 +167,10 @@ export function CatalogPage() {
                           {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)}
                         </p>
                         <p className="shrink-0 text-label text-ink-muted">
-                          cost {incomplete ? 'incomplete' : formatMoney(recipe.costing.unitCost, currency)}
+                          cost{' '}
+                          {incomplete
+                            ? 'incomplete'
+                            : formatMoney(recipe.costing.unitCost, currency)}
                         </p>
                       </div>
                       {incomplete ? (
@@ -175,7 +178,14 @@ export function CatalogPage() {
                           {linked} of {total} ingredients linked — cost incomplete
                         </p>
                       ) : null}
-                      {recipe.status && <RecipeStatusPill status={recipe.status} />}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {recipe.status && <RecipeStatusPill status={recipe.status} />}
+                        {incomplete ? (
+                          <span className="rounded-pill bg-surface-cream-strong px-2 py-0.5 text-label font-medium text-ink-muted">
+                            Incomplete
+                          </span>
+                        ) : null}
+                      </div>
                     </Link>
                   );
                 })

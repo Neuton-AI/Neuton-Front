@@ -73,6 +73,31 @@ export function useVerifyReceipt(
   });
 }
 
+/** Saves locally first; the existing sync mutation protocol persists the correction. */
+export function useUpdateReceiptMerchant(token: Token, shopId: ShopId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: ({ id, merchantName }: { id: string; merchantName: string }) =>
+      apiFetch<{ receipt: Receipt }>(`/receipts/${id}`, {
+        method: 'PATCH',
+        token,
+        shopId,
+        body: { merchantName },
+      }),
+    onSuccess: (data, { id }) => {
+      const key = receiptsKeys.receipt(shopId, id);
+      queryClient.setQueryData<{ receipt: ReceiptDetail }>(key, (old) =>
+        old ? { receipt: { ...old.receipt, ...data.receipt } } : old,
+      );
+      void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({
+        queryKey: receiptsKeys.receipts(shopId),
+      });
+    },
+  });
+}
+
 export function useDeleteReceipt(
   token: Token,
   shopId: ShopId,
