@@ -71,6 +71,24 @@
   .pressable {
     @apply transition-transform duration-150 active:scale-[0.97];
   }
+
+  .sheet {
+    translate: 0 var(--sheet-drag-y, 0px);
+    transition: translate 180ms ease-out;
+    overscroll-behavior-y: contain;
+  }
+
+  .sheet[data-dragging] {
+    transition: none;
+    user-select: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      animation: none;
+      transition: none;
+    }
+  }
 }
 
 @layer utilities {
