@@ -25,6 +25,8 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
       price: number;
       packageSize: number;
       packageUnit: 'kg';
+      quantity: number;
+      rawSrcUnit: string;
     }) => void;
     error?: string;
   }) => (
@@ -38,6 +40,8 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
             price: 10,
             packageSize: 1,
             packageUnit: 'kg',
+            quantity: 150,
+            rawSrcUnit: 'g',
           })
         }
       >
@@ -48,7 +52,7 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
   ),
 }));
 
-it('persists a manually added product as the draft inventory link when saving the recipe', async () => {
+it('replaces extracted usage with the submitted manual usage and saves its general-price link', async () => {
   const user = userEvent.setup();
   let createdBody: unknown;
   let savedBody: unknown;
@@ -62,6 +66,7 @@ it('persists a manually added product as the draft inventory link when saving th
             name: 'Manual tomato pack',
             rawMaterialName: 'Tomato',
           },
+          usage: { baseUnit: 'g', baseUnitAmount: 150 },
         },
         { status: 201 },
       );
@@ -85,19 +90,21 @@ it('persists a manually added product as the draft inventory link when saving th
     packageSize: 1,
     packageUnit: 'kg',
     rawMaterialName: 'Tomato',
-    quantity: 2,
-    rawSrcUnit: 'kg',
+    quantity: 150,
+    rawSrcUnit: 'g',
   });
   expect(screen.getByLabelText('Ingredient 1 name')).toHaveValue('Manual tomato pack');
+  expect(screen.getByLabelText('Ingredient 1 amount')).toHaveValue(150);
+  expect(screen.getByLabelText('Ingredient 1 unit')).toHaveValue('g');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(await screen.findByText('Recipe destination')).toBeInTheDocument();
   expect(savedBody).toMatchObject({
     ingredients: [
       {
-        inventoryItemId: 'manual-product-1',
-        generalPriceId: null,
-        quantity: 2,
-        rawSrcUnit: 'kg',
+        inventoryItemId: null,
+        generalPriceId: 'manual-product-1',
+        quantity: 150,
+        rawSrcUnit: 'g',
       },
     ],
   });
@@ -138,6 +145,8 @@ function renderEditor() {
     rawMaterialName: 'Tomato',
     quantity: 2,
     rawSrcUnit: 'kg',
+    baseUnit: 'g',
+    baseUnitAmount: '2000.000',
     generalPriceId: 'old-unresolved-price',
     linked: false,
   };
@@ -151,6 +160,16 @@ function renderEditor() {
     { route: '/catalog/recipes/rp-1/edit?ingredient=ingredient-1' },
   );
 }
+
+it('allows manual linking when the extracted amount and unit are missing', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  const amount = await screen.findByLabelText('Ingredient 1 amount');
+  fireEvent.change(amount, { target: { value: '' } });
+  fireEvent.change(screen.getByLabelText('Ingredient 1 unit'), { target: { value: '' } });
+  await user.click(screen.getByRole('button', { name: 'Scan barcode for ingredient 1' }));
+  expect(screen.getByRole('dialog', { name: 'Barcode scanner' })).toBeInTheDocument();
+});
 
 it('keeps one draft across swipes and tabs, resets edits, and focuses the requested ingredient', async () => {
   const user = userEvent.setup();
@@ -343,4 +362,6 @@ it('deletes through the existing delete endpoint after confirmation', async () =
   expect(await screen.findByText('Catalog destination')).toBeInTheDocument();
 });
 
-vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
+vi.mock('@/features/sync/documentsApi', async () => ({
+  documentFetch: (await import('@/lib/api')).apiFetch,
+}));

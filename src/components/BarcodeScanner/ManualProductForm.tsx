@@ -1,10 +1,15 @@
 import { useState, type FormEvent } from 'react';
 import { IconProductLink } from '@/components/icons';
 import type { ManualProductInput } from '@/features/recipes/types';
+import {
+  measurementUnits,
+  packageBaseUnit,
+  type RecipeUsageContext,
+} from '@/features/recipes/measurementUnits';
 
 export type ProductDetails = Pick<
   ManualProductInput,
-  'name' | 'price' | 'packageSize' | 'packageUnit'
+  'name' | 'price' | 'packageSize' | 'packageUnit' | 'quantity' | 'rawSrcUnit'
 >;
 const units = [
   ['g', 'Grams'],
@@ -14,7 +19,7 @@ const units = [
   ['pcs', 'Pieces'],
 ] as const;
 const fieldClass =
-  'h-11 w-full min-w-0 rounded-lg border border-[#E6DFD8] bg-transparent px-3.5 text-base text-[#141413] outline-none focus:border-[#CC785C]';
+  'h-11 min-w-0 rounded-lg border border-[#E6DFD8] bg-transparent px-3.5 text-base text-[#141413] outline-none focus:border-[#CC785C]';
 const labelClass =
   'flex min-w-0 flex-col gap-1.5 text-xs font-medium tracking-[0.12em] text-[#6C6A64]';
 
@@ -31,14 +36,15 @@ export function ManualProductForm({
   currency: string;
   ingredient?: {
     rawMaterialName: string;
-    quantity: string;
-    rawSrcUnit: string;
-  };
+  } & RecipeUsageContext;
 }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [size, setSize] = useState('');
   const [unit, setUnit] = useState<ProductDetails['packageUnit']>('g');
+  const [usageAmount, setUsageAmount] = useState('');
+  const [usageUnit, setUsageUnit] = useState('g');
+  const usageUnits = measurementUnits[packageBaseUnit(unit)];
   const [open, setOpen] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);
   const currencySymbol =
@@ -46,9 +52,39 @@ export function ManualProductForm({
       .formatToParts(0)
       .find((part) => part.type === 'currency')?.value ?? currency;
 
+  function changePackageUnit(next: ProductDetails['packageUnit']) {
+    if (packageBaseUnit(unit) !== packageBaseUnit(next)) {
+      setUsageAmount('');
+      setUsageUnit(packageBaseUnit(next));
+    }
+    setUnit(next);
+    setOpen(false);
+  }
+
+  function changeUsageUnit(next: string) {
+    const from = usageUnits.find(({ unit }) => unit === usageUnit)!;
+    const to = usageUnits.find(({ unit }) => unit === next)!;
+    if (usageAmount.trim() && Number.isFinite(Number(usageAmount))) {
+      setUsageAmount(
+        String(Number(((Number(usageAmount) * from.ratio) / to.ratio).toPrecision(12))),
+      );
+    }
+    setUsageUnit(next);
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    if (
+      !usageAmount.trim() ||
+      !Number.isFinite(Number(usageAmount)) ||
+      Number(usageAmount) <= 0 ||
+      Number(usageAmount) > 999999999.999 ||
+      !usageUnits.some(({ unit }) => unit === usageUnit)
+    ) {
+      setValidation('Enter a positive amount used in this recipe.');
+      return;
+    }
     if (
       !name.trim() ||
       !price.trim() ||
@@ -70,6 +106,8 @@ export function ManualProductForm({
       price: Number(price),
       packageSize: Number(size),
       packageUnit: unit,
+      quantity: Number(usageAmount),
+      rawSrcUnit: usageUnit,
     });
   }
 
@@ -112,9 +150,7 @@ export function ManualProductForm({
           <label className={`${labelClass} flex-1`}>
             PRICE
             <div className="flex h-11 items-center gap-1.5 rounded-lg border border-[#E6DFD8] px-3.5 focus-within:border-[#CC785C]">
-              <span className="shrink-0 text-sm tracking-normal">
-                {currencySymbol}
-              </span>
+              <span className="shrink-0 text-sm tracking-normal">{currencySymbol}</span>
               <input
                 aria-label="Price"
                 required
@@ -187,8 +223,7 @@ export function ManualProductForm({
                     type="button"
                     aria-pressed={unit === value}
                     onClick={() => {
-                      setUnit(value);
-                      setOpen(false);
+                      changePackageUnit(value);
                     }}
                     className={`flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-left tracking-normal ${unit === value ? 'bg-[#EFE9DE] text-[#A9583E]' : 'text-[#141413]'}`}
                   >
@@ -204,6 +239,44 @@ export function ManualProductForm({
         <p className="-mt-3 text-[13px] leading-[18px] text-[#6C6A64]">
           What one pack contains, e.g. 250 g or 12 pcs.
         </p>
+        <div className={labelClass}>
+          <label htmlFor="manual-recipe-amount">AMOUNT USED IN THIS RECIPE</label>
+          <div className="flex gap-3">
+            <input
+              id="manual-recipe-amount"
+              aria-label="Amount used in this recipe"
+              aria-describedby="manual-recipe-amount-help"
+              required
+              type="number"
+              inputMode="decimal"
+              min="0"
+              max="999999999.999"
+              step="any"
+              value={usageAmount}
+              onChange={(event) => setUsageAmount(event.target.value)}
+              placeholder="Enter recipe amount"
+              className={`${fieldClass} flex-1`}
+            />
+            <select
+              aria-label="Recipe amount unit"
+              value={usageUnit}
+              onChange={(event) => changeUsageUnit(event.target.value)}
+              className={`${fieldClass} w-[132px] shrink-0 tracking-normal`}
+            >
+              {usageUnits.map(({ unit, label }) => (
+                <option key={unit} value={unit}>
+                  {unit} · {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p
+            id="manual-recipe-amount-help"
+            className="text-[13px] font-normal leading-[18px] tracking-normal"
+          >
+            How much this recipe uses, separate from the package size.
+          </p>
+        </div>
         {validation || error ? (
           <p role="alert" className="text-sm text-[#A9583E]">
             {validation ?? error}

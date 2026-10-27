@@ -23,6 +23,8 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
       price: number;
       packageSize: number;
       packageUnit: 'kg';
+      quantity: number;
+      rawSrcUnit: string;
     }) => void;
   }) => (
     <div role="dialog" aria-label="Barcode scanner">
@@ -34,6 +36,8 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
             price: 10,
             packageSize: 1,
             packageUnit: 'kg',
+            quantity: 2,
+            rawSrcUnit: 'kg',
           })
         }
       >
@@ -86,7 +90,9 @@ function renderRecipeFlow(route = catalog) {
         ingredients: body.ingredients.map((ingredient: object) => ({
           ...recipe.costing.ingredients[0],
           ...ingredient,
-          linked: 'inventoryItemId' in ingredient && !!ingredient.inventoryItemId,
+          linked:
+            ('generalPriceId' in ingredient && !!ingredient.generalPriceId) ||
+            ('inventoryItemId' in ingredient && !!ingredient.inventoryItemId),
         })),
       },
     };
@@ -102,6 +108,7 @@ function renderRecipeFlow(route = catalog) {
           name: 'Linked tomatoes',
           rawMaterialName: 'Tomato',
         },
+        usage: { baseUnit: 'g', baseUnitAmount: 2000 },
       }),
     ),
   );
@@ -176,4 +183,6 @@ it('cancels and completes ingredient linking through the real pages without accu
   expect(screen.getByLabelText('Route').textContent).toBe(catalog);
 });
 
-vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
+vi.mock('@/features/sync/documentsApi', async () => ({
+  documentFetch: (await import('@/lib/api')).apiFetch,
+}));

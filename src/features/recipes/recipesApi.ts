@@ -1,6 +1,5 @@
 import { analyticsKeys } from '@/features/analytics/keys';
-import { inventoryKeys } from '@/features/inventory/keys';
-import type { ManualProduct, ManualProductInput } from './types';
+import type { ManualProduct, ManualProductInput, ManualProductUsage } from './types';
 import { type OrderableRecipe } from '@/features/orders/types';
 import { recipesKeys } from '@/features/recipes/keys';
 import {
@@ -186,19 +185,16 @@ export function useBarcodePrice(token: Token, shopId: ShopId) {
 }
 
 export function useManualProduct(token: Token, shopId: ShopId) {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ManualProductInput }) =>
-      apiFetch<{ product: ManualProduct }>(`/recipes/${id}/manual-product`, {
-        method: 'POST',
-        token,
-        shopId,
-        body,
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: inventoryKeys.inventory(shopId),
-      });
-    },
+      apiFetch<{ product: ManualProduct; usage: ManualProductUsage }>(
+        `/recipes/${id}/manual-product`,
+        {
+          method: 'POST',
+          token,
+          shopId,
+          body,
+        },
+      ),
   });
 }

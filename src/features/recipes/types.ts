@@ -56,6 +56,11 @@ export type ManualProduct = {
   rawMaterialName: string;
 };
 
+export type ManualProductUsage = {
+  baseUnit: string;
+  baseUnitAmount: number;
+};
+
 export type BarcodePrice = {
   id: string;
   rawName: string;
