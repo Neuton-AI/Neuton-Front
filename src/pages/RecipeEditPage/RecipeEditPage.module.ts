@@ -18,9 +18,6 @@ type IngredientDraft = {
   rawMaterialName: string;
   quantity: string;
   rawSrcUnit: string;
-  baseUnit?: string | null;
-  baseUnitAmount?: string | null;
-  baseUnitRatio?: number;
   inventoryItemId: string | null;
   generalPriceId: string | null;
   linked?: boolean;
@@ -51,12 +48,6 @@ function recipeDraft(recipe: Recipe): Draft {
       rawMaterialName: ingredient.rawMaterialName ?? ingredient.rawName ?? ingredient.name,
       quantity: String(ingredient.quantity),
       rawSrcUnit: ingredient.rawSrcUnit,
-      baseUnit: ingredient.baseUnit,
-      baseUnitAmount: ingredient.baseUnitAmount,
-      baseUnitRatio:
-        ingredient.baseUnitAmount != null && ingredient.quantity > 0
-          ? Number(ingredient.baseUnitAmount) / ingredient.quantity
-          : undefined,
       inventoryItemId: ingredient.inventoryItemId ?? null,
       generalPriceId: ingredient.generalPriceId ?? null,
       linked: ingredient.linked,
@@ -162,19 +153,7 @@ export function useRecipeEditPage() {
                     generalPriceId: null,
                     linked: false,
                   }
-                : {
-                    ...row,
-                    [field]: value,
-                    baseUnit: field === 'rawSrcUnit' ? null : row.baseUnit,
-                    baseUnitRatio: field === 'rawSrcUnit' ? undefined : row.baseUnitRatio,
-                    baseUnitAmount:
-                      field === 'quantity' &&
-                      row.baseUnitRatio != null &&
-                      Number.isFinite(Number(value)) &&
-                      Number(value) > 0
-                        ? String(row.baseUnitRatio * Number(value))
-                        : null,
-                  };
+                : { ...row, [field]: value };
             }),
           }
         : current,
@@ -278,9 +257,6 @@ export function useRecipeEditPage() {
                       rawMaterialName: price.rawMaterialName,
                       quantity: ingredient.quantity,
                       rawSrcUnit: ingredient.rawSrcUnit,
-                      baseUnit: ingredient.baseUnit,
-                      baseUnitAmount: ingredient.baseUnitAmount,
-                      baseUnitRatio: ingredient.baseUnitRatio,
                       inventoryItemId: null,
                       generalPriceId: price.id,
                       linked: true,
@@ -326,9 +302,6 @@ export function useRecipeEditPage() {
                       rawMaterialName: product.rawMaterialName,
                       quantity: String(usage.baseUnitAmount),
                       rawSrcUnit: usage.baseUnit,
-                      baseUnit: usage.baseUnit,
-                      baseUnitAmount: String(usage.baseUnitAmount),
-                      baseUnitRatio: 1,
                       inventoryItemId: null,
                       generalPriceId: product.id,
                       linked: true,
@@ -387,9 +360,6 @@ export function useRecipeEditPage() {
         ({
           key: _key,
           linked: _linked,
-          baseUnit: _base,
-          baseUnitAmount: _amount,
-          baseUnitRatio: _ratio,
           quantity,
           ...ingredient
         }) => ({

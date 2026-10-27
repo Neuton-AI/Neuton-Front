@@ -2,10 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { IconProductLink } from '@/components/icons';
 import type { ManualProductInput } from '@/features/recipes/types';
 import {
-  initialRecipeUsage,
   measurementUnits,
   packageBaseUnit,
-  recipeUsageBase,
   type RecipeUsageContext,
 } from '@/features/recipes/measurementUnits';
 
@@ -43,12 +41,9 @@ export function ManualProductForm({
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [size, setSize] = useState('');
-  const [unit, setUnit] = useState<ProductDetails['packageUnit']>(() => {
-    const base = recipeUsageBase(ingredient);
-    return base === 'each' ? 'pcs' : base;
-  });
-  const [usageAmount, setUsageAmount] = useState(() => initialRecipeUsage(ingredient));
-  const [usageUnit, setUsageUnit] = useState(() => recipeUsageBase(ingredient) as string);
+  const [unit, setUnit] = useState<ProductDetails['packageUnit']>('g');
+  const [usageAmount, setUsageAmount] = useState('');
+  const [usageUnit, setUsageUnit] = useState('g');
   const usageUnits = measurementUnits[packageBaseUnit(unit)];
   const [open, setOpen] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);

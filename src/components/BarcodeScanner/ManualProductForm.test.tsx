@@ -31,6 +31,11 @@ it('submits package pricing with ingredient context and the five Paper units', (
   for (const unit of ['Grams', 'Kilograms', 'Milliliters', 'Liters', 'Pieces'])
     expect(screen.getByText(unit)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /kg Kilograms/ }));
+  fireEvent.submit(screen.getByLabelText('Amount used in this recipe').closest('form')!);
+  expect(save).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText('Amount used in this recipe'), {
+    target: { value: '120' },
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Save & link' }));
   expect(save).toHaveBeenCalledWith({
     name: 'Unsalted butter',
@@ -131,12 +136,12 @@ it('keeps recipe usage visible, clears incompatible amounts and restricts units 
 });
 
 it.each([
-  ['0.2', 'kg', 200],
-  ['120', 'g', 120],
-  ['2', 'heaped tbsp', null],
-  ['0', 'g', null],
-  ['2', 'unknown', null],
-])('prefills only resolvable compatible usage: %s %s', (quantity, rawSrcUnit, expected) => {
+  ['0.2', 'kg'],
+  ['120', 'g'],
+  ['2', 'heaped tbsp'],
+  ['0', 'g'],
+  ['2', 'unknown'],
+])('never prefills manual fields from extracted usage: %s %s', (quantity, rawSrcUnit) => {
   render(
     <ManualProductForm
       onSave={vi.fn()}
@@ -145,7 +150,10 @@ it.each([
       ingredient={{ rawMaterialName: 'Butter', quantity, rawSrcUnit }}
     />,
   );
-  expect(screen.getByLabelText('Amount used in this recipe')).toHaveValue(expected);
+  expect(screen.getByLabelText('Amount used in this recipe')).toHaveValue(null);
+  expect(screen.getByLabelText('Product name')).toHaveValue('');
+  expect(screen.getByLabelText('Price')).toHaveValue(null);
+  expect(screen.getByLabelText('Package size')).toHaveValue(null);
 });
 
 it('keeps user usage across compatible package changes and converts when its own unit changes', () => {
@@ -173,12 +181,12 @@ it('keeps user usage across compatible package changes and converts when its own
 });
 
 it.each([
-  ['גרם', 'g', '120.000', 120],
-  ['tsp', 'ml', '4.929', 4.929],
-  ['piece', 'each', '2.000', 2],
+  ['גרם', 'g', '120.000'],
+  ['tsp', 'ml', '4.929'],
+  ['piece', 'each', '2.000'],
 ])(
-  'uses API base amounts for extracted %s aliases',
-  (rawSrcUnit, baseUnit, baseUnitAmount, expected) => {
+  'ignores extracted %s base amounts when starting manual entry',
+  (rawSrcUnit, baseUnit, baseUnitAmount) => {
     render(
       <ManualProductForm
         onSave={vi.fn()}
@@ -193,7 +201,7 @@ it.each([
         }}
       />,
     );
-    expect(screen.getByLabelText('Amount used in this recipe')).toHaveValue(expected);
-    expect(screen.getByLabelText('Recipe amount unit')).toHaveValue(baseUnit);
+    expect(screen.getByLabelText('Amount used in this recipe')).toHaveValue(null);
+    expect(screen.getByLabelText('Recipe amount unit')).toHaveValue('g');
   },
 );

@@ -5,6 +5,10 @@ Verified through Chrome DevTools against the local frontend/backend using testSh
 - `before.png`: original manual form, with no way to correct recipe usage.
 - `after.png`: always-visible recipe amount with weight-only unit choices after
   changing an extracted piece-based ingredient to a gram-based product.
+- Manual entry always starts with empty name, price, package size and recipe amount,
+  regardless of compatible extracted quantities or API-normalized base amounts.
+- `manual-empty.png`: corrected manual form with all fields empty despite the
+  original ingredient having a compatible 115 g quantity.
 - `saved-cost.png`: replacement retained after saving/reloading; 200 g used from a
   500 g package priced at $10 contributes $4.00. Other ingredients remain unpriced.
 

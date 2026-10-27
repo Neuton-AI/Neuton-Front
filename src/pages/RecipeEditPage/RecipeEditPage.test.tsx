@@ -16,7 +16,6 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
     onDetected,
     onClose,
     onManualSave,
-    ingredient,
     error,
   }: {
     onDetected: (barcode: string) => void;
@@ -30,10 +29,8 @@ vi.mock('@/components/BarcodeScanner/BarcodeScanner', () => ({
       rawSrcUnit: string;
     }) => void;
     error?: string;
-    ingredient?: { baseUnitAmount?: string | null };
   }) => (
     <div role="dialog" aria-label="Barcode scanner">
-      <output aria-label="Normalized recipe context">{ingredient?.baseUnitAmount}</output>
       <button onClick={() => onDetected('7290000000001')}>Scan product</button>
       <button onClick={onClose}>Cancel scan</button>
       <button
@@ -164,14 +161,14 @@ function renderEditor() {
   );
 }
 
-it('preserves normalized measurement context when an amount is cleared and re-entered', async () => {
+it('allows manual linking when the extracted amount and unit are missing', async () => {
   const user = userEvent.setup();
   renderEditor();
   const amount = await screen.findByLabelText('Ingredient 1 amount');
   fireEvent.change(amount, { target: { value: '' } });
-  fireEvent.change(amount, { target: { value: '3' } });
+  fireEvent.change(screen.getByLabelText('Ingredient 1 unit'), { target: { value: '' } });
   await user.click(screen.getByRole('button', { name: 'Scan barcode for ingredient 1' }));
-  expect(screen.getByLabelText('Normalized recipe context')).toHaveTextContent('3000');
+  expect(screen.getByRole('dialog', { name: 'Barcode scanner' })).toBeInTheDocument();
 });
 
 it('keeps one draft across swipes and tabs, resets edits, and focuses the requested ingredient', async () => {
