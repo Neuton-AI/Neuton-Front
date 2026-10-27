@@ -19,7 +19,7 @@ const units = [
   ['pcs', 'Pieces'],
 ] as const;
 const fieldClass =
-  'h-11 w-full min-w-0 rounded-lg border border-[#E6DFD8] bg-transparent px-3.5 text-base text-[#141413] outline-none focus:border-[#CC785C]';
+  'h-11 min-w-0 rounded-lg border border-[#E6DFD8] bg-transparent px-3.5 text-base text-[#141413] outline-none focus:border-[#CC785C]';
 const labelClass =
   'flex min-w-0 flex-col gap-1.5 text-xs font-medium tracking-[0.12em] text-[#6C6A64]';
 
