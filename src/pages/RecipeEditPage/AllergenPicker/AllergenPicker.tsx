@@ -66,7 +66,7 @@ export function AllergenPicker({ selected, onToggle }: Props) {
           onCancel={picker.dismiss}
           onClose={picker.dismiss}
           onClick={picker.onBackdropClick}
-          className="allergen-popover fixed m-0 overflow-auto rounded-[14px] border border-hairline bg-white p-3 text-ink shadow-[0_16px_40px_#14141329,0_2px_6px_#1414130F]"
+          className="allergen-popover fixed m-0 max-w-none overflow-auto rounded-[14px] border border-hairline bg-white p-3 text-ink shadow-[0_16px_40px_#14141329,0_2px_6px_#1414130F]"
         >
           <div className="flex h-11 shrink-0 items-center gap-2.5 rounded-input border-[1.5px] border-brand-primary pl-3.5 pr-3">
             <IconSearch className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
