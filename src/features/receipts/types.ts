@@ -1,3 +1,5 @@
+import type { DocumentSource } from '@/features/uploads/types';
+
 export type ReceiptStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 export type Receipt = {
   id: string;
@@ -39,7 +41,10 @@ export type ReceiptItem = {
   createdAt: string;
 };
 
-export type ReceiptDetail = Receipt & { items: ReceiptItem[] };
+export type ReceiptDetail = Receipt & {
+  items: ReceiptItem[];
+  sources?: DocumentSource[];
+};
 
 export type VerifyReceiptBody = {
   items: { id: string; accepted: boolean }[];

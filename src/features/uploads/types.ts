@@ -29,6 +29,22 @@ export type GroupPresignResponse = {
 
 export type MediaKind = 'receipt' | 'recipe' | 'product' | 'order';
 
+export type SourcePreview = {
+  storagePath: string;
+  contentType: 'image/webp';
+  width: number;
+  height: number;
+};
+
+export type DocumentSource = {
+  sourceId: string;
+  storagePath: string;
+  contentType: string;
+  originalFilename: string | null;
+  byteSize?: number;
+  preview?: SourcePreview;
+};
+
 export const ALLOWED_CONTENT_TYPES = [
   'image/jpeg',
   'image/png',

@@ -1,3 +1,5 @@
+import type { DocumentSource } from '@/features/uploads/types';
+
 export type OrderStatus = 'processing' | 'delivered' | 'cancelled';
 
 export type OrderableRecipe = {
@@ -52,7 +54,10 @@ export type OrderDetailItem = {
   unitPrice: string;
 };
 
-export type OrderDetail = Order & { items: OrderDetailItem[] };
+export type OrderDetail = Order & {
+  items: OrderDetailItem[];
+  sources?: DocumentSource[];
+};
 
 export type OrderQuoteItem = {
   recipeId: string;
