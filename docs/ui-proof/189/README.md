@@ -10,4 +10,4 @@ Reference: [Paper capture designs](https://app.paper.design/file/01M5CV8CAXEHV9P
 
 Verified Upload source picker, Add, review navigation to 4 of 4, reorder and delete; no horizontal overflow at 320, 390, 768, 1024, or 1440px. At 390px, Upload/Send start at y=559 and shutter at y=598; captured circles are 64px with Add 18px higher.
 
-Small-screen follow-up: captured previews adapt to viewport height so Upload remains on-screen with Retake/Add/Send. Verified 375x667, 360x640, and 320x568; captured-small-after.png shows 320x568 and the Upload source picker was opened successfully.
+Upload is available only in live camera mode. Captured previews show Retake, Add, and Send without Upload; captured-after.png reflects this state.

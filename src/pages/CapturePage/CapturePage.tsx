@@ -38,7 +38,7 @@ export const CapturePage: React.FC = () => {
           onSelect={model.setKind}
         />
         <CaptureControls {...model} instant={instant} />
-        <CaptureDropzone {...model} />
+        {!model.current && <CaptureDropzone {...model} />}
         <div className="capture-feedback" aria-live="polite">
           {model.error && <ErrorState message={model.error} />}
           {model.total >= 4 && !model.busy && (

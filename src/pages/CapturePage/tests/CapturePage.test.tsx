@@ -94,6 +94,9 @@ it("keeps Retake, Add and Send separate and disables adding at four sources", as
   render(<CapturePage />);
   const user = userEvent.setup();
   expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "Upload" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Receipt" })).toBeDisabled();
   await user.click(
     screen.getByRole("button", { name: "Review current document" }),
@@ -113,6 +116,9 @@ it("passes keyboard activation through to Add without requesting motion", async 
   const state = { ...model(), current: source("current"), total: 1 };
   vi.mocked(useCapturePage).mockReturnValue(state);
   render(<CapturePage />);
+  expect(
+    screen.queryByRole("button", { name: "Upload" }),
+  ).not.toBeInTheDocument();
   screen.getByRole("button", { name: "Add" }).focus();
   await userEvent.setup().keyboard("{Enter}");
   expect(state.addCurrent).toHaveBeenCalledWith(true);

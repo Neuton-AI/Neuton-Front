@@ -333,25 +333,6 @@
 .capture-layout[data-saved]:not([data-captured]) .capture-upload {
   top: calc(max(48px, calc(var(--safe-top) + 16px)) + 511px);
 }
-.capture-layout[data-captured] .capture-upload {
-  position: static;
-  align-self: center;
-  margin-top: 40px;
-}
-.capture-layout[data-captured] {
-  min-height: 100dvh;
-}
-/* Keep Upload in view on shorter phones without shrinking the action buttons. */
-.capture-layout[data-captured] .capture-preview {
-  height: clamp(
-    120px,
-    calc(100dvh - 478px - var(--safe-top) - var(--safe-bottom)),
-    370px
-  );
-}
-.capture-layout[data-captured] .capture-feedback {
-  min-height: 0;
-}
 .capture-file-card {
   display: flex;
   flex-direction: column;
