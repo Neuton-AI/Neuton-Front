@@ -1,12 +1,23 @@
-import { useRecipeNavigation } from '@/features/recipes/recipeNavigation';
-import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
-import { useDeleteRecipe, useRecipe, useVerifyRecipe } from '@/features/recipes/recipesApi';
-import { ingredientIsLinked, ingredientLinkSummary } from '@/features/recipes/selectors';
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useRecipeNavigation } from "@/features/recipes/recipeNavigation";
+import {
+  useAuth,
+  useCurrentShop,
+  useShopMemberships,
+} from "@/features/auth/supabase";
+import {
+  useDeleteRecipe,
+  useRecipe,
+  useVerifyRecipe,
+} from "@/features/recipes/recipesApi";
+import {
+  ingredientIsLinked,
+  ingredientLinkSummary,
+} from "@/features/recipes/selectors";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 export function useRecipeDetailPage() {
-  const { id = '' } = useParams();
+  const { id = "" } = useParams();
 
   const { user, token } = useAuth();
 
@@ -46,10 +57,10 @@ export function useRecipeDetailPage() {
   const error = recipeQuery.error
     ? recipeQuery.error instanceof Error
       ? recipeQuery.error.message
-      : 'Could not load the recipe.'
+      : "Could not load the recipe."
     : null;
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = shop?.currency ?? "USD";
 
   const { close, edit: openEditor } = useRecipeNavigation();
 
@@ -59,7 +70,7 @@ export function useRecipeDetailPage() {
   // ever earn a 403 from a button they could see.
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
 
-  const canVerify = role === 'owner' || role === 'admin';
+  const canVerify = role === "owner" || role === "admin";
 
   // Polling while the worker is extracting is baked into the query hook:
   // it keeps a quiet 3s refetch while status is pending/processing.
@@ -71,13 +82,22 @@ export function useRecipeDetailPage() {
    * endpoint's body is an object even though every field is optional.
    */
   const verify = async () => {
-    if (!token || !activeShopId || !id || !canVerify || verifyMutation.isPending) return;
+    if (
+      !token ||
+      !activeShopId ||
+      !id ||
+      !canVerify ||
+      verifyMutation.isPending
+    )
+      return;
 
     setVerifyError(null);
     try {
       await verifyMutation.mutateAsync({ id });
     } catch (cause) {
-      setVerifyError(cause instanceof Error ? cause.message : 'Could not verify the recipe.');
+      setVerifyError(
+        cause instanceof Error ? cause.message : "Could not verify the recipe.",
+      );
     }
   };
 
@@ -91,10 +111,17 @@ export function useRecipeDetailPage() {
    * success navigates back. No status gate here — every status is deletable.
    */
   const remove = async () => {
-    if (!token || !activeShopId || !id || !canVerify || deleteMutation.isPending) return;
+    if (
+      !token ||
+      !activeShopId ||
+      !id ||
+      !canVerify ||
+      deleteMutation.isPending
+    )
+      return;
     if (
       !window.confirm(
-        'Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.',
+        "Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.",
       )
     ) {
       return;
@@ -103,25 +130,40 @@ export function useRecipeDetailPage() {
     setDeleteError(null);
     try {
       await deleteMutation.mutateAsync({ id });
-      navigate('/catalog?tab=recipes', { replace: true });
+      navigate("/catalog?tab=recipes", { replace: true });
     } catch (cause) {
-      setDeleteError(cause instanceof Error ? cause.message : 'Could not delete the recipe.');
+      setDeleteError(
+        cause instanceof Error ? cause.message : "Could not delete the recipe.",
+      );
     }
   };
 
   const { total, linked, incomplete } = recipe
     ? ingredientLinkSummary(recipe.costing)
     : { total: 0, linked: 0, incomplete: false };
-  const [costWarningDismissedFor, setCostWarningDismissedFor] = useState<string | null>(null);
-  const [costWarningExitingFor, setCostWarningExitingFor] = useState<string | null>(null);
+  const [costWarningDismissedFor, setCostWarningDismissedFor] = useState<
+    string | null
+  >(null);
+  const [costWarningExitingFor, setCostWarningExitingFor] = useState<
+    string | null
+  >(null);
   const showCostWarning =
-    canVerify && recipe?.status === 'unverified' && incomplete && costWarningDismissedFor !== id;
+    canVerify &&
+    recipe?.status === "unverified" &&
+    incomplete &&
+    costWarningDismissedFor !== id;
   const costWarningExiting = showCostWarning && costWarningExitingFor === id;
 
   useEffect(() => {
     if (!showCostWarning) return;
-    const exitTimeout = window.setTimeout(() => setCostWarningExitingFor(id), 2000);
-    const dismissTimeout = window.setTimeout(() => setCostWarningDismissedFor(id), 2600);
+    const exitTimeout = window.setTimeout(
+      () => setCostWarningExitingFor(id),
+      2000,
+    );
+    const dismissTimeout = window.setTimeout(
+      () => setCostWarningDismissedFor(id),
+      2600,
+    );
     return () => {
       window.clearTimeout(exitTimeout);
       window.clearTimeout(dismissTimeout);

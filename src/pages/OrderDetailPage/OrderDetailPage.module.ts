@@ -1,12 +1,20 @@
-import { useSheetClose } from '@/components/Sheet/Sheet.module';
-import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
-import { useDeleteOrder, useMarkOrderDelivered, useOrder } from '@/features/orders/ordersApi';
-import { toNumber } from '@/lib/format';
-import { useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useSheetClose } from "@/components/Sheet/Sheet.module";
+import {
+  useAuth,
+  useCurrentShop,
+  useShopMemberships,
+} from "@/features/auth/supabase";
+import {
+  useDeleteOrder,
+  useMarkOrderDelivered,
+  useOrder,
+} from "@/features/orders/ordersApi";
+import { toNumber } from "@/lib/format";
+import { useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 export function useOrderDetailPage() {
-  const { id = '' } = useParams();
+  const { id = "" } = useParams();
 
   const location = useLocation();
 
@@ -50,7 +58,7 @@ export function useOrderDetailPage() {
   const error = orderQuery.error
     ? orderQuery.error instanceof Error
       ? orderQuery.error.message
-      : 'Could not load the order.'
+      : "Could not load the order."
     : actionError;
 
   const retry = () => {
@@ -58,11 +66,12 @@ export function useOrderDetailPage() {
     void orderQuery.refetch();
   };
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = shop?.currency ?? "USD";
 
-  const close = useSheetClose('/orders');
+  const close = useSheetClose("/orders");
 
-  const justSaved = (location.state as { fresh?: boolean } | null)?.fresh === true;
+  const justSaved =
+    (location.state as { fresh?: boolean } | null)?.fresh === true;
 
   const remove = async () => {
     if (!token || !activeShopId || !id || deleteOrder.isPending) return;
@@ -71,9 +80,11 @@ export function useOrderDetailPage() {
     setActionError(null);
     try {
       await deleteOrder.mutateAsync({ id });
-      navigate('/orders', { replace: true });
+      navigate("/orders", { replace: true });
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : 'Could not delete the order.');
+      setActionError(
+        cause instanceof Error ? cause.message : "Could not delete the order.",
+      );
     }
   };
 
@@ -92,7 +103,11 @@ export function useOrderDetailPage() {
     try {
       await markOrder.mutateAsync({ id });
     } catch (cause) {
-      setMarkError(cause instanceof Error ? cause.message : 'Could not mark the order delivered.');
+      setMarkError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not mark the order delivered.",
+      );
     }
   };
 
@@ -104,7 +119,8 @@ export function useOrderDetailPage() {
   const baseFee = toNumber(shop?.deliveryBaseFee);
   const markOrderPending = markOrder.isPending;
   const deleteOrderPending = deleteOrder.isPending;
-  const distanceFee = toNumber(order?.deliveryDistanceKm) * toNumber(shop?.deliveryRatePerKm);
+  const distanceFee =
+    toNumber(order?.deliveryDistanceKm) * toNumber(shop?.deliveryRatePerKm);
   return {
     token,
     activeShopId,

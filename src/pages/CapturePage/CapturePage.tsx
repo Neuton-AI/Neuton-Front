@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import { ErrorState } from '@/components/feedback';
-import { useCapturePage } from './CapturePage.module';
-import { CaptureControls } from './CaptureControls';
-import { CaptureDropzone } from './CaptureDropzone';
-import { CaptureFileInputs } from './CaptureFileInputs';
-import { CaptureHeader } from './CaptureHeader';
-import { CaptureKinds } from './CaptureKinds';
-import { CaptureReview } from './CaptureReview/CaptureReview';
-import { CaptureSourcePicker } from './CaptureSourcePicker';
-import { CaptureViewport } from './CaptureViewport';
-import './CapturePage.css';
+import type React from "react";
+import { useState } from "react";
+import { ErrorState } from "@/components/feedback";
+import { useCapturePage } from "./CapturePage.module";
+import { CaptureControls } from "./components/CaptureControls/CaptureControls";
+import { CaptureDropzone } from "./components/CaptureDropzone/CaptureDropzone";
+import { CaptureFileInputs } from "./components/CaptureFileInputs/CaptureFileInputs";
+import { CaptureHeader } from "./components/CaptureHeader/CaptureHeader";
+import { CaptureKinds } from "./components/CaptureKinds/CaptureKinds";
+import { CaptureReview } from "./components/CaptureReview/CaptureReview";
+import { CaptureSourcePicker } from "./components/CaptureSourcePicker/CaptureSourcePicker";
+import { CaptureViewport } from "./components/CaptureViewport/CaptureViewport";
+import "./CapturePage.css";
 
-export function CapturePage() {
+export const CapturePage: React.FC = () => {
   const model = useCapturePage();
   const [instant, setInstant] = useState(false);
   return (
@@ -22,7 +23,10 @@ export function CapturePage() {
       onKeyDownCapture={() => setInstant(true)}
     >
       <div className="capture-layout">
-        <CaptureHeader disabled={model.busy || model.adding} onClose={model.handleClose} />
+        <CaptureHeader
+          disabled={model.busy || model.adding}
+          onClose={model.handleClose}
+        />
         <CaptureViewport {...model} />
         <CaptureKinds
           kind={model.kind}
@@ -43,4 +47,4 @@ export function CapturePage() {
       <CaptureReview model={model} instant={instant} setInstant={setInstant} />
     </main>
   );
-}
+};

@@ -1,26 +1,36 @@
-import { BottomNav } from '@/components/BottomNav/BottomNav';
-import { Fab } from '@/components/Fab/Fab';
-import { ErrorState } from '@/components/feedback';
-import { Layout } from '@/components/Layout/Layout';
-import { PageHeader } from '@/components/PageHeader/PageHeader';
-import { Link } from 'react-router-dom';
-import { OrderFilters } from './OrderFilters/OrderFilters';
-import { OrderRow } from './OrderRow/OrderRow';
-import { OrdersEmpty } from './OrdersEmpty/OrdersEmpty';
-import { useOrdersPage } from './OrdersPage.module';
-import { OrdersSkeleton } from './OrdersSkeleton/OrdersSkeleton';
+import type React from "react";
+import { BottomNav } from "@/components/BottomNav/BottomNav";
+import { Fab } from "@/components/Fab/Fab";
+import { ErrorState } from "@/components/feedback";
+import { Layout } from "@/components/Layout/Layout";
+import { PageHeader } from "@/components/PageHeader/PageHeader";
+import { Link } from "react-router-dom";
+import { OrderFilters } from "./components/OrderFilters/OrderFilters";
+import { OrderRow } from "./components/OrderRow/OrderRow";
+import { OrdersEmpty } from "./components/OrdersEmpty/OrdersEmpty";
+import { useOrdersPage } from "./OrdersPage.module";
+import { OrdersSkeleton } from "./components/OrdersSkeleton/OrdersSkeleton";
 
-export function OrdersPage() {
+export const OrdersPage: React.FC = () => {
   const model = useOrdersPage();
   return (
     <Layout
       className="shell"
       mainContent={
         <div className="flex-1 pb-44">
-          <PageHeader eyebrow="YOUR SALES" title="Orders" className="screen-header px-4" />
-          <OrderFilters statusFilter={model.statusFilter} onSelect={model.setStatusFilter} />
+          <PageHeader
+            eyebrow="YOUR SALES"
+            title="Orders"
+            className="screen-header px-4"
+          />
+          <OrderFilters
+            statusFilter={model.statusFilter}
+            onSelect={model.setStatusFilter}
+          />
           <div className="mt-4 px-4">
-            {model.error ? <ErrorState message={model.message} onRetry={model.handleRetry} /> : null}
+            {model.error ? (
+              <ErrorState message={model.message} onRetry={model.handleRetry} />
+            ) : null}
             {model.loading ? (
               <OrdersSkeleton />
             ) : model.visibleOrders.length === 0 ? (
@@ -28,7 +38,11 @@ export function OrdersPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {model.visibleOrders.map((order) => (
-                  <OrderRow key={order.id} order={order} currency={model.currency} />
+                  <OrderRow
+                    key={order.id}
+                    order={order}
+                    currency={model.currency}
+                  />
                 ))}
               </div>
             )}
@@ -51,4 +65,4 @@ export function OrdersPage() {
       footer={<BottomNav />}
     />
   );
-}
+};

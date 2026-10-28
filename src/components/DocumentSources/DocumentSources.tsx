@@ -1,15 +1,26 @@
-import { Skeleton } from '@/components/feedback';
-import type { DocumentSource } from '@/features/uploads/types';
-import { useDocumentSource } from './DocumentSources.module';
+import type React from "react";
+import { Skeleton } from "@/components/feedback";
+import type { DocumentSource } from "@/features/uploads/types";
+import { useDocumentSource } from "./DocumentSources.module";
 
-type Context = { token: string | null; shopId: string | null };
+interface IDocumentSourceView {
+  token: string | null;
+  shopId: string | null;
+  source: DocumentSource;
+}
 
-function DocumentSourceView({ source, token, shopId }: Context & { source: DocumentSource }) {
+const DocumentSourceView: React.FC<IDocumentSourceView> = ({
+  source,
+  token,
+  shopId,
+}) => {
   const preview = useDocumentSource({ source, token, shopId });
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 break-all text-label text-ink-muted">{preview.filename}</p>
+        <p className="min-w-0 break-all text-label text-ink-muted">
+          {preview.filename}
+        </p>
         {!preview.isPdfLink || preview.failed ? (
           <button
             type="button"
@@ -18,17 +29,24 @@ function DocumentSourceView({ source, token, shopId }: Context & { source: Docum
             onClick={() => void preview.openOriginal()}
             className="pressable min-h-10 shrink-0 text-label font-medium text-ink underline disabled:opacity-45"
           >
-            {preview.opening ? 'Opening…' : 'View original'}
+            {preview.opening ? "Opening…" : "View original"}
           </button>
         ) : null}
       </div>
       <div className="flex h-[150px] items-center justify-center overflow-hidden rounded-card bg-surface-cream-strong">
         {preview.failed ? (
-          <p className="px-6 text-center text-label text-ink-muted">Preview could not be loaded.</p>
+          <p className="px-6 text-center text-label text-ink-muted">
+            Preview could not be loaded.
+          </p>
         ) : !preview.ready || !preview.url ? (
           <Skeleton className="h-full w-full rounded-none" />
         ) : preview.isPdfLink ? (
-          <a href={preview.url} target="_blank" rel="noreferrer" className="pressable text-label font-medium text-ink underline">
+          <a
+            href={preview.url}
+            target="_blank"
+            rel="noreferrer"
+            className="pressable text-label font-medium text-ink underline"
+          >
             Open {preview.filename}
           </a>
         ) : (
@@ -50,9 +68,18 @@ function DocumentSourceView({ source, token, shopId }: Context & { source: Docum
       ) : null}
     </div>
   );
+};
+
+interface IDocumentSources {
+  token: string | null;
+  shopId: string | null;
+  sources: DocumentSource[];
 }
 
-export function DocumentSources({ sources, ...context }: Context & { sources: DocumentSource[] }) {
+export const DocumentSources: React.FC<IDocumentSources> = ({
+  sources,
+  ...context
+}) => {
   return (
     <div className="flex flex-col gap-3">
       {sources.map((source) => (
@@ -64,4 +91,4 @@ export function DocumentSources({ sources, ...context }: Context & { sources: Do
       ))}
     </div>
   );
-}
+};

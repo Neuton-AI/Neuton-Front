@@ -1,6 +1,11 @@
-import { useInstallApp } from './installContext';
+import type React from "react";
+import { useInstallApp } from "./installContext";
 
-function InstallIcon({ className }: { className: string }) {
+interface IInstallIcon {
+  className: string;
+}
+
+const InstallIcon: React.FC<IInstallIcon> = ({ className }) => {
   return (
     <svg
       aria-hidden="true"
@@ -15,9 +20,9 @@ function InstallIcon({ className }: { className: string }) {
       <path d="M9 2.5V11.5M5.25 8L9 11.75L12.75 8M3 14.5H15" />
     </svg>
   );
-}
+};
 
-export function InstallAppButton() {
+export const InstallAppButton: React.FC = () => {
   const state = useInstallApp();
   if (!state?.canInstall) return null;
   return (
@@ -31,9 +36,9 @@ export function InstallAppButton() {
       Install app
     </button>
   );
-}
+};
 
-export function InstallAppPopover() {
+export const InstallAppPopover: React.FC = () => {
   const state = useInstallApp();
   if (!state?.showPopover) return null;
   return (
@@ -77,4 +82,4 @@ export function InstallAppPopover() {
       </div>
     </aside>
   );
-}
+};

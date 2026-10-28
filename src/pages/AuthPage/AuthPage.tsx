@@ -1,14 +1,22 @@
-import { FormFields } from '@/components/FormFields/FormFields';
-import { Button } from '@/components/ui';
-import { Link } from 'react-router-dom';
-import { AuthConfiguration } from './AuthConfiguration/AuthConfiguration';
-import { AuthHeading, AuthModeTabs } from './AuthHeading/AuthHeading';
-import { useAuthPage } from './AuthPage.module';
-import { AuthSocial } from './AuthSocial/AuthSocial';
+import type React from "react";
+import { FormFields } from "@/components/FormFields/FormFields";
+import { Button } from "@/components/ui";
+import { Link } from "react-router-dom";
+import { AuthConfiguration } from "./components/AuthConfiguration/AuthConfiguration";
+import {
+  AuthHeading,
+  AuthModeTabs,
+} from "./components/AuthHeading/AuthHeading";
+import { useAuthPage } from "./AuthPage.module";
+import { AuthSocial } from "./components/AuthSocial/AuthSocial";
 
-type Mode = 'signin' | 'signup';
+type Mode = "signin" | "signup";
 
-export function AuthPage({ mode }: { mode: Mode }) {
+interface IAuthPage {
+  mode: Mode;
+}
+
+export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
   const model = useAuthPage({ mode });
   if (!model.isConfigured) return <AuthConfiguration />;
   return (
@@ -17,19 +25,41 @@ export function AuthPage({ mode }: { mode: Mode }) {
         <AuthHeading isSignIn={model.isSignIn} />
         <AuthModeTabs isSignIn={model.isSignIn} onSelect={model.setSegment} />
         <form onSubmit={model.submit} className="mt-6 flex flex-col gap-4">
-          <FormFields fields={model.fields} values={model.formValues} onChange={model.handleFieldChange} />
+          <FormFields
+            fields={model.fields}
+            values={model.formValues}
+            onChange={model.handleFieldChange}
+          />
           {model.error ? (
-            <p role="alert" className="rounded-card bg-semantic-error/10 p-3 text-label font-medium text-ink">
+            <p
+              role="alert"
+              className="rounded-card bg-semantic-error/10 p-3 text-label font-medium text-ink"
+            >
               {model.error}
             </p>
           ) : null}
           {model.notice ? (
-            <p role="status" className="rounded-card bg-surface-cream-strong p-3 text-label font-medium text-ink">
+            <p
+              role="status"
+              className="rounded-card bg-surface-cream-strong p-3 text-label font-medium text-ink"
+            >
               {model.notice}
             </p>
           ) : null}
-          <Button type="submit" variant="primary" size="lg" radius="input" block loading={model.busy} className="h-12">
-            {model.busy ? 'Working…' : model.isSignIn ? 'Sign in' : 'Create account'}
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            radius="input"
+            block
+            loading={model.busy}
+            className="h-12"
+          >
+            {model.busy
+              ? "Working…"
+              : model.isSignIn
+                ? "Sign in"
+                : "Create account"}
           </Button>
         </form>
         {model.isSignIn && (
@@ -46,4 +76,4 @@ export function AuthPage({ mode }: { mode: Mode }) {
       </div>
     </div>
   );
-}
+};

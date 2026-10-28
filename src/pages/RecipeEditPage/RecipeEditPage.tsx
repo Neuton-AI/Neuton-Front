@@ -1,33 +1,53 @@
-import { BarcodeScanner } from '@/components/BarcodeScanner/BarcodeScanner';
-import { ErrorState, InlineNotice, Spinner } from '@/components/feedback';
-import { IngredientsPanel } from './IngredientsPanel/IngredientsPanel';
-import { PreparationPanel } from './PreparationPanel/PreparationPanel';
-import { RecipeEditFooter } from './RecipeEditFooter/RecipeEditFooter';
-import { RecipeEditHeader, RecipeEditTabs } from './RecipeEditHeader/RecipeEditHeader';
-import { useRecipeEditPage, type RecipeEditPageModel } from './RecipeEditPage.module';
+import type React from "react";
+import { BarcodeScanner } from "@/components/BarcodeScanner/BarcodeScanner";
+import { ErrorState, InlineNotice, Spinner } from "@/components/feedback";
+import { IngredientsPanel } from "./components/IngredientsPanel/IngredientsPanel";
+import { PreparationPanel } from "./components/PreparationPanel/PreparationPanel";
+import { RecipeEditFooter } from "./components/RecipeEditFooter/RecipeEditFooter";
+import {
+  RecipeEditHeader,
+  RecipeEditTabs,
+} from "./components/RecipeEditHeader/RecipeEditHeader";
+import {
+  useRecipeEditPage,
+  type RecipeEditPageModel,
+} from "./RecipeEditPage.module";
 
-export function RecipeEditPage() {
+export const RecipeEditPage: React.FC = () => {
   return <RecipeEditView model={useRecipeEditPage()} />;
+};
+
+interface IRecipeEditView {
+  model: RecipeEditPageModel;
 }
 
-export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
+export const RecipeEditView: React.FC<IRecipeEditView> = ({ model }) => {
   const { draft, recipe, busy, canManage } = model;
   return (
     <main className="mx-auto flex h-[100dvh] max-w-shell flex-col bg-surface-canvas pt-[max(var(--safe-top),16px)]">
       <RecipeEditHeader model={model} />
       {model.loading ? (
-        <div role="status" aria-label="Loading recipe" className="flex flex-1 items-center justify-center">
+        <div
+          role="status"
+          aria-label="Loading recipe"
+          className="flex flex-1 items-center justify-center"
+        >
           <Spinner />
         </div>
       ) : null}
       {model.error ? (
         <div className="px-4 pb-3">
-          <ErrorState message={model.error} onRetry={!draft ? model.retry : undefined} />
+          <ErrorState
+            message={model.error}
+            onRetry={!draft ? model.retry : undefined}
+          />
         </div>
       ) : null}
       {!model.loading && !canManage ? (
         <div className="px-4">
-          <InlineNotice>Only shop owners and admins can edit recipes.</InlineNotice>
+          <InlineNotice>
+            Only shop owners and admins can edit recipes.
+          </InlineNotice>
         </div>
       ) : null}
       {!model.loading && draft && recipe && canManage ? (
@@ -53,7 +73,9 @@ export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
           <RecipeEditFooter model={model} />
         </form>
       ) : null}
-      {!model.loading && !recipe && !model.error ? <p className="px-4 text-ink-muted">Recipe not found.</p> : null}
+      {!model.loading && !recipe && !model.error ? (
+        <p className="px-4 text-ink-muted">Recipe not found.</p>
+      ) : null}
       {model.scanKey ? (
         <BarcodeScanner
           onDetected={(barcode) => void model.linkBarcode(barcode)}
@@ -68,4 +90,4 @@ export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
       ) : null}
     </main>
   );
-}
+};

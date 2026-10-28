@@ -1,46 +1,57 @@
-import type { ReactNode } from 'react';
+import type React from "react";
+import type { ReactNode } from "react";
 
-type Props = {
+interface IStatCard {
   label: string;
   value?: ReactNode;
   /** Rendered between the label and the value, e.g. the average/median toggle. */
   middle?: ReactNode;
   sub?: ReactNode;
-  tone?: 'card' | 'dark' | 'primary' | 'outline';
+  tone?: "card" | "dark" | "primary" | "outline";
   /** Extra classes for the label, used to opt out of the default faded tone. */
   labelClassName?: string;
   className?: string;
-};
+}
 
 const TONES = {
-  card: 'bg-surface-card text-ink',
-  dark: 'bg-surface-dark text-ink-on-dark',
-  primary: 'bg-brand-primary text-ink-on-primary',
-  outline: 'bg-surface-canvas text-ink border border-hairline',
+  card: "bg-surface-card text-ink",
+  dark: "bg-surface-dark text-ink-on-dark",
+  primary: "bg-brand-primary text-ink-on-primary",
+  outline: "bg-surface-canvas text-ink border border-hairline",
 } as const;
 
 const SUB_TONE = {
-  card: 'text-ink-muted',
-  dark: 'text-ink-on-dark-soft',
-  primary: 'text-ink-on-primary',
-  outline: 'text-ink-muted',
+  card: "text-ink-muted",
+  dark: "text-ink-on-dark-soft",
+  primary: "text-ink-on-primary",
+  outline: "text-ink-muted",
 } as const;
 
-export function StatCard({
+export const StatCard: React.FC<IStatCard> = ({
   label,
   value,
   middle,
   sub,
-  tone = 'card',
-  labelClassName = '',
-  className = '',
-}: Props) {
+  tone = "card",
+  labelClassName = "",
+  className = "",
+}) => {
   return (
-    <div className={`flex flex-col gap-1.5 rounded-card p-4 ${TONES[tone]} ${className}`}>
-      <p className={`text-eyebrow font-medium uppercase opacity-80 ${labelClassName}`}>{label}</p>
+    <div
+      className={`flex flex-col gap-1.5 rounded-card p-4 ${TONES[tone]} ${className}`}
+    >
+      <p
+        className={`text-eyebrow font-medium uppercase opacity-80 ${labelClassName}`}
+      >
+        {label}
+      </p>
       {middle}
-      {value !== undefined ? <p className="font-display text-card-value">{value}</p> : null}
-      {sub ? <p className={`text-label font-medium ${SUB_TONE[tone]}`}>{sub}</p> : null}
+      {value !== undefined ? (
+        <p className="font-display text-card-value">{value}</p>
+      ) : null}
+      {sub ? (
+        <p className={`text-label font-medium ${SUB_TONE[tone]}`}>{sub}</p>
+      ) : null}
     </div>
   );
-}
+};

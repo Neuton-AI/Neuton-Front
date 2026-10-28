@@ -1,31 +1,61 @@
-import { DocumentSources } from '@/components/DocumentSources/DocumentSources';
-import { Sheet, SheetSection } from '@/components/Sheet/Sheet';
-import { ErrorState } from '@/components/feedback';
-import { IconBox } from '@/components/icons';
-import { RecipeDetailActions } from './RecipeDetailActions/RecipeDetailActions';
-import { RecipeDetailHero } from './RecipeDetailHero/RecipeDetailHero';
-import { useRecipeDetailPage, type RecipeDetailPageModel } from './RecipeDetailPage.module';
-import { RecipeDetailSkeleton } from './RecipeDetailSkeleton/RecipeDetailSkeleton';
-import { RecipeIngredientsSection } from './RecipeIngredientsSection/RecipeIngredientsSection';
-import { RecipeAllergens, RecipeSteps, RecipeYield } from './RecipeMeta/RecipeMeta';
+import type React from "react";
+import { DocumentSources } from "@/components/DocumentSources/DocumentSources";
+import { Sheet, SheetSection } from "@/components/Sheet/Sheet";
+import { ErrorState } from "@/components/feedback";
+import { IconBox } from "@/components/icons";
+import { RecipeDetailActions } from "./components/RecipeDetailActions/RecipeDetailActions";
+import { RecipeDetailHero } from "./components/RecipeDetailHero/RecipeDetailHero";
+import {
+  useRecipeDetailPage,
+  type RecipeDetailPageModel,
+} from "./RecipeDetailPage.module";
+import { RecipeDetailSkeleton } from "./components/RecipeDetailSkeleton/RecipeDetailSkeleton";
+import { RecipeIngredientsSection } from "./components/RecipeIngredientsSection/RecipeIngredientsSection";
+import {
+  RecipeAllergens,
+  RecipeSteps,
+  RecipeYield,
+} from "./components/RecipeMeta/RecipeMeta";
 
-export function RecipeDetailPage() {
+export const RecipeDetailPage: React.FC = () => {
   return <RecipeDetailView model={useRecipeDetailPage()} />;
+};
+
+interface IRecipeDetailView {
+  model: RecipeDetailPageModel;
 }
 
-export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
-  const { recipe, loading, error, currency, incomplete, total, linked, showCostWarning } = model;
+export const RecipeDetailView: React.FC<IRecipeDetailView> = ({ model }) => {
+  const {
+    recipe,
+    loading,
+    error,
+    currency,
+    incomplete,
+    total,
+    linked,
+    showCostWarning,
+  } = model;
   return (
     <Sheet open fillHeight onClose={model.close} label="Recipe details">
       <div
-        className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 pt-1.5 [&>div]:shrink-0 [&>section]:shrink-0 ${showCostWarning ? 'pb-16' : 'pb-5'}`}
+        className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 pt-1.5 [&>div]:shrink-0 [&>section]:shrink-0 ${showCostWarning ? "pb-16" : "pb-5"}`}
       >
-        {error ? <ErrorState message={error} onRetry={() => void model.handleRetry()} /> : null}
+        {error ? (
+          <ErrorState
+            message={error}
+            onRetry={() => void model.handleRetry()}
+          />
+        ) : null}
         {loading && !recipe ? (
           <RecipeDetailSkeleton />
         ) : recipe ? (
           <>
-            <RecipeDetailHero recipe={recipe} currency={currency} incomplete={incomplete} />
+            <RecipeDetailHero
+              recipe={recipe}
+              currency={currency}
+              incomplete={incomplete}
+            />
             <RecipeIngredientsSection
               recipe={recipe}
               currency={currency}
@@ -35,12 +65,18 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
               canVerify={model.canVerify}
               onLink={model.edit}
             />
-            {recipe.allergens && recipe.allergens.length > 0 ? <RecipeAllergens allergens={recipe.allergens} /> : null}
+            {recipe.allergens && recipe.allergens.length > 0 ? (
+              <RecipeAllergens allergens={recipe.allergens} />
+            ) : null}
             <RecipeYield recipe={recipe} />
             <RecipeSteps steps={model.steps} />
             {recipe.sources?.length ? (
               <SheetSection title="Original scans">
-                <DocumentSources token={model.token} shopId={model.activeShopId} sources={recipe.sources} />
+                <DocumentSources
+                  token={model.token}
+                  shopId={model.activeShopId}
+                  sources={recipe.sources}
+                />
               </SheetSection>
             ) : null}
           </>
@@ -54,4 +90,4 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
       <RecipeDetailActions model={model} />
     </Sheet>
   );
-}
+};

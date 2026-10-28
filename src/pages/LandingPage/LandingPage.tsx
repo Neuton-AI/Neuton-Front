@@ -1,12 +1,16 @@
-import { LandingCta, LandingHero } from './LandingHero/LandingHero';
-import { LandingHow } from './LandingHow/LandingHow';
-import { LandingFeatures } from './LandingFeatures/LandingFeatures';
-import { useLandingPage } from './LandingPage.module';
-import { LandingMenu, LandingNav } from './LandingNav/LandingNav';
-import { LandingPreview } from './LandingPreview/LandingPreview';
-import { LandingFooter, LandingPricing } from './LandingPricing/LandingPricing';
+import type React from "react";
+import { LandingCta, LandingHero } from "./components/LandingHero/LandingHero";
+import { LandingHow } from "./components/LandingHow/LandingHow";
+import { LandingFeatures } from "./components/LandingFeatures/LandingFeatures";
+import { useLandingPage } from "./LandingPage.module";
+import { LandingMenu, LandingNav } from "./components/LandingNav/LandingNav";
+import { LandingPreview } from "./components/LandingPreview/LandingPreview";
+import {
+  LandingFooter,
+  LandingPricing,
+} from "./components/LandingPricing/LandingPricing";
 
-export function LandingPage() {
+export const LandingPage: React.FC = () => {
   const { menuOpen, handleToggleMenu, handleCloseMenu } = useLandingPage();
   return (
     <div className="shell min-h-screen bg-surface-canvas text-ink antialiased">
@@ -21,4 +25,4 @@ export function LandingPage() {
       <LandingFooter />
     </div>
   );
-}
+};

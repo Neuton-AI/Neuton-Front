@@ -16,10 +16,8 @@
   max-width: 390px;
   min-height: max(848px, 100dvh);
   margin: auto;
-  padding: max(48px, calc(var(--safe-top) + 16px))
-    max(16px, var(--safe-right))
-    max(46px, calc(var(--safe-bottom) + 16px))
-    max(16px, var(--safe-left));
+  padding: max(48px, calc(var(--safe-top) + 16px)) max(16px, var(--safe-right))
+    max(46px, calc(var(--safe-bottom) + 16px)) max(16px, var(--safe-left));
 }
 .capture-header {
   position: relative;

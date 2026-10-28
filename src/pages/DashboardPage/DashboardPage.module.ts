@@ -1,15 +1,19 @@
-import { useFabNavigation } from '@/components/Fab/Fab.module';
-import { useDashboardSummary } from '@/features/analytics/analyticsApi';
-import type { DashboardPeriod } from '@/features/analytics/types';
-import { useChartSeries } from '@/features/analytics/usePeriodSeries';
-import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useFabNavigation } from "@/components/Fab/Fab.module";
+import { useDashboardSummary } from "@/features/analytics/analyticsApi";
+import type { DashboardPeriod } from "@/features/analytics/types";
+import { useChartSeries } from "@/features/analytics/usePeriodSeries";
+import {
+  useAuth,
+  useCurrentShop,
+  useShopMemberships,
+} from "@/features/auth/supabase";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 export const DASHBOARD_PERIODS: { key: DashboardPeriod; label: string }[] = [
-  { key: '7d', label: '7D' },
-  { key: '30d', label: '30D' },
-  { key: '90d', label: '90D' },
-  { key: '12m', label: '1Y' },
+  { key: "7d", label: "7D" },
+  { key: "30d", label: "30D" },
+  { key: "90d", label: "90D" },
+  { key: "12m", label: "1Y" },
 ];
 export function useDashboardPage() {
   const { user, token, loading: authLoading } = useAuth();
@@ -28,15 +32,21 @@ export function useDashboardPage() {
 
   const navigate = useNavigate();
 
-  const [period, setPeriod] = useState<DashboardPeriod>('30d');
+  const [period, setPeriod] = useState<DashboardPeriod>("30d");
 
-  const [profitability, setProfitability] = useState<'average' | 'median'>('average');
+  const [profitability, setProfitability] = useState<"average" | "median">(
+    "average",
+  );
 
-  const { data, isLoading, error, refetch } = useDashboardSummary(token, activeShopId, period);
+  const { data, isLoading, error, refetch } = useDashboardSummary(
+    token,
+    activeShopId,
+    period,
+  );
 
   const series = useChartSeries(data?.graph ?? [], period);
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = shop?.currency ?? "USD";
 
   const summary = data?.summary;
 
@@ -44,19 +54,25 @@ export function useDashboardPage() {
 
   // Period is a trailing window (30d != the calendar month), so captions quote
   // the tab label instead of a calendar phrase like "this month".
-  const periodLabel = DASHBOARD_PERIODS.find((entry) => entry.key === period)?.label ?? period;
-  const handleSetUpShop = () => navigate('/profile');
+  const periodLabel =
+    DASHBOARD_PERIODS.find((entry) => entry.key === period)?.label ?? period;
+  const handleSetUpShop = () => navigate("/profile");
   const handleRetry = () => {
     void refetch();
   };
   const dateLabel = new Date()
-    .toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
-    .replace(',', ' ·');
+    .toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    })
+    .replace(",", " ·");
   const profitPerOrder =
-    profitability === 'average'
+    profitability === "average"
       ? data?.orderProfitability.average
       : data?.orderProfitability.median;
-  const errorMessage = error instanceof Error ? error.message : 'Could not load the dashboard.';
+  const errorMessage =
+    error instanceof Error ? error.message : "Could not load the dashboard.";
   return {
     dateLabel,
     profitPerOrder,

@@ -1,8 +1,9 @@
-import { SyncPopup } from './SyncPopup';
-import { useSyncStatus } from './SyncStatus.module';
+import type React from "react";
+import { SyncPopup } from "./SyncPopup";
+import { useSyncStatus } from "./SyncStatus.module";
 
-export function SyncStatus() {
+export const SyncStatus: React.FC = () => {
   const status = useSyncStatus();
   if (!status) return null;
   return <SyncPopup {...status} />;
-}
+};

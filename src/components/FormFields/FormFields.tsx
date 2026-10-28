@@ -1,31 +1,33 @@
-import { Field } from '@/components/ui';
-import { Fragment, type ReactNode } from 'react';
-import { InputRegistry } from './FormControls';
-import type { FormField, FormValues } from './schema';
+import { Field } from "@/components/ui";
+import { Fragment, type ReactNode } from "react";
+import { InputRegistry } from "./components/FormControls/FormControls";
+import type { FormField, FormValues } from "./schema";
 
 export { InputRegistry };
 
-type Props<V extends FormValues> = {
+interface IFormFields<V extends FormValues> {
   fields: readonly FormField<V>[];
   values: V;
   onChange: (name: keyof V & string, value: string) => void;
   disabled?: boolean;
   customFields?: Record<string, ReactNode>;
-};
+}
 
-export function FormFields<V extends FormValues>({
+export const FormFields = <V extends FormValues>({
   fields,
   values,
   onChange,
   disabled = false,
   customFields = {},
-}: Props<V>) {
+}: IFormFields<V>) => {
   return (
     <>
       {fields.map((field) => {
-        if (field.kind === 'custom')
-          return <Fragment key={field.name}>{customFields[field.name]}</Fragment>;
-        if (field.kind === 'group') {
+        if (field.kind === "custom")
+          return (
+            <Fragment key={field.name}>{customFields[field.name]}</Fragment>
+          );
+        if (field.kind === "group") {
           const content = (
             <FormFields
               fields={field.fields}
@@ -67,4 +69,4 @@ export function FormFields<V extends FormValues>({
       })}
     </>
   );
-}
+};

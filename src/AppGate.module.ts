@@ -1,5 +1,5 @@
-import { useAuth } from '@/features/auth/supabase';
-import { useLocation } from 'react-router-dom';
+import { useAuth } from "@/features/auth/supabase";
+import { useLocation } from "react-router-dom";
 
 export function useRootRedirect() {
   const { session, loading } = useAuth();

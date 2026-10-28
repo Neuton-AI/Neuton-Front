@@ -1,16 +1,26 @@
-import { useAuth, useShopMemberships } from '@/features/auth/supabase';
+import { useAuth, useShopMemberships } from "@/features/auth/supabase";
 import {
   useBarcodePrice,
   useManualProduct,
   useDeleteRecipe,
   useRecipe,
   useUpdateRecipe,
-} from '@/features/recipes/recipesApi';
-import { ingredientIsLinked } from '@/features/recipes/selectors';
-import { useRecipeNavigation } from '@/features/recipes/recipeNavigation';
-import type { Recipe, RecipeUpdate, ManualProductInput } from '@/features/recipes/types';
-import { useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+} from "@/features/recipes/recipesApi";
+import { ingredientIsLinked } from "@/features/recipes/selectors";
+import { useRecipeNavigation } from "@/features/recipes/recipeNavigation";
+import type {
+  Recipe,
+  RecipeUpdate,
+  ManualProductInput,
+} from "@/features/recipes/types";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type UIEvent,
+} from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 type IngredientDraft = {
   key: string;
@@ -36,7 +46,7 @@ type Draft = {
 function recipeDraft(recipe: Recipe): Draft {
   return {
     name: recipe.name,
-    imageUrl: recipe.imageUrl ?? '',
+    imageUrl: recipe.imageUrl ?? "",
     prepTimeMinutes: String(recipe.prepTimeMinutes),
     yieldQuantity: String(recipe.yieldQuantity),
     yieldUnit: recipe.yieldUnit,
@@ -45,7 +55,8 @@ function recipeDraft(recipe: Recipe): Draft {
     ingredients: recipe.costing.ingredients.map((ingredient, index) => ({
       key: ingredient.id ?? `original-${index}`,
       rawName: ingredient.rawName ?? ingredient.name,
-      rawMaterialName: ingredient.rawMaterialName ?? ingredient.rawName ?? ingredient.name,
+      rawMaterialName:
+        ingredient.rawMaterialName ?? ingredient.rawName ?? ingredient.name,
       quantity: String(ingredient.quantity),
       rawSrcUnit: ingredient.rawSrcUnit,
       inventoryItemId: ingredient.inventoryItemId ?? null,
@@ -56,13 +67,17 @@ function recipeDraft(recipe: Recipe): Draft {
 }
 
 export function useRecipeEditPage() {
-  const { id = '' } = useParams();
+  const { id = "" } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user, token, loading: authLoading } = useAuth();
-  const { memberships, activeShopId, loading: membershipsLoading } = useShopMemberships(user?.id);
+  const {
+    memberships,
+    activeShopId,
+    loading: membershipsLoading,
+  } = useShopMemberships(user?.id);
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
-  const canManage = role === 'owner' || role === 'admin';
+  const canManage = role === "owner" || role === "admin";
   const query = useRecipe(token, activeShopId, id);
   const recipe = query.data?.recipe;
   const update = useUpdateRecipe(token, activeShopId);
@@ -76,12 +91,12 @@ export function useRecipeEditPage() {
   const [scanKey, setScanKey] = useState<string | null>(null);
   const [editingPhoto, setEditingPhoto] = useState(false);
   const [allergenResetKey, setAllergenResetKey] = useState(0);
-  const initialized = useRef('');
+  const initialized = useRef("");
   const nextKey = useRef(0);
   const scanRequest = useRef(0);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const focusIngredient = params.get('ingredient');
-  const focusedContext = useRef('');
+  const focusIngredient = params.get("ingredient");
+  const focusedContext = useRef("");
   const busy = update.isPending || deletion.isPending;
   const editorReady =
     Boolean(draft && recipe && canManage) &&
@@ -96,7 +111,9 @@ export function useRecipeEditPage() {
       .forEach((panel, index) => {
         // Keep offscreen form controls out of keyboard navigation as well as the accessibility tree.
         if (index !== page && panel.contains(document.activeElement)) {
-          document.getElementById(`recipe-tab-${page}`)?.focus({ preventScroll: true });
+          document
+            .getElementById(`recipe-tab-${page}`)
+            ?.focus({ preventScroll: true });
         }
         panel.inert = index !== page;
       });
@@ -115,11 +132,13 @@ export function useRecipeEditPage() {
 
   useEffect(() => {
     const context = `${activeShopId}:${id}:${focusIngredient}`;
-    if (!draft || !focusIngredient || focusedContext.current === context) return;
+    if (!draft || !focusIngredient || focusedContext.current === context)
+      return;
     const selected =
       draft.ingredients.find((row) => row.key === focusIngredient) ??
       draft.ingredients[Number(focusIngredient)];
-    if (selected) document.getElementById(`ingredient-${selected.key}`)?.focus();
+    if (selected)
+      document.getElementById(`ingredient-${selected.key}`)?.focus();
     focusedContext.current = context;
   }, [draft, focusIngredient, activeShopId, id]);
 
@@ -136,7 +155,7 @@ export function useRecipeEditPage() {
 
   function changeIngredient(
     key: string,
-    field: 'rawName' | 'quantity' | 'rawSrcUnit',
+    field: "rawName" | "quantity" | "rawSrcUnit",
     value: string,
   ) {
     setDraft((current) =>
@@ -145,7 +164,7 @@ export function useRecipeEditPage() {
             ...current,
             ingredients: current.ingredients.map((row) => {
               if (row.key !== key) return row;
-              return field === 'rawName'
+              return field === "rawName"
                 ? {
                     ...row,
                     rawName: value,
@@ -170,10 +189,10 @@ export function useRecipeEditPage() {
               ...current.ingredients,
               {
                 key: `new-${nextKey.current++}`,
-                rawName: '',
-                rawMaterialName: '',
-                quantity: '1',
-                rawSrcUnit: 'g',
+                rawName: "",
+                rawMaterialName: "",
+                quantity: "1",
+                rawSrcUnit: "g",
                 inventoryItemId: null,
                 generalPriceId: null,
               },
@@ -197,7 +216,7 @@ export function useRecipeEditPage() {
   function changeStep(index: number, value: string) {
     if (draft)
       changeField(
-        'steps',
+        "steps",
         draft.steps.map((step, i) => (i === index ? value : step)),
       );
   }
@@ -205,7 +224,7 @@ export function useRecipeEditPage() {
   function toggleAllergen(allergen: string) {
     if (!draft) return;
     changeField(
-      'allergens',
+      "allergens",
       draft.allergens.includes(allergen)
         ? draft.allergens.filter((item) => item !== allergen)
         : [...draft.allergens, allergen],
@@ -222,7 +241,7 @@ export function useRecipeEditPage() {
     if (!canManage || busy) return;
     const row = draft?.ingredients.find((ingredient) => ingredient.key === key);
     if (!row || !row.rawMaterialName.trim()) {
-      setError('Enter the ingredient name before linking a product.');
+      setError("Enter the ingredient name before linking a product.");
       return;
     }
     scanRequest.current += 1;
@@ -231,8 +250,11 @@ export function useRecipeEditPage() {
   }
 
   async function linkBarcode(value: string) {
-    const row = draft?.ingredients.find((ingredient) => ingredient.key === scanKey);
-    if (!row || !canManage || barcode.isPending || !token || !activeShopId) return;
+    const row = draft?.ingredients.find(
+      (ingredient) => ingredient.key === scanKey,
+    );
+    if (!row || !canManage || barcode.isPending || !token || !activeShopId)
+      return;
     const request = ++scanRequest.current;
     setScanError(null);
     try {
@@ -271,15 +293,22 @@ export function useRecipeEditPage() {
     } catch (cause) {
       if (request === scanRequest.current) {
         setScanError(
-          cause instanceof Error ? cause.message : 'Could not find a price for that barcode.',
+          cause instanceof Error
+            ? cause.message
+            : "Could not find a price for that barcode.",
         );
       }
     }
   }
 
-  async function linkManualProduct(value: Omit<ManualProductInput, 'rawMaterialName'>) {
-    const row = draft?.ingredients.find((ingredient) => ingredient.key === scanKey);
-    if (!row || !canManage || manual.isPending || !token || !activeShopId) return;
+  async function linkManualProduct(
+    value: Omit<ManualProductInput, "rawMaterialName">,
+  ) {
+    const row = draft?.ingredients.find(
+      (ingredient) => ingredient.key === scanKey,
+    );
+    if (!row || !canManage || manual.isPending || !token || !activeShopId)
+      return;
     const request = ++scanRequest.current;
     setScanError(null);
     try {
@@ -315,7 +344,9 @@ export function useRecipeEditPage() {
       closeScanner();
     } catch (cause) {
       if (request === scanRequest.current) {
-        setScanError(cause instanceof Error ? cause.message : 'Could not save product.');
+        setScanError(
+          cause instanceof Error ? cause.message : "Could not save product.",
+        );
       }
     }
   }
@@ -339,7 +370,7 @@ export function useRecipeEditPage() {
       Number(draft.prepTimeMinutes) < 0
     ) {
       setError(
-        'Enter a recipe name, valid preparation time and servings, and at least one ingredient with a positive amount and unit.',
+        "Enter a recipe name, valid preparation time and servings, and at least one ingredient with a positive amount and unit.",
       );
       selectPage(0);
       return;
@@ -358,12 +389,7 @@ export function useRecipeEditPage() {
           instruction: instruction.trim(),
         })),
       ingredients: draft.ingredients.map(
-        ({
-          key: _key,
-          linked: _linked,
-          quantity,
-          ...ingredient
-        }) => ({
+        ({ key: _key, linked: _linked, quantity, ...ingredient }) => ({
           ...ingredient,
           quantity: Number(quantity),
         }),
@@ -373,7 +399,9 @@ export function useRecipeEditPage() {
       await update.mutateAsync({ id, body });
       showDetails();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save the recipe.');
+      setError(
+        cause instanceof Error ? cause.message : "Could not save the recipe.",
+      );
     }
   }
 
@@ -381,16 +409,18 @@ export function useRecipeEditPage() {
     if (!canManage || busy || !token || !activeShopId) return;
     if (
       !window.confirm(
-        'Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.',
+        "Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.",
       )
     )
       return;
     setError(null);
     try {
       await deletion.mutateAsync({ id });
-      navigate('/catalog?tab=recipes', { replace: true });
+      navigate("/catalog?tab=recipes", { replace: true });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not delete the recipe.');
+      setError(
+        cause instanceof Error ? cause.message : "Could not delete the recipe.",
+      );
     }
   }
 
@@ -409,27 +439,37 @@ export function useRecipeEditPage() {
     // CSS supplies smooth scrolling and the reduced-motion override; keyboard changes stay instant.
     carousel?.scrollTo({
       left: index * carousel.clientWidth,
-      behavior: animate ? 'auto' : 'instant',
+      behavior: animate ? "auto" : "instant",
     });
   }
 
   function onCarouselScroll(event: UIEvent<HTMLDivElement>) {
     const carousel = event.currentTarget;
     if (carousel.clientWidth > 0) {
-      setPage(Math.max(0, Math.min(1, Math.round(carousel.scrollLeft / carousel.clientWidth))));
+      setPage(
+        Math.max(
+          0,
+          Math.min(1, Math.round(carousel.scrollLeft / carousel.clientWidth)),
+        ),
+      );
     }
   }
 
-  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+  function onTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) {
     let next: number;
-    if (event.key === 'ArrowRight') next = Math.min(index + 1, 1);
-    else if (event.key === 'ArrowLeft') next = Math.max(index - 1, 0);
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = 1;
+    if (event.key === "ArrowRight") next = Math.min(index + 1, 1);
+    else if (event.key === "ArrowLeft") next = Math.max(index - 1, 0);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = 1;
     else return;
     event.preventDefault();
     selectPage(next, false);
-    document.getElementById(`recipe-tab-${next}`)?.focus({ preventScroll: true });
+    document
+      .getElementById(`recipe-tab-${next}`)
+      ?.focus({ preventScroll: true });
   }
 
   return {
@@ -462,8 +502,12 @@ export function useRecipeEditPage() {
     scanError,
     clearScanError: () => setScanError(null),
     scanBusy: barcode.isPending || manual.isPending,
-    scanIngredient: draft?.ingredients.find((ingredient) => ingredient.key === scanKey),
-    scanCurrency: memberships.find((row) => row.shopId === activeShopId)?.shops?.currency ?? 'USD',
+    scanIngredient: draft?.ingredients.find(
+      (ingredient) => ingredient.key === scanKey,
+    ),
+    scanCurrency:
+      memberships.find((row) => row.shopId === activeShopId)?.shops?.currency ??
+      "USD",
     linkManualProduct,
     openScanner,
     closeScanner,

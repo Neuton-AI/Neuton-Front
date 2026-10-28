@@ -1,8 +1,8 @@
-import { renderWithRouter } from '@/test/render';
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithRouter } from "@/test/render";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Route, Routes, useLocation } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * App is the routing table plus two guards. These tests mount it for real but
@@ -24,8 +24,8 @@ const supabaseAuth = vi.hoisted(() => ({
   signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
 }));
 
-vi.mock('@/features/auth/supabase', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/features/auth/supabase')>()),
+vi.mock("@/features/auth/supabase", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/auth/supabase")>()),
   // A fake client so AuthPage renders its real form regardless of whether the
   // developer's machine happens to have a .env with Supabase keys.
   supabase: { auth: supabaseAuth },
@@ -42,26 +42,38 @@ vi.mock('@/features/auth/supabase', async (importOriginal) => ({
  * Stubs a lazy page module with a single identifiable heading. `vi.mock` only
  * hoists literal specifiers, so these are written out rather than looped.
  */
-vi.mock('@/pages/DashboardPage/DashboardPage', () => ({ DashboardPage: () => <h1>Dashboard</h1> }));
-vi.mock('@/pages/CatalogPage/CatalogPage', () => ({ CatalogPage: () => <h1>Catalog</h1> }));
-vi.mock('@/pages/OrdersPage/OrdersPage', () => ({ OrdersPage: () => <h1>Orders</h1> }));
-vi.mock('@/pages/NewOrderPage/NewOrderPage', () => ({ NewOrderPage: () => <h1>New order</h1> }));
-vi.mock('@/pages/NotFoundPage/NotFoundPage', () => ({
+vi.mock("@/pages/DashboardPage/DashboardPage", () => ({
+  DashboardPage: () => <h1>Dashboard</h1>,
+}));
+vi.mock("@/pages/CatalogPage/CatalogPage", () => ({
+  CatalogPage: () => <h1>Catalog</h1>,
+}));
+vi.mock("@/pages/OrdersPage/OrdersPage", () => ({
+  OrdersPage: () => <h1>Orders</h1>,
+}));
+vi.mock("@/pages/NewOrderPage/NewOrderPage", () => ({
+  NewOrderPage: () => <h1>New order</h1>,
+}));
+vi.mock("@/pages/NotFoundPage/NotFoundPage", () => ({
   NotFoundPage: () => <h1>Page not found</h1>,
 }));
-vi.mock('@/pages/OrderDetailPage/OrderDetailPage', () => ({
+vi.mock("@/pages/OrderDetailPage/OrderDetailPage", () => ({
   OrderDetailPage: () => <h1>Order detail</h1>,
 }));
-vi.mock('@/pages/ProfilePage/ProfilePage', () => ({ ProfilePage: () => <h1>Profile</h1> }));
-vi.mock('@/pages/CapturePage/CapturePage', () => ({ CapturePage: () => <h1>Capture</h1> }));
-vi.mock('@/pages/RecipeDetailPage/RecipeDetailPage', () => ({
+vi.mock("@/pages/ProfilePage/ProfilePage", () => ({
+  ProfilePage: () => <h1>Profile</h1>,
+}));
+vi.mock("@/pages/CapturePage/CapturePage", () => ({
+  CapturePage: () => <h1>Capture</h1>,
+}));
+vi.mock("@/pages/RecipeDetailPage/RecipeDetailPage", () => ({
   RecipeDetailPage: () => <h1>Recipe detail</h1>,
 }));
-vi.mock('@/pages/ReceiptDetailPage/ReceiptDetailPage', () => ({
+vi.mock("@/pages/ReceiptDetailPage/ReceiptDetailPage", () => ({
   ReceiptDetailPage: () => <h1>Receipt detail</h1>,
 }));
 
-const { App } = await import('@/App');
+const { App } = await import("@/App");
 
 const WhereAmI = () => {
   const { pathname, search } = useLocation();
@@ -85,131 +97,147 @@ beforeEach(() => {
   authState.loading = false;
 });
 
-describe('RequireAuth', () => {
-  it('waits on the loader instead of redirecting while the session resolves', async () => {
+describe("RequireAuth", () => {
+  it("waits on the loader instead of redirecting while the session resolves", async () => {
     // Redirecting mid-resolve bounces a signed-in user to sign-in on every
     // hard refresh.
     authState.loading = true;
-    authState.session = { user: { id: 'u1' } };
+    authState.session = { user: { id: "u1" } };
 
-    renderApp('/dashboard');
+    renderApp("/dashboard");
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/dashboard');
-    expect(screen.queryByRole('heading', { name: 'Dashboard' })).toBeNull();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent("/dashboard");
+    expect(screen.queryByRole("heading", { name: "Dashboard" })).toBeNull();
   });
 
-  it('sends an anonymous visitor from a protected route to sign-in', async () => {
+  it("sends an anonymous visitor from a protected route to sign-in", async () => {
     authState.session = null;
 
-    renderApp('/dashboard');
+    renderApp("/dashboard");
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/signin'));
+    await waitFor(() =>
+      expect(screen.getByTestId("where")).toHaveTextContent("/signin"),
+    );
   });
 
-  it('never mounts the protected page for an anonymous visitor', async () => {
+  it("never mounts the protected page for an anonymous visitor", async () => {
     authState.session = null;
 
-    renderApp('/orders/o-123');
+    renderApp("/orders/o-123");
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/signin'));
-    expect(screen.queryByRole('heading', { name: 'Order detail' })).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByTestId("where")).toHaveTextContent("/signin"),
+    );
+    expect(screen.queryByRole("heading", { name: "Order detail" })).toBeNull();
   });
 
-  it('leaves the sign-in route reachable without a session', async () => {
+  it("leaves the sign-in route reachable without a session", async () => {
     authState.session = null;
 
-    renderApp('/signin');
+    renderApp("/signin");
 
     // No bounce back to the dashboard, and no second redirect.
-    await screen.findByRole('heading', { name: 'Welcome back' });
-    expect(screen.getByTestId('where')).toHaveTextContent('/signin');
+    await screen.findByRole("heading", { name: "Welcome back" });
+    expect(screen.getByTestId("where")).toHaveTextContent("/signin");
   });
 });
 
-describe('routing', () => {
+describe("routing", () => {
   beforeEach(() => {
-    authState.session = { user: { id: 'u1' } };
+    authState.session = { user: { id: "u1" } };
   });
 
-  it('renders the dashboard for a signed-in visitor', async () => {
-    renderApp('/dashboard');
+  it("renders the dashboard for a signed-in visitor", async () => {
+    renderApp("/dashboard");
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Dashboard" }),
+    ).toBeInTheDocument();
   });
 
   it.each([
-    ['/catalog', 'Catalog'],
-    ['/orders', 'Orders'],
-    ['/profile', 'Profile'],
-    ['/capture', 'Capture'],
-    ['/orders/new', 'New order'],
-  ])('routes %s to its page', async (route, heading) => {
+    ["/catalog", "Catalog"],
+    ["/orders", "Orders"],
+    ["/profile", "Profile"],
+    ["/capture", "Capture"],
+    ["/orders/new", "New order"],
+  ])("routes %s to its page", async (route, heading) => {
     renderApp(route);
 
-    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent(route);
+    expect(
+      await screen.findByRole("heading", { name: heading }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent(route);
   });
 
   it.each([
-    ['/orders/o-1', 'Order detail'],
-    ['/catalog/recipes/r-1', 'Recipe detail'],
-    ['/catalog/receipts/rc-1', 'Receipt detail'],
-  ])('routes the deep link %s to its detail sheet', async (route, heading) => {
+    ["/orders/o-1", "Order detail"],
+    ["/catalog/recipes/r-1", "Recipe detail"],
+    ["/catalog/receipts/rc-1", "Receipt detail"],
+  ])("routes the deep link %s to its detail sheet", async (route, heading) => {
     // These are the URLs people paste from Slack; they must survive a reload.
     renderApp(route);
 
-    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: heading }),
+    ).toBeInTheDocument();
   });
 
-  it('shows the not-found page for an unknown private route without redirecting', async () => {
+  it("shows the not-found page for an unknown private route without redirecting", async () => {
     // Silently redirecting masked broken deep links, so the URL must stay put
     // and the NotFound screen must be the one that renders.
-    renderApp('/nope/does-not-exist');
+    renderApp("/nope/does-not-exist");
 
-    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/nope/does-not-exist');
-    expect(screen.queryByRole('heading', { name: 'Dashboard' })).toBeNull();
+    expect(
+      await screen.findByRole("heading", { name: "Page not found" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent(
+      "/nope/does-not-exist",
+    );
+    expect(screen.queryByRole("heading", { name: "Dashboard" })).toBeNull();
   });
 
-  it('sends the root path to the dashboard when signed in', async () => {
-    renderApp('/');
+  it("sends the root path to the dashboard when signed in", async () => {
+    renderApp("/");
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard'));
+    await waitFor(() =>
+      expect(screen.getByTestId("where")).toHaveTextContent("/dashboard"),
+    );
   });
 
-  it('renders the landing page on the root path when signed out', async () => {
+  it("renders the landing page on the root path when signed out", async () => {
     authState.session = null;
 
-    renderApp('/');
+    renderApp("/");
 
-    expect(screen.getByTestId('where')).toHaveTextContent('/');
+    expect(screen.getByTestId("where")).toHaveTextContent("/");
     expect(
-      await screen.findByRole('heading', {
-        name: 'Just upload. Neuton takes care of the numbers.',
+      await screen.findByRole("heading", {
+        name: "Just upload. Neuton takes care of the numbers.",
       }),
     ).toBeInTheDocument();
   });
 
-  it('renders the landing page on /landing', async () => {
-    renderApp('/landing');
+  it("renders the landing page on /landing", async () => {
+    renderApp("/landing");
 
-    expect(screen.getByTestId('where')).toHaveTextContent('/landing');
+    expect(screen.getByTestId("where")).toHaveTextContent("/landing");
     expect(
-      await screen.findByRole('heading', {
-        name: 'Just upload. Neuton takes care of the numbers.',
+      await screen.findByRole("heading", {
+        name: "Just upload. Neuton takes care of the numbers.",
       }),
     ).toBeInTheDocument();
   });
 });
 
-describe('deep-link round trip', () => {
+describe("deep-link round trip", () => {
   beforeEach(() => {
     authState.session = null;
     supabaseAuth.signInWithPassword.mockClear();
   });
 
-  it('brings the user back to the deep link they originally asked for', async () => {
+  it("brings the user back to the deep link they originally asked for", async () => {
     // The whole point of the guard storing `state.from`: a link to a specific
     // order that hits a signed-out user must not dump them on the dashboard
     // after they sign in.
@@ -218,20 +246,24 @@ describe('deep-link round trip', () => {
     // Stand in for supabase's onAuthStateChange, which is what makes the guard
     // let them through in the real app.
     supabaseAuth.signInWithPassword.mockImplementationOnce(async () => {
-      authState.session = { user: { id: 'u1' } };
+      authState.session = { user: { id: "u1" } };
       return { error: null };
     });
 
-    renderApp('/orders/o-123');
+    renderApp("/orders/o-123");
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/signin'));
+    await waitFor(() =>
+      expect(screen.getByTestId("where")).toHaveTextContent("/signin"),
+    );
 
-    await user.type(screen.getByLabelText('Email'), 'testtest@gmail.com');
-    await user.type(screen.getByLabelText('Password'), 'testTest');
-    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
+    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/orders/o-123'));
+    await waitFor(() =>
+      expect(screen.getByTestId("where")).toHaveTextContent("/orders/o-123"),
+    );
   });
 });
 
-vi.mock('@/features/sync/SyncStatus', () => ({ SyncStatus: () => null }));
+vi.mock("@/features/sync/SyncStatus", () => ({ SyncStatus: () => null }));
