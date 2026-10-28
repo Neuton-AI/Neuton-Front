@@ -74,7 +74,7 @@ it("wires camera, browse, close and all document types", async () => {
   render(<CapturePage />);
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Take photo" }));
-  await user.click(screen.getByRole("button", { name: /Drop a file/ }));
+  await user.click(screen.getByRole("button", { name: "Upload" }));
   await user.click(screen.getByRole("button", { name: "Order" }));
   await user.click(screen.getByRole("button", { name: "Close capture" }));
   expect(state.handleShutter).toHaveBeenCalledOnce();
@@ -118,12 +118,16 @@ it("passes keyboard activation through to Add without requesting motion", async 
   expect(state.addCurrent).toHaveBeenCalledWith(true);
 });
 
-it("reviews only saved sources while preserving the current source outside the dialog", async () => {
+it("reviews saved sources and the current preview in the same dialog", async () => {
   const state = {
     ...model(),
     current: source("current"),
     stacked: [source("one"), source("two", "application/pdf")],
-    reviewSources: [source("one"), source("two", "application/pdf")],
+    reviewSources: [
+      source("one"),
+      source("two", "application/pdf"),
+      source("current"),
+    ],
     total: 3,
     reviewIndex: 0,
   };
@@ -133,9 +137,11 @@ it("reviews only saved sources while preserving the current source outside the d
     screen.getByRole("dialog", { name: "Review document sources" }),
   );
   expect(
-    dialog.getByText("1 of 2", { selector: ".capture-review-count" }),
+    dialog.getByText("1 of 3", { selector: ".capture-review-count" }),
   ).toBeInTheDocument();
-  expect(dialog.queryByText("current.png")).not.toBeInTheDocument();
+  expect(
+    dialog.getByText("3 of 3", { selector: ".capture-review-count" }),
+  ).toBeInTheDocument();
   expect(dialog.getByRole("button", { name: "Move earlier" })).toBeDisabled();
   const user = userEvent.setup();
   await user.click(dialog.getByRole("button", { name: "Next →" }));

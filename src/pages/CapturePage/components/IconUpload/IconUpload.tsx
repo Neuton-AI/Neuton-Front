@@ -6,17 +6,15 @@ interface IIconUpload extends React.SVGProps<SVGSVGElement> {
 export const IconUpload: React.FC<IIconUpload> = ({ ...props }) => {
   return (
     <svg
-      viewBox="0 0 22 22"
+      viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.83}
+      strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M2.75 13.75v1.83a2.75 2.75 0 0 0 2.75 2.75h11a2.75 2.75 0 0 0 2.75-2.75v-1.83" />
-      <path d="M6.42 7.33 11 2.75l4.58 4.58" />
-      <path d="M11 2.75v11" />
+      <path d="M12 16V3M7 8L12 3L17 8M4 15V19C4 20.1 4.9 21 6 21H18C19.1 21 20 20.1 20 19V15" />
     </svg>
   );
 };

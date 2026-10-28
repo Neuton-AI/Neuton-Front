@@ -61,7 +61,6 @@ export function useCapturePage() {
   const autofocus = useRef<Promise<void>>(Promise.resolve());
   const focusPending = useRef(false);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
-  const [reviewIncludesCurrent, setReviewIncludesCurrent] = useState(false);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const replaceId = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,7 +91,7 @@ export function useCapturePage() {
     (source) => source.id !== collection.currentId,
   );
   const total = collection.sources.length;
-  const reviewSources = reviewIncludesCurrent ? collection.sources : stacked;
+  const reviewSources = collection.sources;
   const locked = busy || adding || capturing;
   const editingLocked = () =>
     busyRef.current || addingRef.current || capturingRef.current;
@@ -328,16 +327,13 @@ export function useCapturePage() {
     const previous = collectionRef.current;
     const sources = previous.sources.filter((source) => source.id !== id);
     const nextCurrent = previous.currentId === id ? null : previous.currentId;
-    const remainingStack = reviewIncludesCurrent
-      ? sources
-      : sources.filter((source) => source.id !== nextCurrent);
     updateCollection({ sources, currentId: nextCurrent });
     setReviewIndex((index) =>
-      !remainingStack.length
+      !sources.length
         ? null
         : index === null
           ? null
-          : Math.min(index, remainingStack.length - 1),
+          : Math.min(index, sources.length - 1),
     );
     setError(null);
   };
@@ -346,21 +342,12 @@ export function useCapturePage() {
     const previous = collectionRef.current;
     const sources = [...previous.sources];
     const index = sources.findIndex((source) => source.id === id);
-    const stack = reviewIncludesCurrent
-      ? sources
-      : sources.filter((source) => source.id !== previous.currentId);
-    const stackIndex = stack.findIndex((source) => source.id === id);
-    const neighbor = stack[stackIndex + direction];
+    const neighbor = sources[index + direction];
     if (index < 0 || !neighbor) return;
     const nextIndex = sources.findIndex((source) => source.id === neighbor.id);
     [sources[index], sources[nextIndex]] = [sources[nextIndex], sources[index]];
     updateCollection({ ...previous, sources });
-    setReviewIndex(
-      (reviewIncludesCurrent
-        ? sources
-        : sources.filter((source) => source.id !== previous.currentId)
-      ).findIndex((source) => source.id === id),
-    );
+    setReviewIndex(sources.findIndex((source) => source.id === id));
   };
   const chooseSource = (source: "gallery" | "file" | "camera") => {
     if (editingLocked()) return;
@@ -476,14 +463,12 @@ export function useCapturePage() {
     reviewSources,
     setReviewIndex,
     openReview: () => {
-      if (stacked.length && !busy && !adding) {
-        setReviewIncludesCurrent(false);
+      if (total && !locked) {
         setReviewIndex(0);
       }
     },
     openCurrentReview: () => {
       if (current && !busy && !adding) {
-        setReviewIncludesCurrent(true);
         setReviewIndex(
           collection.sources.findIndex((source) => source.id === current.id),
         );
