@@ -338,6 +338,17 @@
   align-self: center;
   margin-top: 40px;
 }
+.capture-layout[data-captured] {
+  min-height: 100dvh;
+}
+/* Keep Upload in view on shorter phones without shrinking the action buttons. */
+.capture-layout[data-captured] .capture-preview {
+  height: clamp(
+    120px,
+    calc(100dvh - 478px - var(--safe-top) - var(--safe-bottom)),
+    370px
+  );
+}
 .capture-layout[data-captured] .capture-feedback {
   min-height: 0;
 }
