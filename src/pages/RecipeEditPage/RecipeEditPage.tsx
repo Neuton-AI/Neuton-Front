@@ -308,7 +308,11 @@ export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
                   className="h-full w-full min-w-0 shrink-0 snap-start overflow-y-auto overscroll-y-contain px-4 pb-5"
                 >
                   <div className="flex flex-col gap-5">
-                    <AllergenPicker selected={draft.allergens} onToggle={model.toggleAllergen} />
+                    <AllergenPicker
+                      key={`${recipe.id}:${model.allergenResetKey}`}
+                      selected={draft.allergens}
+                      onToggle={model.toggleAllergen}
+                    />
                     <section className="flex flex-col gap-2.5" aria-labelledby="edit-preparation">
                       <h2 id="edit-preparation" className="text-[18px] font-medium">
                         Preparation

@@ -16,33 +16,35 @@ export function AllergenPicker({ selected, onToggle }: Props) {
         <h2 id="edit-allergens" className="text-[18px] font-medium leading-6">
           Allergens
         </h2>
-        {selected.length > 0 ? (
-          <span className="text-label font-medium text-ink-muted">Tap to remove</span>
+        {picker.allergens.length > 0 ? (
+          <span className="text-label font-medium text-ink-muted">Tap to toggle</span>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        {selected.map((allergen) => (
+        {picker.allergens.map((allergen) => (
           <button
             type="button"
             key={allergen}
-            aria-label={`Remove ${allergen}`}
+            aria-pressed={selected.includes(allergen)}
             onClick={() => onToggle(allergen)}
-            className="flex h-[34px] items-center gap-1.5 rounded-pill bg-surface-dark pl-2.5 pr-3.5 text-sm font-medium leading-[18px] text-ink-on-dark"
+            className={`flex h-[34px] items-center gap-1.5 rounded-pill pl-2.5 pr-3.5 text-sm font-medium leading-[18px] ${selected.includes(allergen) ? 'bg-surface-dark text-ink-on-dark' : 'bg-surface-card text-ink-body'}`}
           >
-            <svg
-              className="h-3.5 w-3.5 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M20 6 9 17l-5-5"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            {selected.includes(allergen) ? (
+              <svg
+                className="h-3.5 w-3.5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : null}
             {allergen}
           </button>
         ))}

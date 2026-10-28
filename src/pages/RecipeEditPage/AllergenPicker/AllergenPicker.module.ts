@@ -22,6 +22,8 @@ const ALLERGENS = [
 ];
 
 export function useAllergenPicker(selected: string[], onToggle: (allergen: string) => void) {
+  // Keep every badge shown during this edit, even when it is pending removal on save.
+  const [allergens, setAllergens] = useState(selected);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -87,6 +89,7 @@ export function useAllergenPicker(selected: string[], onToggle: (allergen: strin
     setOpen(false);
   }
   function choose(name: string) {
+    setAllergens((current) => (current.includes(name) ? current : [...current, name]));
     onToggle(name);
     dismiss();
   }
@@ -118,6 +121,7 @@ export function useAllergenPicker(selected: string[], onToggle: (allergen: strin
       dismiss();
   }
   return {
+    allergens,
     open,
     query,
     search,

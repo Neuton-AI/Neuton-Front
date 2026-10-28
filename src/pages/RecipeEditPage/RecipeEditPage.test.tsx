@@ -169,7 +169,7 @@ it('shows only known allergens and adds filtered suggestions without duplicates'
   const user = userEvent.setup();
   renderEditor(['Gluten', 'Mustard']);
   await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
-  expect(screen.getByRole('button', { name: 'Remove Mustard' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mustard' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.queryByRole('button', { name: 'Dairy' })).toBeNull();
   await user.click(screen.getByRole('button', { name: 'Add allergen' }));
   const input = screen.getByRole('combobox', { name: 'Search allergens' });
@@ -185,13 +185,15 @@ it('shows only known allergens and adds filtered suggestions without duplicates'
   ]);
   await user.click(screen.getByRole('option', { name: 'Soy' }));
   expect(screen.queryByRole('dialog')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Remove Soy' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Soy' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: 'Add allergen' })).toHaveFocus();
   await user.click(screen.getByRole('button', { name: 'Add allergen' }));
   expect(screen.queryByRole('option', { name: 'Soy' })).toBeNull();
   fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
-  await user.click(screen.getByRole('button', { name: 'Remove Soy' }));
-  expect(screen.queryByRole('button', { name: 'Remove Soy' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Soy' }));
+  expect(screen.getByRole('button', { name: 'Soy' })).toHaveAttribute('aria-pressed', 'false');
+  await user.click(screen.getByRole('button', { name: 'Soy' }));
+  expect(screen.getByRole('button', { name: 'Soy' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('supports clearing, no matches, keyboard selection and cancellation without submitting', async () => {
@@ -209,7 +211,7 @@ it('supports clearing, no matches, keyboard selection and cancellation without s
   expect(screen.getAllByRole('option')).toHaveLength(10);
   await user.type(input, 's');
   await user.keyboard('{ArrowDown}{Enter}');
-  expect(screen.getByRole('button', { name: 'Remove Shellfish' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Shellfish' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.queryByRole('dialog')).toBeNull();
   await user.click(screen.getByRole('button', { name: 'Add allergen' }));
   fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
@@ -218,7 +220,7 @@ it('supports clearing, no matches, keyboard selection and cancellation without s
   await user.click(screen.getByRole('button', { name: 'Add allergen' }));
   fireEvent.click(screen.getByRole('dialog'), { clientX: 1, clientY: 1 });
   expect(screen.queryByRole('dialog')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Remove Shellfish' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Shellfish' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('saves additions and removals while preserving existing values outside the suggestions', async () => {
@@ -230,14 +232,34 @@ it('saves additions and removals while preserving existing values outside the su
       return HttpResponse.json({ recipe: { id: 'rp-1' } });
     }),
   );
-  renderEditor(['Gluten', 'Mustard']);
+  const editor = renderEditor(['Gluten', 'Mustard']);
   await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
-  await user.click(screen.getByRole('button', { name: 'Remove Gluten' }));
+  await user.click(screen.getByRole('button', { name: 'Gluten' }));
+  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'false');
   await user.click(screen.getByRole('button', { name: 'Add allergen' }));
   await user.click(screen.getByRole('option', { name: 'Dairy' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(await screen.findByText('Recipe destination')).toBeInTheDocument();
   expect(savedBody).toMatchObject({ allergens: ['Mustard', 'Dairy'] });
+  editor.unmount();
+  renderEditor(['Mustard', 'Dairy']);
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Dairy' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('restores selected badges and discards newly added badges on reset', async () => {
+  const user = userEvent.setup();
+  renderEditor(['Gluten', 'Dairy']);
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  await user.click(screen.getByRole('button', { name: 'Gluten' }));
+  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'false');
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  await user.click(screen.getByRole('option', { name: 'Soy' }));
+  await user.click(screen.getByRole('button', { name: 'Reset' }));
+  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Dairy' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('button', { name: 'Soy' })).toBeNull();
 });
 
 it('allows manual linking when the extracted amount and unit are missing', async () => {
@@ -277,7 +299,7 @@ it('keeps one draft across swipes and tabs, resets edits, and focuses the reques
   await user.click(screen.getByRole('button', { name: 'Reset' }));
   expect(screen.getByLabelText('RECIPE NAME')).toHaveValue('Tomato Soup');
   await user.click(screen.getByRole('tab', { name: 'Preparation' }));
-  expect(screen.queryByRole('button', { name: 'Remove Gluten' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull();
 });
 
 it('supports keyboard tab navigation and excludes the inactive panel from focus and accessibility', async () => {
