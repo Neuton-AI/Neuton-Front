@@ -11,7 +11,7 @@ it('renders module errors and forwards retry and status-selection actions', asyn
     statusFilter: 'all',
     setStatusFilter: vi.fn(),
     error: new Error('offline'),
-    refetch: vi.fn(),
+    handleRetry: vi.fn(),
     loading: false,
     message: 'offline',
     currency: 'USD',
@@ -22,7 +22,7 @@ it('renders module errors and forwards retry and status-selection actions', asyn
   const user = userEvent.setup();
   expect(screen.getByRole('alert')).toHaveTextContent('offline');
   await user.click(screen.getByRole('button', { name: 'Try again' }));
-  expect(model.refetch).toHaveBeenCalledOnce();
+  expect(model.handleRetry).toHaveBeenCalledOnce();
   await user.click(screen.getByRole('tab', { name: 'Delivered' }));
   expect(model.setStatusFilter).toHaveBeenCalledWith('delivered');
 });

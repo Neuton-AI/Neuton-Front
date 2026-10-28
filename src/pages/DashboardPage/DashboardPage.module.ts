@@ -5,7 +5,7 @@ import { useChartSeries } from '@/features/analytics/usePeriodSeries';
 import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-const PERIODS: { key: DashboardPeriod; label: string }[] = [
+export const DASHBOARD_PERIODS: { key: DashboardPeriod; label: string }[] = [
   { key: '7d', label: '7D' },
   { key: '30d', label: '30D' },
   { key: '90d', label: '90D' },
@@ -44,8 +44,11 @@ export function useDashboardPage() {
 
   // Period is a trailing window (30d != the calendar month), so captions quote
   // the tab label instead of a calendar phrase like "this month".
-  const periodLabel = PERIODS.find((entry) => entry.key === period)?.label ?? period;
+  const periodLabel = DASHBOARD_PERIODS.find((entry) => entry.key === period)?.label ?? period;
   const handleSetUpShop = () => navigate('/profile');
+  const handleRetry = () => {
+    void refetch();
+  };
   const dateLabel = new Date()
     .toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
     .replace(',', ' ·');
@@ -72,7 +75,7 @@ export function useDashboardPage() {
     data,
     isLoading,
     error,
-    refetch,
+    handleRetry,
     series,
     currency,
     summary,

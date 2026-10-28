@@ -32,7 +32,14 @@ export function useBarcodeScanner({
   busy = false,
   error,
   paused = false,
+  onModeChange,
 }: BarcodeScannerProps) {
+  const [manual, setManual] = useState(false);
+  const changeMode = (value: boolean) => {
+    setManual(value);
+    onModeChange?.();
+  };
+  const cameraPaused = paused || manual;
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -112,7 +119,7 @@ export function useBarcodeScanner({
   }, [close]);
 
   useEffect(() => {
-    if (busy || pending || paused) return;
+    if (busy || pending || cameraPaused) return;
     let active = true;
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -188,7 +195,7 @@ export function useBarcodeScanner({
     }
     void start();
     return stop;
-  }, [busy, pending, paused, detect]);
+  }, [busy, pending, cameraPaused, detect]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -228,5 +235,7 @@ export function useBarcodeScanner({
     torchAvailable,
     torchOn,
     toggleTorch,
+    manual,
+    changeMode,
   };
 }

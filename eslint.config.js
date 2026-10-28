@@ -37,7 +37,14 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/pages/**/*.tsx', 'src/components/{Fab,Sheet,ConfirmDialog}/**/*.tsx'],
+    files: [
+      'src/pages/**/*.tsx',
+      'src/components/**/*.tsx',
+      'src/features/**/*.tsx',
+      'src/App.tsx',
+      'src/AppGate.tsx',
+      'src/AppRoutes.tsx',
+    ],
     ignores: ['**/*.test.tsx'],
     rules: {
       'no-restricted-imports': ['error', {

@@ -42,12 +42,15 @@ export function useOrdersPage() {
       }));
   }, [data]);
 
+  const handleRetry = () => {
+    void refetch();
+  };
   return {
     fabNavigation,
     statusFilter,
     setStatusFilter,
     error,
-    refetch,
+    handleRetry,
     loading,
     message,
     currency,

@@ -48,6 +48,8 @@ const model = (): CapturePageModel => ({
   videoRef: createRef<HTMLVideoElement>(),
   previewRef: createRef<HTMLDivElement>(),
   onPick: vi.fn(),
+  handleFileInput: vi.fn(),
+  handleDrop: vi.fn(),
   cancelPick: vi.fn(),
   retake: vi.fn(),
   addCurrent: vi.fn(),
@@ -194,7 +196,8 @@ it('offers gallery, file explorer and camera and accepts multiple files', async 
   const input = screen.getByLabelText('Choose document files');
   const files = [source('one').file, source('two').file];
   fireEvent.change(input, { target: { files } });
-  expect(state.onPick).toHaveBeenCalledWith(files);
+  expect(state.handleFileInput).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(state.handleFileInput).mock.calls[0][0].target.files).toBe(files);
 });
 
 it('retains the file preview and allows resubmission after a local save failure', () => {
