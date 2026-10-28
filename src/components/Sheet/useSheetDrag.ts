@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 
-const DISMISS_VIEWPORT_FRACTION = 0.15;
+const DISMISS_VIEWPORT_FRACTION = 0.10;
 const DIRECTION_DISTANCE = 8;
 
 /** Keep native scrolling until a deliberate downward pull claims the gesture. */

@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
  */
 
 describe('Sheet', () => {
-  function swipe(target: Element, x = 0, y = window.innerHeight * 0.15 + 1) {
+  function swipe(target: Element, x = 0, y = window.innerHeight * 0.10 + 1) {
     fireEvent.touchStart(target, {
       touches: [{ identifier: 1, clientX: 100, clientY: 100 }],
     });
@@ -41,15 +41,15 @@ describe('Sheet', () => {
   }
 
   it.each([
-    [400, 59, false],
-    [400, 60, false],
-    [400, 61, true],
-    [800, 119, false],
-    [800, 120, false],
-    [800, 121, true],
-    [1200, 180, false],
-    [1200, 181, true],
-  ])('uses more than 15%% of a %ipx viewport for a %ipx pull', (height, distance, dismiss) => {
+    [400, 39, false],
+    [400, 40, false],
+    [400, 41, true],
+    [800, 79, false],
+    [800, 80, false],
+    [800, 81, true],
+    [1200, 120, false],
+    [1200, 121, true],
+  ])('uses more than 10%% of a %ipx viewport for a %ipx pull', (height, distance, dismiss) => {
     vi.stubGlobal('innerHeight', height);
     const { onClose, content } = renderDraggable();
     swipe(content, 0, distance);
@@ -155,7 +155,7 @@ describe('Sheet', () => {
 
   it('dismisses with a mouse drag released outside the sheet', () => {
     const { onClose, content } = renderDraggable();
-    const endY = 100 + window.innerHeight * 0.15 + 1;
+    const endY = 100 + window.innerHeight * 0.10 + 1;
     fireEvent.mouseDown(content, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 100, clientY: endY });
     fireEvent.mouseUp(window, { clientX: 100, clientY: endY });

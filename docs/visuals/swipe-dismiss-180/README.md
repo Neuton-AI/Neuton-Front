@@ -1,7 +1,7 @@
 # Detail sheet dismissal — #180
 
-Updated threshold: dismiss only when the downward pull exceeds 15% of the
-viewport height. At or below 15%, the existing slide-back transition restores
+Updated threshold: dismiss only when the downward pull exceeds 10% of the
+viewport height. At or below 10%, the existing slide-back transition restores
 the sheet. All 31 sheet tests pass, including exact-boundary cases across
 400px, 800px, and 1200px viewports. A new browser check was blocked by the
 DevTools Chrome profile lock; the screenshots below document the earlier check.
