@@ -121,6 +121,10 @@ const scrollTo = vi.fn(function (this: HTMLElement, options: ScrollToOptions) {
 
 beforeEach(() => {
   resetAuth();
+  // jsdom has no native dialog top layer; browser verification covers modality.
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
   scrollTo.mockClear();
   Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
     configurable: true,
@@ -136,8 +140,8 @@ afterEach(() => {
   }
 });
 
-function renderEditor() {
-  const recipe = buildRecipe();
+function renderEditor(allergens: string[] | null = null) {
+  const recipe = buildRecipe({ allergens });
   recipe.costing.ingredients[0] = {
     ...recipe.costing.ingredients[0]!,
     id: 'ingredient-1',
@@ -161,12 +165,111 @@ function renderEditor() {
   );
 }
 
+it('shows only known allergens and adds filtered suggestions without duplicates', async () => {
+  const user = userEvent.setup();
+  renderEditor(['Gluten', 'Mustard']);
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  expect(screen.getByRole('button', { name: 'Mustard' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('button', { name: 'Dairy' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  const input = screen.getByRole('combobox', { name: 'Search allergens' });
+  expect(input).toHaveFocus();
+  expect(screen.getAllByRole('option')).toHaveLength(9);
+  expect(screen.queryByRole('option', { name: 'Gluten' })).toBeNull();
+  await user.type(input, 'S');
+  expect(screen.getAllByRole('option').map((item) => item.textContent)).toEqual([
+    'Sesame',
+    'Shellfish',
+    'Soy',
+    'Sulphites',
+  ]);
+  await user.click(screen.getByRole('option', { name: 'Soy' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Soy' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Add allergen' })).toHaveFocus();
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  expect(screen.queryByRole('option', { name: 'Soy' })).toBeNull();
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+  await user.click(screen.getByRole('button', { name: 'Soy' }));
+  expect(screen.getByRole('button', { name: 'Soy' })).toHaveAttribute('aria-pressed', 'false');
+  await user.click(screen.getByRole('button', { name: 'Soy' }));
+  expect(screen.getByRole('button', { name: 'Soy' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('supports clearing, no matches, keyboard selection and cancellation without submitting', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  const input = screen.getByRole('combobox', { name: 'Search allergens' });
+  await user.type(input, 'unknown');
+  expect(screen.getByRole('status')).toHaveTextContent('No matching allergens');
+  await user.keyboard('{Enter}');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Clear search' }));
+  expect(input).toHaveFocus();
+  expect(screen.getAllByRole('option')).toHaveLength(10);
+  await user.type(input, 's');
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(screen.getByRole('button', { name: 'Shellfish' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Add allergen' })).toHaveFocus();
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  fireEvent.click(screen.getByRole('dialog'), { clientX: 1, clientY: 1 });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Shellfish' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('saves additions and removals while preserving existing values outside the suggestions', async () => {
+  const user = userEvent.setup();
+  let savedBody: unknown;
+  server.use(
+    http.patch(apiPath('/recipes/rp-1'), async ({ request }) => {
+      savedBody = await request.json();
+      return HttpResponse.json({ recipe: { id: 'rp-1' } });
+    }),
+  );
+  const editor = renderEditor(['Gluten', 'Mustard']);
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  await user.click(screen.getByRole('button', { name: 'Gluten' }));
+  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'false');
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  await user.click(screen.getByRole('option', { name: 'Dairy' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Recipe destination')).toBeInTheDocument();
+  expect(savedBody).toMatchObject({ allergens: ['Mustard', 'Dairy'] });
+  editor.unmount();
+  renderEditor(['Mustard', 'Dairy']);
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Dairy' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('restores selected badges and discards newly added badges on reset', async () => {
+  const user = userEvent.setup();
+  renderEditor(['Gluten', 'Dairy']);
+  await user.click(await screen.findByRole('tab', { name: 'Preparation' }));
+  await user.click(screen.getByRole('button', { name: 'Gluten' }));
+  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'false');
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  await user.click(screen.getByRole('option', { name: 'Soy' }));
+  await user.click(screen.getByRole('button', { name: 'Reset' }));
+  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Dairy' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('button', { name: 'Soy' })).toBeNull();
+});
+
 it('allows manual linking when the extracted amount and unit are missing', async () => {
   const user = userEvent.setup();
   renderEditor();
   const amount = await screen.findByLabelText('Ingredient 1 amount');
   fireEvent.change(amount, { target: { value: '' } });
-  fireEvent.change(screen.getByLabelText('Ingredient 1 unit'), { target: { value: '' } });
+  fireEvent.change(screen.getByLabelText('Ingredient 1 unit'), {
+    target: { value: '' },
+  });
   await user.click(screen.getByRole('button', { name: 'Scan barcode for ingredient 1' }));
   expect(screen.getByRole('dialog', { name: 'Barcode scanner' })).toBeInTheDocument();
 });
@@ -189,13 +292,14 @@ it('keeps one draft across swipes and tabs, resets edits, and focuses the reques
   fireEvent.scroll(carousel, { target: { scrollLeft: 390 } });
   expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.getByRole('tab', { name: 'Preparation' })).toHaveFocus();
-  await user.click(screen.getByRole('button', { name: 'Gluten' }));
+  await user.click(screen.getByRole('button', { name: 'Add allergen' }));
+  await user.click(screen.getByRole('option', { name: 'Gluten' }));
   await user.click(screen.getByRole('tab', { name: 'Ingredients' }));
   expect(screen.getByLabelText('RECIPE NAME')).toHaveValue('Changed recipe');
   await user.click(screen.getByRole('button', { name: 'Reset' }));
   expect(screen.getByLabelText('RECIPE NAME')).toHaveValue('Tomato Soup');
   await user.click(screen.getByRole('tab', { name: 'Preparation' }));
-  expect(screen.getByRole('button', { name: 'Gluten' })).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull();
 });
 
 it('supports keyboard tab navigation and excludes the inactive panel from focus and accessibility', async () => {

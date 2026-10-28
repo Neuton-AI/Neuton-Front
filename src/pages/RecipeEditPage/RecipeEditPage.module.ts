@@ -75,6 +75,7 @@ export function useRecipeEditPage() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanKey, setScanKey] = useState<string | null>(null);
   const [editingPhoto, setEditingPhoto] = useState(false);
+  const [allergenResetKey, setAllergenResetKey] = useState(0);
   const initialized = useRef('');
   const nextKey = useRef(0);
   const scanRequest = useRef(0);
@@ -397,6 +398,7 @@ export function useRecipeEditPage() {
     if (!recipe || busy) return;
     closeScanner();
     setDraft(recipeDraft(recipe));
+    setAllergenResetKey((current) => current + 1);
     setError(null);
     setEditingPhoto(false);
   }
@@ -446,6 +448,7 @@ export function useRecipeEditPage() {
     removeIngredient,
     changeStep,
     toggleAllergen,
+    allergenResetKey,
     save,
     remove,
     reset,
