@@ -1,11 +1,15 @@
 /** Inline stroke icons matching the OpenPencil nav/measurement vectors. */
 
-type IconProps = {
+import type React from "react";
+
+interface IIconProductLink {
   className?: string;
   strokeWidth?: number;
-};
+}
 
-export function IconProductLink({ className = 'h-4 w-4' }: IconProps) {
+export const IconProductLink: React.FC<IIconProductLink> = ({
+  className = "h-4 w-4",
+}) => {
   return (
     <svg
       aria-hidden="true"
@@ -20,9 +24,16 @@ export function IconProductLink({ className = 'h-4 w-4' }: IconProps) {
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   );
+};
+
+interface IIconProductScan {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconProductScan({ className = 'h-4 w-4' }: IconProps) {
+export const IconProductScan: React.FC<IIconProductScan> = ({
+  className = "h-4 w-4",
+}) => {
   return (
     <svg
       aria-hidden="true"
@@ -37,46 +48,69 @@ export function IconProductScan({ className = 'h-4 w-4' }: IconProps) {
       <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10" />
     </svg>
   );
-}
+};
 
-const base = (className = 'h-5 w-5', strokeWidth = 2) => ({
+const base = (className = "h-5 w-5", strokeWidth = 2) => ({
   className,
-  viewBox: '0 0 20 20',
-  fill: 'none',
-  stroke: 'currentColor',
+  viewBox: "0 0 20 20",
+  fill: "none",
+  stroke: "currentColor",
   strokeWidth,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-  'aria-hidden': true,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
 });
 
-export function IconPin({ className, strokeWidth = 1.5 }: IconProps) {
+interface IIconPin {
+  className?: string;
+  strokeWidth?: number;
+}
+
+export const IconPin: React.FC<IIconPin> = ({
+  className,
+  strokeWidth = 1.5,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M10 17.5s5-4.5 5-8.5a5 5 0 0 0-10 0c0 4 5 8.5 5 8.5Z" />
       <circle cx="10" cy="8.75" r="2.25" />
     </svg>
   );
+};
+
+interface IIconHome {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconHome({ className, strokeWidth }: IconProps) {
+export const IconHome: React.FC<IIconHome> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M2.5 8.33 10 2.5l7.5 5.83V17a1 1 0 0 1-1 1h-4v-5.5h-5V18h-4a1 1 0 0 1-1-1V8.33Z" />
     </svg>
   );
+};
+
+interface IIconBook {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconBook({ className, strokeWidth }: IconProps) {
+export const IconBook: React.FC<IIconBook> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M10 5.83S8.5 4.17 3.33 4.17v11.5C8.5 15.67 10 17.33 10 17.33s1.5-1.66 6.67-1.66V4.17C11.5 4.17 10 5.83 10 5.83Z" />
       <path d="M10 5.83v11.5" />
     </svg>
   );
+};
+
+interface IIconBag {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconBag({ className, strokeWidth }: IconProps) {
+export const IconBag: React.FC<IIconBag> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M4 6.67h12v9.16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6.67Z" />
@@ -84,69 +118,124 @@ export function IconBag({ className, strokeWidth }: IconProps) {
       <path d="M7 10a3 3 0 0 0 6 0" />
     </svg>
   );
+};
+
+interface IIconUser {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconUser({ className, strokeWidth }: IconProps) {
+export const IconUser: React.FC<IIconUser> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M4.17 17.5v-1.67a3.33 3.33 0 0 1 3.33-3.33h4.99a3.33 3.33 0 0 1 3.34 3.33v1.67" />
       <circle cx="10" cy="5.83" r="3.33" />
     </svg>
   );
+};
+
+interface IIconPlus {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconPlus({ className, strokeWidth }: IconProps) {
+export const IconPlus: React.FC<IIconPlus> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M10 3.5v13M3.5 10h13" />
     </svg>
   );
+};
+
+interface IIconCamera {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconCamera({ className, strokeWidth }: IconProps) {
+export const IconCamera: React.FC<IIconCamera> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M2.5 6.67h3.33L7.5 4.17h5l1.67 2.5h3.33v9.16a1 1 0 0 1-1 1h-14a1 1 0 0 1-1-1V6.67Z" />
       <circle cx="10" cy="10.83" r="3" />
     </svg>
   );
+};
+
+interface IIconFile {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconFile({ className, strokeWidth }: IconProps) {
+export const IconFile: React.FC<IIconFile> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M11.67 2.5H5.83a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h8.34a1 1 0 0 0 1-1V5.83l-3.5-3.33Z" />
       <path d="M11.67 2.5v3.33H15" />
     </svg>
   );
+};
+
+interface IIconChevronRight {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconChevronRight({ className, strokeWidth }: IconProps) {
+export const IconChevronRight: React.FC<IIconChevronRight> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="m7.5 4.17 5 5.83-5 5.83" />
     </svg>
   );
+};
+
+interface IIconChevronLeft {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconChevronLeft({ className, strokeWidth }: IconProps) {
+export const IconChevronLeft: React.FC<IIconChevronLeft> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="m12.5 4.17-5 5.83 5 5.83" />
     </svg>
   );
+};
+
+interface IIconSearch {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconSearch({ className, strokeWidth }: IconProps) {
+export const IconSearch: React.FC<IIconSearch> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <circle cx="8.83" cy="8.83" r="5.67" />
       <path d="m16.5 16.5-3.84-3.84" />
     </svg>
   );
+};
+
+interface IIconReceipt {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconReceipt({ className, strokeWidth }: IconProps) {
+export const IconReceipt: React.FC<IIconReceipt> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M4.17 2.5h11.66v15l-1.94-1.25-1.94 1.25-1.94-1.25-1.94 1.25-1.94-1.25-1.96 1.25v-15Z" />
@@ -154,9 +243,14 @@ export function IconReceipt({ className, strokeWidth }: IconProps) {
       <path d="M7 10h6" />
     </svg>
   );
+};
+
+interface IIconBox {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconBox({ className, strokeWidth }: IconProps) {
+export const IconBox: React.FC<IIconBox> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M17.5 6.67v6.66l-7.5 4.17-7.5-4.17V6.67" />
@@ -164,26 +258,44 @@ export function IconBox({ className, strokeWidth }: IconProps) {
       <path d="M10 10.83v6.67" />
     </svg>
   );
+};
+
+interface IIconChefHat {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconChefHat({ className, strokeWidth }: IconProps) {
+export const IconChefHat: React.FC<IIconChefHat> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M4.17 13.33h11.66v3.5a1 1 0 0 1-1 1h-9.66a1 1 0 0 1-1-1v-3.5Z" />
       <path d="M4.17 13.33a2.83 2.83 0 0 1-.67-5.58A3.33 3.33 0 0 1 9.83 4a2.83 2.83 0 0 1 6.67 3.75 2.83 2.83 0 0 1 0 5.58" />
     </svg>
   );
+};
+
+interface IIconClose {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconClose({ className, strokeWidth }: IconProps) {
+export const IconClose: React.FC<IIconClose> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="m5 5 10 10M15 5 5 15" />
     </svg>
   );
+};
+
+interface IIconTrash {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconTrash({ className, strokeWidth }: IconProps) {
+export const IconTrash: React.FC<IIconTrash> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M3.33 5.83h13.34" />
@@ -191,9 +303,17 @@ export function IconTrash({ className, strokeWidth }: IconProps) {
       <path d="M5 5.83 5.83 17a1 1 0 0 0 1 .83h6.34a1 1 0 0 0 1-.83L15 5.83" />
     </svg>
   );
+};
+
+interface IIconWarning {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconWarning({ className, strokeWidth = 1.75 }: IconProps) {
+export const IconWarning: React.FC<IIconWarning> = ({
+  className,
+  strokeWidth = 1.75,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M10 3.5 17.5 16.5H2.5L10 3.5Z" />
@@ -201,17 +321,30 @@ export function IconWarning({ className, strokeWidth = 1.75 }: IconProps) {
       <path d="M10 14h.01" />
     </svg>
   );
+};
+
+interface IIconEdit {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconEdit({ className, strokeWidth }: IconProps) {
+export const IconEdit: React.FC<IIconEdit> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M13.33 3.33 16.67 6.67 7 16.34H3.66v-3.34l9.67-9.67Z" />
     </svg>
   );
+};
+
+interface IIconRefresh {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconRefresh({ className, strokeWidth }: IconProps) {
+export const IconRefresh: React.FC<IIconRefresh> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M16.67 8.33a6.67 6.67 0 0 0-11.66-2.5L3.33 7.5" />
@@ -220,9 +353,14 @@ export function IconRefresh({ className, strokeWidth }: IconProps) {
       <path d="M16.67 16.67v-4.17h-4.17" />
     </svg>
   );
+};
+
+interface IIconStore {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconStore({ className, strokeWidth }: IconProps) {
+export const IconStore: React.FC<IIconStore> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M3.33 8.33h13.34v8.5a.83.83 0 0 1-.83.83H4.16a.83.83 0 0 1-.83-.83v-8.5Z" />
@@ -230,9 +368,17 @@ export function IconStore({ className, strokeWidth }: IconProps) {
       <path d="M7.5 12.5h5" />
     </svg>
   );
+};
+
+interface IIconLogout {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconLogout({ className, strokeWidth }: IconProps) {
+export const IconLogout: React.FC<IIconLogout> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path d="M12.5 6.67V3.33h-10v13.34h10v-3.34" />
@@ -240,9 +386,17 @@ export function IconLogout({ className, strokeWidth }: IconProps) {
       <path d="m14.17 6.67 3.5 3.33-3.5 3.33" />
     </svg>
   );
+};
+
+interface IIconGoogle {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconGoogle({ className, strokeWidth }: IconProps) {
+export const IconGoogle: React.FC<IIconGoogle> = ({
+  className,
+  strokeWidth,
+}) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path
@@ -252,9 +406,14 @@ export function IconGoogle({ className, strokeWidth }: IconProps) {
       />
     </svg>
   );
+};
+
+interface IIconApple {
+  className?: string;
+  strokeWidth?: number;
 }
 
-export function IconApple({ className, strokeWidth }: IconProps) {
+export const IconApple: React.FC<IIconApple> = ({ className, strokeWidth }) => {
   return (
     <svg {...base(className, strokeWidth)}>
       <path
@@ -264,4 +423,4 @@ export function IconApple({ className, strokeWidth }: IconProps) {
       />
     </svg>
   );
-}
+};

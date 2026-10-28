@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import type { ProductDetails } from './ManualProductForm';
-import type { RecipeUsageContext } from '@/features/recipes/measurementUnits';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import type { ProductDetails } from "./components/ManualProductForm/ManualProductForm";
+import type { RecipeUsageContext } from "@/features/recipes/measurementUnits";
 
 export type BarcodeScannerProps = {
   onDetected: (barcode: string) => void;
@@ -23,8 +30,9 @@ type BarcodeDetectorConstructor = {
   getSupportedFormats?: () => Promise<string[]>;
 };
 
-const RETAIL_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf'];
-const MANUAL_FALLBACK = 'Live barcode scanning is unavailable. Enter the barcode below.';
+const RETAIL_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "itf"];
+const MANUAL_FALLBACK =
+  "Live barcode scanning is unavailable. Enter the barcode below.";
 
 export function useBarcodeScanner({
   onDetected,
@@ -32,7 +40,14 @@ export function useBarcodeScanner({
   busy = false,
   error,
   paused = false,
+  onModeChange,
 }: BarcodeScannerProps) {
+  const [manual, setManual] = useState(false);
+  const changeMode = (value: boolean) => {
+    setManual(value);
+    onModeChange?.();
+  };
+  const cameraPaused = paused || manual;
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -44,7 +59,7 @@ export function useBarcodeScanner({
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [pending, setPending] = useState(false);
-  const [barcode, setBarcode] = useState('');
+  const [barcode, setBarcode] = useState("");
   const [cameraNotice, setCameraNotice] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -80,14 +95,14 @@ export function useBarcodeScanner({
   useEffect(() => {
     const previousFocus = document.activeElement;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.stopImmediatePropagation();
         close();
       }
-      if (event.key !== 'Tab') return;
+      if (event.key !== "Tab") return;
       event.stopImmediatePropagation();
       const controls = dialogRef.current?.querySelectorAll<HTMLElement>(
         'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
@@ -103,16 +118,17 @@ export function useBarcodeScanner({
         first.focus();
       }
     };
-    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
       document.body.style.overflow = previousOverflow;
-      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected)
+        previousFocus.focus();
     };
   }, [close]);
 
   useEffect(() => {
-    if (busy || pending || paused) return;
+    if (busy || pending || cameraPaused) return;
     let active = true;
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -130,8 +146,9 @@ export function useBarcodeScanner({
     stopCamera.current = stop;
 
     async function start() {
-      const Detector = (window as Window & { BarcodeDetector?: BarcodeDetectorConstructor })
-        .BarcodeDetector;
+      const Detector = (
+        window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }
+      ).BarcodeDetector;
       if (!Detector || !navigator.mediaDevices?.getUserMedia) {
         setCameraNotice(MANUAL_FALLBACK);
         return;
@@ -139,14 +156,16 @@ export function useBarcodeScanner({
       try {
         const supported = await Detector.getSupportedFormats?.();
         if (!active) return;
-        const formats = RETAIL_FORMATS.filter((format) => !supported || supported.includes(format));
+        const formats = RETAIL_FORMATS.filter(
+          (format) => !supported || supported.includes(format),
+        );
         if (!formats.length) {
           setCameraNotice(MANUAL_FALLBACK);
           return;
         }
         const detector = new Detector({ formats });
         const camera = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: { facingMode: { ideal: "environment" } },
           audio: false,
         });
         if (!active) {
@@ -157,7 +176,10 @@ export function useBarcodeScanner({
         const track = camera.getVideoTracks?.()[0];
         cameraTrack.current = track ?? null;
         setTorchAvailable(
-          Boolean((track?.getCapabilities?.() as { torch?: boolean } | undefined)?.torch),
+          Boolean(
+            (track?.getCapabilities?.() as { torch?: boolean } | undefined)
+              ?.torch,
+          ),
         );
         if (video) video.srcObject = camera;
         setCameraNotice(null);
@@ -167,7 +189,9 @@ export function useBarcodeScanner({
             try {
               const results = await detector.detect(video);
               if (!active) return;
-              const result = results.find((item) => /^\d{8,14}$/.test(item.rawValue));
+              const result = results.find((item) =>
+                /^\d{8,14}$/.test(item.rawValue),
+              );
               if (result) {
                 detect(result.rawValue);
                 return;
@@ -182,19 +206,21 @@ export function useBarcodeScanner({
       } catch {
         if (active) {
           stop();
-          setCameraNotice('Camera access is unavailable. Enter the barcode below.');
+          setCameraNotice(
+            "Camera access is unavailable. Enter the barcode below.",
+          );
         }
       }
     }
     void start();
     return stop;
-  }, [busy, pending, paused, detect]);
+  }, [busy, pending, cameraPaused, detect]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const value = barcode.trim();
     if (!/^\d{8,14}$/.test(value)) {
-      setValidationError('Enter the 8–14 digits printed below the barcode.');
+      setValidationError("Enter the 8–14 digits printed below the barcode.");
       return;
     }
     setValidationError(null);
@@ -209,7 +235,7 @@ export function useBarcodeScanner({
       });
       setTorchOn(!torchOn);
     } catch {
-      setCameraNotice('Flashlight is unavailable on this camera.');
+      setCameraNotice("Flashlight is unavailable on this camera.");
     }
   }
 
@@ -228,5 +254,7 @@ export function useBarcodeScanner({
     torchAvailable,
     torchOn,
     toggleTorch,
+    manual,
+    changeMode,
   };
 }

@@ -5,10 +5,22 @@ import {
   validateUploadFiles,
 } from "@/features/uploads/uploadSources";
 import { saveScan } from "@/features/sync/documentsApi";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CAMERA_VIDEO_CONSTRAINTS, capturePhoto } from "./cameraCapture";
-import { enableContinuousFocus, focusAtPoint } from "./cameraFocus";
+import {
+  CAMERA_VIDEO_CONSTRAINTS,
+  capturePhoto,
+} from "./components/CaptureViewport/cameraCapture";
+import {
+  enableContinuousFocus,
+  focusAtPoint,
+} from "./components/CaptureViewport/cameraFocus";
 
 export type CaptureSource = {
   id: string;
@@ -83,9 +95,7 @@ export function useCapturePage() {
   const reviewSources = reviewIncludesCurrent ? collection.sources : stacked;
   const locked = busy || adding || capturing;
   const editingLocked = () =>
-    busyRef.current ||
-    addingRef.current ||
-    capturingRef.current;
+    busyRef.current || addingRef.current || capturingRef.current;
 
   useEffect(() => {
     alive.current = true;
@@ -152,12 +162,7 @@ export function useCapturePage() {
     return { id: crypto.randomUUID(), file, previewUrl };
   };
   const onPick = (picked: FileList | readonly File[] | undefined | null) => {
-    if (
-      !picked?.length ||
-      busyRef.current ||
-      addingRef.current
-    )
-      return;
+    if (!picked?.length || busyRef.current || addingRef.current) return;
     captureVersion.current += 1;
     const files = Array.from(picked);
     const previous = collectionRef.current;
@@ -411,6 +416,14 @@ export function useCapturePage() {
       if (alive.current) setBusy(false);
     }
   };
+  const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
+    onPick(event.target.files ?? undefined);
+    event.target.value = "";
+  };
+  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (!locked && total < 4) onPick(event.dataTransfer.files);
+  };
   return {
     kind,
     setKind: (next: MediaKind) => {
@@ -433,6 +446,8 @@ export function useCapturePage() {
     handleShutter,
     handleFocus,
     onPick,
+    handleFileInput,
+    handleDrop,
     retake,
     addCurrent,
     submit,

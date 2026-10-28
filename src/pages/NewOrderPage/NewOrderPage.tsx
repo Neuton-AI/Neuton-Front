@@ -1,13 +1,14 @@
-import { FullPageLoader, InlineNotice } from '@/components/feedback';
-import { FormFields } from '@/components/FormFields/FormFields';
-import { PageHeader } from '@/components/PageHeader/PageHeader';
-import { Button } from '@/components/ui';
-import { formatMoney } from '@/lib/format';
-import { useNewOrderPage } from './NewOrderPage.module';
-import { OrderItems } from './OrderItems/OrderItems';
-import { Row } from './Row/Row';
+import type React from "react";
+import { FullPageLoader, InlineNotice } from "@/components/feedback";
+import { FormFields } from "@/components/FormFields/FormFields";
+import { PageHeader } from "@/components/PageHeader/PageHeader";
+import { Button } from "@/components/ui";
+import { formatMoney } from "@/lib/format";
+import { useNewOrderPage } from "./NewOrderPage.module";
+import { OrderItems } from "./components/OrderItems/OrderItems";
+import { Row } from "./components/Row/Row";
 
-export function NewOrderPage() {
+export const NewOrderPage: React.FC = () => {
   const {
     quoteSubtotal,
     itemFields,
@@ -40,8 +41,14 @@ export function NewOrderPage() {
 
       <form onSubmit={submit} className="flex flex-1 flex-col gap-5 px-5 pb-8">
         <section className="flex flex-col gap-3">
-          <h2 className="text-eyebrow font-medium uppercase text-ink-muted">Customer</h2>
-          <FormFields fields={fields} values={formValues} onChange={handleFieldChange} />
+          <h2 className="text-eyebrow font-medium uppercase text-ink-muted">
+            Customer
+          </h2>
+          <FormFields
+            fields={fields}
+            values={formValues}
+            onChange={handleFieldChange}
+          />
         </section>
 
         <FormFields
@@ -51,7 +58,14 @@ export function NewOrderPage() {
           customFields={{
             items: (
               <OrderItems
-                {...{ itemsError, loading, recipes, currency, quantityOf, changeQuantity }}
+                {...{
+                  itemsError,
+                  loading,
+                  recipes,
+                  currency,
+                  quantityOf,
+                  changeQuantity,
+                }}
               />
             ),
           }}
@@ -61,12 +75,22 @@ export function NewOrderPage() {
           {quote ? (
             <>
               <Row label="Items" value={formatMoney(quoteSubtotal, currency)} />
-              <Row label="Delivery" value={formatMoney(quote.deliveryFee, currency)} />
+              <Row
+                label="Delivery"
+                value={formatMoney(quote.deliveryFee, currency)}
+              />
               <div className="h-px bg-hairline" />
-              <Row label="Total" value={formatMoney(quote.totalAmount, currency)} emphasis />
-              <Row label="Net profit" value={formatMoney(quote.netProfit, currency)} />
+              <Row
+                label="Total"
+                value={formatMoney(quote.totalAmount, currency)}
+                emphasis
+              />
+              <Row
+                label="Net profit"
+                value={formatMoney(quote.netProfit, currency)}
+              />
               <p className="text-label text-ink-muted">
-                Margin {quote.profitMarginPercent.toFixed(1)}% · cost{' '}
+                Margin {quote.profitMarginPercent.toFixed(1)}% · cost{" "}
                 {formatMoney(quote.totalCost, currency)}
               </p>
             </>
@@ -74,7 +98,7 @@ export function NewOrderPage() {
             <InlineNotice tone="error">{quoteError}</InlineNotice>
           ) : (
             <p className="py-1 text-label text-ink-muted">
-              {quoting ? 'Pricing…' : 'Add an item to see the live quote.'}
+              {quoting ? "Pricing…" : "Add an item to see the live quote."}
             </p>
           )}
         </section>
@@ -88,12 +112,12 @@ export function NewOrderPage() {
           disabled={lines.length === 0 || quoting || quote === null}
         >
           {lines.length === 0
-            ? 'Add at least one item'
+            ? "Add at least one item"
             : quoting
-              ? 'Pricing…'
+              ? "Pricing…"
               : `Save order · ${formatMoney(quote?.totalAmount ?? 0, currency)}`}
         </Button>
       </form>
     </div>
   );
-}
+};

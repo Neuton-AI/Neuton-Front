@@ -1,93 +1,33 @@
-import { Field, Input, Textarea } from '@/components/ui';
-import { Fragment, type ReactNode } from 'react';
-import type { ControlField, FormField, FormValues } from './schema';
+import { Field } from "@/components/ui";
+import { Fragment, type ReactNode } from "react";
+import { InputRegistry } from "./components/FormControls/FormControls";
+import type { FormField, FormValues } from "./schema";
 
-type ControlProps = {
-  field: Omit<ControlField<FormValues>, 'visible'>;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-};
+export { InputRegistry };
 
-function TextControl({ field, value, disabled, onChange }: ControlProps) {
-  const {
-    id,
-    type,
-    required,
-    minLength,
-    maxLength,
-    min,
-    max,
-    step,
-    inputMode,
-    autoComplete,
-    placeholder,
-    dense,
-    inputClassName,
-  } = field;
-  return (
-    <Input
-      {...{
-        id,
-        type,
-        required,
-        minLength,
-        maxLength,
-        min,
-        max,
-        step,
-        inputMode,
-        autoComplete,
-        placeholder,
-        dense,
-      }}
-      value={value}
-      disabled={disabled}
-      className={inputClassName}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
-function TextareaControl({ field, value, disabled, onChange }: ControlProps) {
-  return (
-    <Textarea
-      id={field.id}
-      rows={field.rows}
-      required={field.required}
-      maxLength={field.maxLength}
-      autoComplete={field.autoComplete}
-      placeholder={field.placeholder}
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
-export const InputRegistry = { input: TextControl, textarea: TextareaControl } as const;
-
-type Props<V extends FormValues> = {
+interface IFormFields<V extends FormValues> {
   fields: readonly FormField<V>[];
   values: V;
   onChange: (name: keyof V & string, value: string) => void;
   disabled?: boolean;
   customFields?: Record<string, ReactNode>;
-};
+}
 
-export function FormFields<V extends FormValues>({
+export const FormFields = <V extends FormValues>({
   fields,
   values,
   onChange,
   disabled = false,
   customFields = {},
-}: Props<V>) {
+}: IFormFields<V>) => {
   return (
     <>
       {fields.map((field) => {
-        if (field.kind === 'custom')
-          return <Fragment key={field.name}>{customFields[field.name]}</Fragment>;
-        if (field.kind === 'group') {
+        if (field.kind === "custom")
+          return (
+            <Fragment key={field.name}>{customFields[field.name]}</Fragment>
+          );
+        if (field.kind === "group") {
           const content = (
             <FormFields
               fields={field.fields}
@@ -129,4 +69,4 @@ export function FormFields<V extends FormValues>({
       })}
     </>
   );
-}
+};

@@ -1,6 +1,6 @@
-import { IconCamera, IconFile } from '@/components/icons';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { IconCamera, IconFile } from "@/components/icons";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 type Props = {
   onCapture?: () => void;
   onUploadFile?: () => void;
@@ -18,20 +18,20 @@ export function useFab({ onCapture, onUploadFile }: Props) {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === "Escape") setOpen(false);
     };
 
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 
   const actions = [
-    { label: 'Scan with camera', Icon: IconCamera, onClick: onCapture },
-    { label: 'Upload file', Icon: IconFile, onClick: onUploadFile },
+    { label: "Scan with camera", Icon: IconCamera, onClick: onCapture },
+    { label: "Upload file", Icon: IconFile, onClick: onUploadFile },
   ].filter((action) => action.onClick) as {
     label: string;
     Icon: typeof IconCamera;
@@ -41,7 +41,7 @@ export function useFab({ onCapture, onUploadFile }: Props) {
 }
 export type FabModel = ReturnType<typeof useFab>;
 
-export function useFabNavigation(kind: MediaKind = 'receipt') {
+export function useFabNavigation(kind: MediaKind = "receipt") {
   const navigate = useNavigate();
   return {
     onCapture: () => navigate(`/capture?source=camera&kind=${kind}`),
@@ -49,4 +49,4 @@ export function useFabNavigation(kind: MediaKind = 'receipt') {
   };
 }
 
-export type MediaKind = 'receipt' | 'recipe' | 'product' | 'order';
+export type MediaKind = "receipt" | "recipe" | "product" | "order";

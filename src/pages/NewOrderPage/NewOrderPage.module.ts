@@ -1,16 +1,23 @@
-import type { FormField } from '@/components/FormFields/schema';
-import { validateFields } from '@/components/FormFields/schema';
-import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
-import { useCreateOrder, useOrderQuote } from '@/features/orders/ordersApi';
-import type { OrderableRecipe } from '@/features/orders/types';
-import { useOrderableRecipes, useRecipes } from '@/features/recipes/recipesApi';
-import { ingredientLinkSummary } from '@/features/recipes/selectors';
-import { toNumber } from '@/lib/format';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import type { FormField } from "@/components/FormFields/schema";
+import { validateFields } from "@/components/FormFields/schema";
+import {
+  useAuth,
+  useCurrentShop,
+  useShopMemberships,
+} from "@/features/auth/supabase";
+import { useCreateOrder, useOrderQuote } from "@/features/orders/ordersApi";
+import type { OrderableRecipe } from "@/features/orders/types";
+import { useOrderableRecipes, useRecipes } from "@/features/recipes/recipesApi";
+import { ingredientLinkSummary } from "@/features/recipes/selectors";
+import { toNumber } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 type DraftLine = { recipe: OrderableRecipe; quantity: number };
-export type NewOrderRecipe = Omit<OrderableRecipe, 'unitCost' | 'retailPrice'> & {
+export type NewOrderRecipe = Omit<
+  OrderableRecipe,
+  "unitCost" | "retailPrice"
+> & {
   unitCost: number | null;
   retailPrice: number | null;
   costComplete?: boolean;
@@ -20,7 +27,11 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function useNewOrderPage() {
   const { user, token, loading: authLoading } = useAuth();
 
-  const { memberships, activeShopId, loading: shopsLoading } = useShopMemberships(user?.id);
+  const {
+    memberships,
+    activeShopId,
+    loading: shopsLoading,
+  } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
@@ -30,15 +41,15 @@ export function useNewOrderPage() {
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [customerName, setCustomerName] = useState('');
+  const [customerName, setCustomerName] = useState("");
 
   const [orderDate, setOrderDate] = useState(today);
 
-  const [destinationAddress, setDestinationAddress] = useState('');
+  const [destinationAddress, setDestinationAddress] = useState("");
 
-  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState('0');
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState("0");
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = shop?.currency ?? "USD";
 
   const recipesQuery = useOrderableRecipes(token, activeShopId);
   const catalogQuery = useRecipes(token, activeShopId);
@@ -47,11 +58,13 @@ export function useNewOrderPage() {
   const incompleteRecipes = (catalogQuery.data?.recipes ?? []).filter(
     (recipe) =>
       recipe.isActive &&
-      recipe.status === 'verified' &&
+      recipe.status === "verified" &&
       ingredientLinkSummary(recipe.costing).incomplete,
   );
   const incompleteIds = new Set(incompleteRecipes.map((recipe) => recipe.id));
-  const eligibleRecipes = orderable.filter((recipe) => !incompleteIds.has(recipe.id));
+  const eligibleRecipes = orderable.filter(
+    (recipe) => !incompleteIds.has(recipe.id),
+  );
   const lines = draftLines.filter((line) =>
     eligibleRecipes.some((recipe) => recipe.id === line.recipe.id),
   );
@@ -75,10 +88,13 @@ export function useNewOrderPage() {
   const itemsError = recipeError
     ? recipeError instanceof Error
       ? recipeError.message
-      : 'Could not load recipes.'
+      : "Could not load recipes."
     : submitError;
 
-  const items = lines.map((line) => ({ recipeId: line.recipe.id, quantity: line.quantity }));
+  const items = lines.map((line) => ({
+    recipeId: line.recipe.id,
+    quantity: line.quantity,
+  }));
 
   const itemsKey = JSON.stringify(items);
 
@@ -102,7 +118,9 @@ export function useNewOrderPage() {
   });
 
   const quote =
-    items.length > 0 && debouncedItemsKey === itemsKey ? (quoteQuery.data ?? null) : null;
+    items.length > 0 && debouncedItemsKey === itemsKey
+      ? (quoteQuery.data ?? null)
+      : null;
 
   const quoteError =
     items.length === 0
@@ -110,7 +128,7 @@ export function useNewOrderPage() {
       : quoteQuery.error
         ? quoteQuery.error instanceof Error
           ? quoteQuery.error.message
-          : 'Could not price this order.'
+          : "Could not price this order."
         : null;
 
   const quoting = quoteQuery.isFetching;
@@ -128,7 +146,8 @@ export function useNewOrderPage() {
       const existing = current.find((line) => line.recipe.id === recipe.id);
       const next = Math.max(0, (existing?.quantity ?? 0) + delta);
 
-      if (next === 0) return current.filter((line) => line.recipe.id !== recipe.id);
+      if (next === 0)
+        return current.filter((line) => line.recipe.id !== recipe.id);
       if (existing) {
         return current.map((line) =>
           line.recipe.id === recipe.id ? { ...line, quantity: next } : line,
@@ -140,15 +159,12 @@ export function useNewOrderPage() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (
-      !token ||
-      !activeShopId ||
-      items.length === 0 ||
-      createOrder.isPending
-    )
+    if (!token || !activeShopId || items.length === 0 || createOrder.isPending)
       return;
 
-    const validationError = Object.values(validateFields(fields, formValues))[0];
+    const validationError = Object.values(
+      validateFields(fields, formValues),
+    )[0];
     if (validationError) {
       setSubmitError(String(validationError));
       return;
@@ -164,11 +180,13 @@ export function useNewOrderPage() {
       });
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
-      setSubmitError(cause instanceof Error ? cause.message : 'Could not save the order.');
+      setSubmitError(
+        cause instanceof Error ? cause.message : "Could not save the order.",
+      );
     }
   };
   const createOrderPending = createOrder.isPending;
-  const handleBack = () => navigate('/orders');
+  const handleBack = () => navigate("/orders");
 
   const formValues = {
     customerName,
@@ -178,46 +196,46 @@ export function useNewOrderPage() {
   };
   const fields: readonly FormField<typeof formValues>[] = [
     {
-      kind: 'input',
-      name: 'customerName',
-      id: 'customer',
-      label: 'Name',
-      placeholder: 'Optional',
-      autoComplete: 'name',
+      kind: "input",
+      name: "customerName",
+      id: "customer",
+      label: "Name",
+      placeholder: "Optional",
+      autoComplete: "name",
     },
     {
-      kind: 'group',
-      name: 'dateDistance',
-      className: 'grid grid-cols-2 gap-3',
+      kind: "group",
+      name: "dateDistance",
+      className: "grid grid-cols-2 gap-3",
       fields: [
         {
-          kind: 'input',
-          name: 'orderDate',
-          id: 'order-date',
-          label: 'Date',
-          type: 'date',
+          kind: "input",
+          name: "orderDate",
+          id: "order-date",
+          label: "Date",
+          type: "date",
           required: true,
         },
         {
-          kind: 'input',
-          name: 'deliveryDistanceKm',
-          id: 'distance',
-          label: 'Distance',
-          type: 'number',
-          inputMode: 'decimal',
+          kind: "input",
+          name: "deliveryDistanceKm",
+          id: "distance",
+          label: "Distance",
+          type: "number",
+          inputMode: "decimal",
           min: 0,
           step: 0.1,
         },
       ],
     },
     {
-      kind: 'textarea',
-      name: 'destinationAddress',
-      id: 'address',
-      label: 'Address',
+      kind: "textarea",
+      name: "destinationAddress",
+      id: "address",
+      label: "Address",
       rows: 2,
-      placeholder: 'Optional',
-      autoComplete: 'street-address',
+      placeholder: "Optional",
+      autoComplete: "street-address",
     },
   ];
   const handleFieldChange = (name: keyof typeof formValues, value: string) => {
@@ -229,7 +247,9 @@ export function useNewOrderPage() {
     };
     setters[name](value);
   };
-  const itemFields: readonly FormField<typeof formValues>[] = [{ kind: 'custom', name: 'items' }];
+  const itemFields: readonly FormField<typeof formValues>[] = [
+    { kind: "custom", name: "items" },
+  ];
   const quoteSubtotal = quote ? quote.totalAmount - quote.deliveryFee : 0;
   return {
     quoteSubtotal,

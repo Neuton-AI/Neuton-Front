@@ -1,12 +1,16 @@
-import { useSheetClose } from '@/components/Sheet/Sheet.module';
-import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/supabase';
-import { useReceipt, useVerifyReceipt } from '@/features/receipts/receiptsApi';
-import type { VerifyReceiptBody } from '@/features/receipts/types';
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useSheetClose } from "@/components/Sheet/Sheet.module";
+import {
+  useAuth,
+  useCurrentShop,
+  useShopMemberships,
+} from "@/features/auth/supabase";
+import { useReceipt, useVerifyReceipt } from "@/features/receipts/receiptsApi";
+import type { VerifyReceiptBody } from "@/features/receipts/types";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
 
 export function useReceiptDetailPage() {
-  const { id = '' } = useParams();
+  const { id = "" } = useParams();
 
   const { user, token } = useAuth();
 
@@ -29,18 +33,18 @@ export function useReceiptDetailPage() {
   const error = receiptQuery.error
     ? receiptQuery.error instanceof Error
       ? receiptQuery.error.message
-      : 'Could not load the receipt.'
+      : "Could not load the receipt."
     : null;
 
-  const currency = shop?.currency ?? 'USD';
+  const currency = shop?.currency ?? "USD";
 
-  const close = useSheetClose('/catalog?tab=receipts');
+  const close = useSheetClose("/catalog?tab=receipts");
 
   // Verification is an owner/admin action server-side, so a member would only
   // ever earn a 403 from a button they could see.
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
 
-  const canVerify = role === 'owner' || role === 'admin';
+  const canVerify = role === "owner" || role === "admin";
 
   // Polling while the worker is still chewing is baked into the query hook:
   // only `processing` keeps a quiet 3s refetch. `unverified` is terminal for
@@ -55,7 +59,14 @@ export function useReceiptDetailPage() {
    * lines and timestamps.
    */
   const verify = async () => {
-    if (!token || !activeShopId || !id || !canVerify || verifyMutation.isPending || !receipt)
+    if (
+      !token ||
+      !activeShopId ||
+      !id ||
+      !canVerify ||
+      verifyMutation.isPending ||
+      !receipt
+    )
       return;
 
     setVerifyError(null);
@@ -65,17 +76,22 @@ export function useReceiptDetailPage() {
     try {
       await verifyMutation.mutateAsync({ id, body });
     } catch (cause) {
-      setVerifyError(cause instanceof Error ? cause.message : 'Could not verify the receipt.');
+      setVerifyError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not verify the receipt.",
+      );
     }
   };
 
-  const failureMessage = receipt?.status === 'failed' ? (receipt.errorMessage ?? null) : null;
+  const failureMessage =
+    receipt?.status === "failed" ? (receipt.errorMessage ?? null) : null;
 
   // A receipt can be denominated in a currency other than the shop's, so every
   // figure on this sheet has to follow the receipt, not the shop.
   const receiptCurrency = receipt?.currency ?? currency;
 
-  const isVerified = receipt?.status === 'verified';
+  const isVerified = receipt?.status === "verified";
 
   const handleRetry = () => {
     void receiptQuery.refetch();

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSheetDrag } from './useSheetDrag';
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSheetDrag } from "./useSheetDrag";
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -16,12 +16,12 @@ export function useSheet({ open, onClose }: Props) {
     if (!open) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onClose();
         return;
       }
       // Keep focus inside the sheet while it owns the screen.
-      if (event.key !== 'Tab' || !sheetRef.current) return;
+      if (event.key !== "Tab" || !sheetRef.current) return;
       const focusable = sheetRef.current.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), input:not([disabled]), textarea, select, [tabindex]:not([tabindex="-1"])',
       );
@@ -41,12 +41,12 @@ export function useSheet({ open, onClose }: Props) {
     // Preserve the scroll position so the list behind the sheet does not jump.
     const scrollY = window.scrollY;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     window.scrollTo(0, scrollY);
 
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
   }, [open, onClose]);
@@ -58,7 +58,7 @@ export function useSheetClose(fallback: string) {
   const navigate = useNavigate();
   return useCallback(() => {
     const idx = (window.history.state as { idx?: number } | null)?.idx;
-    if (typeof idx === 'number' && idx > 0) navigate(-1);
+    if (typeof idx === "number" && idx > 0) navigate(-1);
     else navigate(fallback, { replace: true });
   }, [navigate, fallback]);
 }

@@ -1,7 +1,8 @@
-import { IconChevronLeft } from '@/components/icons';
-import type { ReactNode } from 'react';
+import type React from "react";
+import { IconChevronLeft } from "@/components/icons";
+import type { ReactNode } from "react";
 
-type PageHeaderProps = {
+interface IPageHeader {
   /** Small uppercase line above the title, e.g. the weekday and date. */
   eyebrow?: string;
   title: string;
@@ -10,9 +11,15 @@ type PageHeaderProps = {
   /** Shows a back chevron; pass the handler rather than building the button here. */
   onBack?: () => void;
   className?: string;
-};
+}
 
-export function PageHeader({ eyebrow, title, action, onBack, className = '' }: PageHeaderProps) {
+export const PageHeader: React.FC<IPageHeader> = ({
+  eyebrow,
+  title,
+  action,
+  onBack,
+  className = "",
+}) => {
   return (
     <header className={`page-header flex flex-col gap-0.5 ${className}`}>
       <div className="flex items-start justify-between gap-3">
@@ -27,11 +34,13 @@ export function PageHeader({ eyebrow, title, action, onBack, className = '' }: P
           </button>
         ) : null}
         <div className="min-w-0 flex-1">
-          {eyebrow ? <p className="eyebrow text-brand-primary">{eyebrow}</p> : null}
+          {eyebrow ? (
+            <p className="eyebrow text-brand-primary">{eyebrow}</p>
+          ) : null}
           <h1 className="font-display text-title text-ink">{title}</h1>
         </div>
         {action ? <div className="shrink-0 pt-1">{action}</div> : null}
       </div>
     </header>
   );
-}
+};

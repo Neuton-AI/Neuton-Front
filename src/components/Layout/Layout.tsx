@@ -1,11 +1,17 @@
-import type { ReactNode } from 'react';
-type LayoutProps = {
+import type React from "react";
+import type { ReactNode } from "react";
+interface ILayout {
   mainContent: ReactNode;
   actions?: ReactNode;
   footer?: ReactNode;
   className?: string;
-};
-export function Layout({ mainContent, actions, footer, className = 'shell' }: LayoutProps) {
+}
+export const Layout: React.FC<ILayout> = ({
+  mainContent,
+  actions,
+  footer,
+  className = "shell",
+}) => {
   return (
     <div className={className}>
       {mainContent}
@@ -13,4 +19,4 @@ export function Layout({ mainContent, actions, footer, className = 'shell' }: La
       {footer}
     </div>
   );
-}
+};

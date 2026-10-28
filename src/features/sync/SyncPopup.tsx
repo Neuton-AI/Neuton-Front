@@ -1,11 +1,11 @@
-import { useState, type Ref } from 'react';
-import { Link } from 'react-router-dom';
-import type { SyncError } from './errors';
-
-const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-type Props = {
+import type React from "react";
+import { type Ref } from "react";
+import { Link } from "react-router-dom";
+import type { SyncError } from "./errors";
+import { useSyncPopup } from "./SyncPopup.module";
+interface ISyncPopup {
   rootRef?: Ref<HTMLElement>;
-  tone: 'error' | 'success';
+  tone: "error" | "success";
   title: string;
   message: string;
   errors: SyncError[];
@@ -17,9 +17,9 @@ type Props = {
   retry: () => void;
   exportPending: () => Promise<void>;
   onSignIn: () => void;
-};
+}
 
-export function SyncPopup({
+export const SyncPopup: React.FC<ISyncPopup> = ({
   rootRef,
   tone,
   title,
@@ -30,39 +30,25 @@ export function SyncPopup({
   retry,
   exportPending,
   onSignIn,
-}: Props) {
-  const [index, setIndex] = useState(0);
-  const selected = errors[index % Math.max(errors.length, 1)];
-  const text = selected?.message ?? message;
-  const context = selected
-    ? `${label(selected.entity)} · ${selected.operation === 'metadata-check' ? 'Sync' : label(selected.operation)}`
-    : title;
-  const recoveryPath =
-    selected?.recovery === 'request-access'
-      ? '/profile?tab=shop'
-      : selected?.documentId &&
-          ['recipe', 'receipt', 'order'].includes(selected.entity)
-        ? selected.entity === 'order'
-          ? `/orders/${selected.documentId}`
-          : `/catalog/${selected.entity}s/${selected.documentId}`
-        : null;
-  const recover = () => {
-    if (selected?.recovery === 'sign-in') onSignIn();
-    else if (selected?.recovery === 'export') void exportPending();
-    else retry();
-  };
-  const recoveryLabel =
-    selected?.recovery === 'sign-in'
-      ? 'Sign in'
-      : selected?.recovery === 'export'
-        ? 'Export work'
-        : selected?.recovery === 'request-access'
-          ? 'Ask owner'
-          : ['review-document', 'resolve-conflict'].includes(
-                selected?.recovery ?? '',
-              )
-            ? 'Review document'
-            : 'Retry sync';
+}) => {
+  const popup = useSyncPopup({
+    title,
+    message,
+    errors,
+    retry,
+    exportPending,
+    onSignIn,
+  });
+  const {
+    index,
+    setIndex,
+    selected,
+    text,
+    context,
+    recoveryPath,
+    recover,
+    recoveryLabel,
+  } = popup;
   return (
     <aside
       ref={rootRef}
@@ -71,13 +57,13 @@ export function SyncPopup({
     >
       <button
         type="button"
-        className={`sync-popup__pill ${opened ? 'sync-popup__pill--opened' : ''}`}
+        className={`sync-popup__pill ${opened ? "sync-popup__pill--opened" : ""}`}
         aria-expanded={opened}
         aria-label={text}
         onClick={() => setOpened((value) => !value)}
       >
         <span className="sync-popup__disc" aria-hidden="true">
-          {tone === 'error' ? (
+          {tone === "error" ? (
             <svg width="12" height="12" viewBox="0 0 20 20" fill="none">
               <path
                 d="M10 3.5v8"
@@ -127,7 +113,7 @@ export function SyncPopup({
           )}
           {selected.savedLocally === false && <span>Change unsaved</span>}
           {recoveryPath &&
-          ['request-access', 'review-document', 'resolve-conflict'].includes(
+          ["request-access", "review-document", "resolve-conflict"].includes(
             selected.recovery,
           ) ? (
             <Link to={recoveryPath}>{recoveryLabel}</Link>
@@ -138,4 +124,4 @@ export function SyncPopup({
       )}
     </aside>
   );
-}
+};

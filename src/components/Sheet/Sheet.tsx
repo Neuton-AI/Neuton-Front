@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { useSheet } from './Sheet.module';
-type Props = {
+import type React from "react";
+import type { ReactNode } from "react";
+import { useSheet } from "./Sheet.module";
+interface ISheet {
   open: boolean;
   onClose: () => void;
   /** Accessible name for the dialog. */
@@ -8,9 +9,15 @@ type Props = {
   /** Fill the available height for detail views with a bottom action bar. */
   fillHeight?: boolean;
   children: ReactNode;
-};
+}
 
-export function Sheet({ open, onClose, label, children, fillHeight = false }: Props) {
+export const Sheet: React.FC<ISheet> = ({
+  open,
+  onClose,
+  label,
+  children,
+  fillHeight = false,
+}) => {
   const { sheetRef } = useSheet({ open, onClose, label, children });
   if (!open) return null;
   return (
@@ -26,7 +33,7 @@ export function Sheet({ open, onClose, label, children, fillHeight = false }: Pr
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className={`sheet relative flex w-full max-w-shell flex-col bg-surface-canvas pb-[max(var(--safe-bottom),20px)] shadow-[0_-12px_40px_rgba(24,23,21,0.28)] animate-[sheet-in_260ms_cubic-bezier(0.32,0.72,0,1)] ${fillHeight ? 'h-[calc(100dvh-56px)] rounded-t-2xl' : 'max-h-[88dvh] rounded-t-[20px]'}`}
+        className={`sheet relative flex w-full max-w-shell flex-col bg-surface-canvas pb-[max(var(--safe-bottom),20px)] shadow-[0_-12px_40px_rgba(24,23,21,0.28)] animate-[sheet-in_260ms_cubic-bezier(0.32,0.72,0,1)] ${fillHeight ? "h-[calc(100dvh-56px)] rounded-t-2xl" : "max-h-[88dvh] rounded-t-[20px]"}`}
       >
         <div
           data-sheet-drag-handle
@@ -39,33 +46,42 @@ export function Sheet({ open, onClose, label, children, fillHeight = false }: Pr
       </div>
     </div>
   );
-}
+};
 
 /** Heading used inside the detail sheets; 18px medium per the design ramp. */
-export function SheetSection({ title, children }: { title: string; children: ReactNode }) {
+interface ISheetSection {
+  title: string;
+  children: ReactNode;
+}
+
+export const SheetSection: React.FC<ISheetSection> = ({ title, children }) => {
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[18px] font-medium leading-[25px] text-ink">{title}</h2>
+      <h2 className="text-[18px] font-medium leading-[25px] text-ink">
+        {title}
+      </h2>
       {children}
     </section>
   );
-}
+};
 
 /** Badge pill used for allergens, tags, and status. */
-export function SheetBadge({
-  children,
-  tone = 'card',
-}: {
+interface ISheetBadge {
   children: ReactNode;
-  tone?: 'card' | 'success' | 'danger' | 'teal' | 'deleted';
-}) {
+  tone?: "card" | "success" | "danger" | "teal" | "deleted";
+}
+
+export const SheetBadge: React.FC<ISheetBadge> = ({
+  children,
+  tone = "card",
+}) => {
   const tones = {
-    card: 'bg-surface-card text-ink',
-    success: 'bg-semantic-success text-ink',
-    danger: 'bg-semantic-error text-ink-on-primary',
-    teal: 'bg-brand-teal text-ink',
+    card: "bg-surface-card text-ink",
+    success: "bg-semantic-success text-ink",
+    danger: "bg-semantic-error text-ink-on-primary",
+    teal: "bg-brand-teal text-ink",
     // The design's "DELETED" pill: grey, spaced, and set in caps.
-    deleted: 'bg-deleted-badge text-ink-muted uppercase tracking-[0.66px]',
+    deleted: "bg-deleted-badge text-ink-muted uppercase tracking-[0.66px]",
   } as const;
   return (
     <span
@@ -74,4 +90,4 @@ export function SheetBadge({
       {children}
     </span>
   );
-}
+};

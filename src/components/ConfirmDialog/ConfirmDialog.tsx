@@ -1,7 +1,8 @@
-import { IconWarning } from '@/components/icons';
-import type { ReactNode } from 'react';
-import { useConfirmDialog } from './ConfirmDialog.module';
-type Props = {
+import type React from "react";
+import { IconWarning } from "@/components/icons";
+import type { ReactNode } from "react";
+import { useConfirmDialog } from "./ConfirmDialog.module";
+interface IConfirmDialog {
   open: boolean;
   /** Question shown as the dialog heading, e.g. "Delete this order?". */
   title: string;
@@ -13,17 +14,17 @@ type Props = {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
-};
+}
 
-export function ConfirmDialog({
+export const ConfirmDialog: React.FC<IConfirmDialog> = ({
   open,
   title,
   description,
   confirmLabel,
-  cancelLabel = 'Cancel',
+  cancelLabel = "Cancel",
   onConfirm,
   onCancel,
-}: Props) {
+}) => {
   const { dialogRef, cancelRef } = useConfirmDialog({
     open,
     title,
@@ -54,10 +55,16 @@ export function ConfirmDialog({
           <IconWarning className="h-[22px] w-[22px]" />
         </span>
         <div className="flex flex-col gap-1.5">
-          <h2 id="confirm-dialog-title" className="text-[20px] font-bold leading-[1.2] text-ink">
+          <h2
+            id="confirm-dialog-title"
+            className="text-[20px] font-bold leading-[1.2] text-ink"
+          >
             {title}
           </h2>
-          <p id="confirm-dialog-description" className="text-[14px] leading-[1.5] text-ink-muted">
+          <p
+            id="confirm-dialog-description"
+            className="text-[14px] leading-[1.5] text-ink-muted"
+          >
             {description}
           </p>
         </div>
@@ -81,4 +88,4 @@ export function ConfirmDialog({
       </div>
     </div>
   );
-}
+};

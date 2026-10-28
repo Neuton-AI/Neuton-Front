@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from "react";
 type Props = {
   open: boolean;
   /** Question shown as the dialog heading, e.g. "Delete this order?". */
@@ -27,7 +27,7 @@ export function useConfirmDialog({
     cancelRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         // Own the key while open: without this the Sheet behind the dialog
         // hears the same Escape and closes out from under the confirmation.
         event.stopImmediatePropagation();
@@ -35,7 +35,7 @@ export function useConfirmDialog({
         return;
       }
       // Keep focus inside the dialog while it owns the screen.
-      if (event.key !== 'Tab' || !dialogRef.current) return;
+      if (event.key !== "Tab" || !dialogRef.current) return;
       event.stopImmediatePropagation();
       const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
         'button:not([disabled]), a[href], input:not([disabled]), textarea, select, [tabindex]:not([tabindex="-1"])',
@@ -56,13 +56,13 @@ export function useConfirmDialog({
     // Preserve the scroll position so the page behind the dialog does not jump.
     const scrollY = window.scrollY;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     window.scrollTo(0, scrollY);
 
     // Capture phase so it runs before the Sheet's own bubble-phase handler.
-    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
       document.body.style.overflow = previousOverflow;
     };
   }, [open, onCancel]);

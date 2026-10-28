@@ -1,14 +1,15 @@
-import { BottomNav } from '@/components/BottomNav/BottomNav';
-import { InlineNotice } from '@/components/feedback';
-import { IconLogout } from '@/components/icons';
-import { Layout } from '@/components/Layout/Layout';
-import { PageHeader } from '@/components/PageHeader/PageHeader';
-import { InstallAppButton } from '@/features/pwa/InstallApp';
-import { MeTab } from './MeTab/MeTab';
-import { useProfilePage } from './ProfilePage.module';
-import { ShopTab } from './ShopTab/ShopTab';
+import type React from "react";
+import { BottomNav } from "@/components/BottomNav/BottomNav";
+import { InlineNotice } from "@/components/feedback";
+import { IconLogout } from "@/components/icons";
+import { Layout } from "@/components/Layout/Layout";
+import { PageHeader } from "@/components/PageHeader/PageHeader";
+import { InstallAppButton } from "@/features/pwa/InstallApp";
+import { MeTab } from "./components/MeTab/MeTab";
+import { useProfilePage } from "./ProfilePage.module";
+import { ShopTab } from "./components/ShopTab/ShopTab";
 
-export function ProfilePage() {
+export const ProfilePage: React.FC = () => {
   const {
     role,
     handleSelectShop,
@@ -36,7 +37,7 @@ export function ProfilePage() {
             eyebrow="Account & shop"
             title="Profile"
             action={
-              tab === 'me' ? (
+              tab === "me" ? (
                 <div className="pt-5">
                   <InstallAppButton />
                 </div>
@@ -49,7 +50,7 @@ export function ProfilePage() {
             aria-label="Profile section"
             className="mt-3 flex gap-1 rounded-card border border-hairline bg-surface-soft p-1"
           >
-            {(['me', 'shop'] as const).map((key) => (
+            {(["me", "shop"] as const).map((key) => (
               <button
                 key={key}
                 role="tab"
@@ -57,7 +58,7 @@ export function ProfilePage() {
                 aria-selected={tab === key}
                 onClick={() => setTab(key)}
                 className={`flex-1 rounded-input px-3.5 py-2 text-body font-medium capitalize transition-colors duration-200 ${
-                  tab === key ? 'bg-surface-card text-ink' : 'text-ink-muted'
+                  tab === key ? "bg-surface-card text-ink" : "text-ink-muted"
                 }`}
               >
                 {key}
@@ -66,9 +67,9 @@ export function ProfilePage() {
           </div>
 
           <div className="mt-3">
-            {tab === 'me' ? (
+            {tab === "me" ? (
               <MeTab
-                email={user?.email ?? '—'}
+                email={user?.email ?? "—"}
                 memberships={memberships}
                 activeShopId={activeShopId}
                 creating={createShopPending}
@@ -102,4 +103,4 @@ export function ProfilePage() {
       footer={<BottomNav />}
     />
   );
-}
+};
