@@ -1,0 +1,7 @@
+.allergen-popover::backdrop {
+  background: linear-gradient(
+    to bottom,
+    transparent var(--allergen-scrim-top),
+    #faf9f5d1 var(--allergen-scrim-top)
+  );
+}

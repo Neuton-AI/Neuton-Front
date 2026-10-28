@@ -3,8 +3,8 @@ import { ErrorState, InlineNotice, Spinner } from '@/components/feedback';
 import { IconCamera, IconClose, IconPlus, IconTrash } from '@/components/icons';
 import { Button, Field, Input, Textarea } from '@/components/ui';
 import { useRecipeEditPage, type RecipeEditPageModel } from './RecipeEditPage.module';
+import { AllergenPicker } from './AllergenPicker/AllergenPicker';
 
-const ALLERGENS = ['Gluten', 'Eggs', 'Dairy', 'Tree nuts', 'Peanuts', 'Soy', 'Sesame', 'Fish'];
 const addClassName =
   'flex h-10 w-full items-center justify-center gap-2 rounded-input border border-dashed border-ink-muted-soft text-sm font-medium text-brand-primary-active';
 
@@ -308,28 +308,7 @@ export function RecipeEditView({ model }: { model: RecipeEditPageModel }) {
                   className="h-full w-full min-w-0 shrink-0 snap-start overflow-y-auto overscroll-y-contain px-4 pb-5"
                 >
                   <div className="flex flex-col gap-5">
-                    <section className="flex flex-col gap-2.5" aria-labelledby="edit-allergens">
-                      <div className="flex items-baseline justify-between">
-                        <h2 id="edit-allergens" className="text-[18px] font-medium">
-                          Allergens
-                        </h2>
-                        <span className="text-label text-ink-muted">Tap to toggle</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {[...new Set([...ALLERGENS, ...draft.allergens])].map((allergen) => (
-                          <button
-                            type="button"
-                            key={allergen}
-                            aria-pressed={draft.allergens.includes(allergen)}
-                            onClick={() => model.toggleAllergen(allergen)}
-                            className={`h-[34px] rounded-pill px-3.5 text-sm font-medium ${draft.allergens.includes(allergen) ? 'bg-surface-dark text-ink-on-dark' : 'bg-surface-card text-ink-body'}`}
-                          >
-                            {draft.allergens.includes(allergen) ? '✓ ' : ''}
-                            {allergen}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
+                    <AllergenPicker selected={draft.allergens} onToggle={model.toggleAllergen} />
                     <section className="flex flex-col gap-2.5" aria-labelledby="edit-preparation">
                       <h2 id="edit-preparation" className="text-[18px] font-medium">
                         Preparation
