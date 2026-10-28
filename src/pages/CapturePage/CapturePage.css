@@ -10,6 +10,7 @@
   min-height: 100dvh;
 }
 .capture-layout {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -177,9 +178,12 @@
   flex-shrink: 0;
   align-items: start;
   justify-content: center;
-  gap: 40px;
-  height: 98px;
+  gap: 48px;
+  height: 108px;
   margin-top: 49px;
+}
+.capture-layout[data-saved]:not([data-captured]) .capture-controls {
+  margin-top: 63px;
 }
 .capture-shutter {
   display: grid;
@@ -220,10 +224,10 @@
   color: #faf9f5;
 }
 .capture-action--retake {
-  padding-top: 16px;
+  padding-top: 18px;
 }
 .capture-action--add {
-  padding-top: 8px;
+  padding-top: 0;
   color: #faf9f5;
 }
 .capture-action--add .capture-action-circle {
@@ -232,14 +236,23 @@
   border: 2px solid #faf9f5;
   background: transparent;
 }
+.capture-controls--captured .capture-action-circle {
+  width: 64px;
+  height: 64px;
+}
+.capture-controls--captured .capture-action svg {
+  width: 24px;
+  height: 24px;
+}
 .capture-action--send {
-  width: 72px;
+  width: 64px;
+  padding-top: 18px;
   color: #faf9f5;
   font-weight: 600;
 }
 .capture-action--send .capture-action-circle {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   background: #cc785c;
   color: #fff;
 }
@@ -248,8 +261,8 @@
   height: 30px;
 }
 .capture-send-count {
-  top: 2px;
-  left: 46px;
+  top: -2px;
+  left: 42px;
   background: #faf9f5;
   color: #181715;
 }
@@ -257,6 +270,8 @@
   position: absolute;
   right: 20px;
   top: -27px;
+  width: 72px;
+  padding-top: 0;
   gap: 2px;
   font-size: 10px;
   line-height: 12px;
@@ -298,33 +313,25 @@
   overflow-wrap: anywhere;
   color: #a09d96;
 }
-.capture-dropzone {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 96px;
-  padding: 14px 12px;
-  border: 1px dashed #a09d96;
-  border-radius: 16px;
-  background: #1f1e1b;
+/* Compact upload follows the same proportions as the saved Send control. */
+.capture-upload {
+  position: absolute;
+  top: calc(max(48px, calc(var(--safe-top) + 16px)) + 497px);
+  left: max(16px, calc(50% - 159px));
+  width: 72px;
+  gap: 2px;
+  color: #faf9f5;
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 600;
 }
-.capture-dropzone > svg {
-  color: #a09d96;
+.capture-upload .capture-action-circle {
+  width: 39px;
+  height: 39px;
+  border-radius: 20px;
 }
-.capture-dropzone strong {
-  font-size: 14px;
-  line-height: 14px;
-  font-weight: 500;
-}
-.capture-dropzone > span {
-  color: #a09d96;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 500;
-  text-align: center;
+.capture-layout[data-saved]:not([data-captured]) .capture-upload {
+  top: calc(max(48px, calc(var(--safe-top) + 16px)) + 511px);
 }
 .capture-file-card {
   display: flex;
@@ -554,7 +561,6 @@
 .capture-close,
 .capture-action-circle,
 .capture-shutter,
-.capture-dropzone,
 .capture-review-done,
 .capture-source-picker button {
   transition: transform 100ms var(--ease-out);
@@ -562,7 +568,6 @@
 .capture-close:active,
 .capture-action:active:not(:disabled) .capture-action-circle,
 .capture-shutter:active:not(:disabled),
-.capture-dropzone:active:not(:disabled),
 .capture-review-done:active,
 .capture-source-picker button:active {
   transform: scale(0.97);
@@ -589,7 +594,6 @@
   .capture-close:active,
   .capture-action:active .capture-action-circle,
   .capture-shutter:active,
-  .capture-dropzone:active,
   .capture-review-done:active,
   .capture-source-picker button:active {
     transform: none;
@@ -610,8 +614,5 @@
   }
   .capture-controls {
     gap: 24px;
-  }
-  .capture-dropzone > span {
-    font-size: 11px;
   }
 }

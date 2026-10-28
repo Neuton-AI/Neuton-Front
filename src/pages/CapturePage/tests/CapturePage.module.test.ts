@@ -116,7 +116,30 @@ describe("capture collection", () => {
       "4",
     ]);
   });
-  it("deletes first, middle and final carousel photos without losing a separate current preview", () => {
+  it("reviews every source from the stack, including the current fourth source", () => {
+    const { result } = renderHookWithProviders(() => useCapturePage());
+    act(() =>
+      result.current.onPick([
+        photo("camera.jpg"),
+        makeFile("upload.pdf", "application/pdf"),
+        photo("gallery.png"),
+        photo("current.jpg"),
+      ]),
+    );
+    act(() => result.current.openReview());
+    expect(
+      result.current.reviewSources.map((source) => source.file.name),
+    ).toEqual(["camera.jpg", "upload.pdf", "gallery.png", "current.jpg"]);
+    act(() => result.current.setReviewIndex(3));
+    act(() => result.current.moveSource(result.current.current!.id, -1));
+    expect(result.current.reviewIndex).toBe(2);
+    expect(result.current.reviewSources[2].file.name).toBe("current.jpg");
+    act(() => result.current.deleteSource(result.current.current!.id));
+    expect(result.current.current).toBeNull();
+    expect(result.current.reviewSources).toHaveLength(3);
+    expect(result.current.reviewIndex).toBe(2);
+  });
+  it("deletes saved carousel photos while retaining the current preview in review", () => {
     const { result } = renderHookWithProviders(() => useCapturePage());
     act(() =>
       result.current.onPick([
@@ -135,9 +158,9 @@ describe("capture collection", () => {
     ]);
     expect(result.current.reviewIndex).toBe(1);
     act(() => result.current.deleteSource(result.current.stacked[0].id));
-    expect(result.current.reviewIndex).toBe(0);
+    expect(result.current.reviewIndex).toBe(1);
     act(() => result.current.deleteSource(result.current.stacked[0].id));
-    expect(result.current.reviewIndex).toBeNull();
+    expect(result.current.reviewIndex).toBe(0);
     expect(result.current.current?.file.name).toBe("current");
     expect(result.current.total).toBe(1);
   });

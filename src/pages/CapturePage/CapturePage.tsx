@@ -22,7 +22,11 @@ export const CapturePage: React.FC = () => {
       onPointerDownCapture={() => setInstant(false)}
       onKeyDownCapture={() => setInstant(true)}
     >
-      <div className="capture-layout">
+      <div
+        className="capture-layout"
+        data-captured={Boolean(model.current) || undefined}
+        data-saved={model.stacked.length > 0 || undefined}
+      >
         <CaptureHeader
           disabled={model.busy || model.adding}
           onClose={model.handleClose}
@@ -34,13 +38,13 @@ export const CapturePage: React.FC = () => {
           onSelect={model.setKind}
         />
         <CaptureControls {...model} instant={instant} />
+        {!model.current && <CaptureDropzone {...model} />}
         <div className="capture-feedback" aria-live="polite">
           {model.error && <ErrorState message={model.error} />}
           {model.total >= 4 && !model.busy && (
             <p>4 of 4 sources. Send your document or review to make changes.</p>
           )}
         </div>
-        <CaptureDropzone {...model} />
       </div>
       <CaptureFileInputs {...model} />
       <CaptureSourcePicker {...model} instant={instant} />
