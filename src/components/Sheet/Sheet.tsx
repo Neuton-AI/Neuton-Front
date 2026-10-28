@@ -26,9 +26,13 @@ export function Sheet({ open, onClose, label, children, fillHeight = false }: Pr
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className={`relative flex w-full max-w-shell flex-col bg-surface-canvas pb-[max(var(--safe-bottom),20px)] pt-2 shadow-[0_-12px_40px_rgba(24,23,21,0.28)] animate-[sheet-in_260ms_cubic-bezier(0.32,0.72,0,1)] ${fillHeight ? 'h-[calc(100dvh-56px)] rounded-t-2xl' : 'max-h-[88dvh] rounded-t-[20px]'}`}
+        className={`sheet relative flex w-full max-w-shell flex-col bg-surface-canvas pb-[max(var(--safe-bottom),20px)] shadow-[0_-12px_40px_rgba(24,23,21,0.28)] animate-[sheet-in_260ms_cubic-bezier(0.32,0.72,0,1)] ${fillHeight ? 'h-[calc(100dvh-56px)] rounded-t-2xl' : 'max-h-[88dvh] rounded-t-[20px]'}`}
       >
-        <div className="flex justify-center pb-1" aria-hidden="true">
+        <div
+          data-sheet-drag-handle
+          className="flex shrink-0 cursor-grab justify-center pb-3 pt-3 active:cursor-grabbing"
+          aria-hidden="true"
+        >
           <span className="h-1 w-10 rounded-full bg-hairline" />
         </div>
         {children}

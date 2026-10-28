@@ -203,7 +203,7 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
                 id="recipe-cost-warning"
                 role="note"
                 data-exiting={costWarningExiting}
-                className="recipe-cost-warning pointer-events-none absolute bottom-[calc(100%+19px)] right-0 flex w-[calc(50%-6px)] flex-col items-end"
+                className="recipe-cost-warning pointer-events-none absolute bottom-[calc(100%+0px)] right-0 flex w-[calc(50%-6px)] flex-col items-end"
               >
                 <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-input bg-[#A63B3B] py-2 pl-2.5 pr-3 text-label font-semibold text-white">
                   <VerificationStatusIcon verified={false} className="h-4 w-4 shrink-0" />

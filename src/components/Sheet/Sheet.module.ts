@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSheetDrag } from './useSheetDrag';
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -9,6 +10,7 @@ type Props = {
 };
 export function useSheet({ open, onClose }: Props) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  useSheetDrag(sheetRef, open, onClose);
 
   useEffect(() => {
     if (!open) return;
