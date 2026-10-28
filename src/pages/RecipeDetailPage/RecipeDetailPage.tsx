@@ -1,4 +1,5 @@
 import { Sheet, SheetBadge, SheetSection } from '@/components/Sheet/Sheet';
+import { DocumentSources } from '@/components/DocumentSources/DocumentSources';
 import { VerificationStatus, VerificationStatusIcon } from '@/components/VerificationStatus';
 import { ErrorState, InlineNotice, Skeleton } from '@/components/feedback';
 import { IconBox, IconEdit, IconTrash } from '@/components/icons';
@@ -185,6 +186,15 @@ export function RecipeDetailView({ model }: { model: RecipeDetailPageModel }) {
                 </ol>
               )}
             </SheetSection>
+            {recipe.sources?.length ? (
+              <SheetSection title="Original scans">
+                <DocumentSources
+                  token={model.token}
+                  shopId={model.activeShopId}
+                  sources={recipe.sources}
+                />
+              </SheetSection>
+            ) : null}
           </>
         ) : !error ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center">

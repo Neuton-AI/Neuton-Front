@@ -4,7 +4,7 @@ import { IconEdit, IconReceipt, IconTrash } from '@/components/icons';
 import { formatDate, formatMoney, formatQuantity } from '@/lib/format';
 import { useReceiptDetailPage } from './ReceiptDetailPage.module';
 import { ReceiptDetailStatus, ReceiptStatusIcon } from './ReceiptDetailStatus';
-import { SignedScan } from './SignedScan/SignedScan';
+import { DocumentSources } from '@/components/DocumentSources/DocumentSources';
 import { ReceiptMerchantEditor } from './ReceiptMerchantEditor';
 
 const actionClassName =
@@ -136,25 +136,29 @@ export function ReceiptDetailPage() {
             </section>
             <div className="shrink-0">
               <SheetSection title="Original scan">
-                {receipt.originalFilename ? (
-                  <p className="break-all text-label text-ink-muted">{receipt.originalFilename}</p>
-                ) : null}
-                <div className="flex h-[150px] items-center justify-center overflow-hidden rounded-card bg-surface-cream-strong">
-                  {receipt.storagePath ? (
-                    <SignedScan
-                      token={token}
-                      shopId={activeShopId}
-                      storagePath={receipt.storagePath}
-                      contentType={receipt.contentType}
-                      filename={receipt.originalFilename}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 px-6 text-center">
-                      <IconReceipt className="h-7 w-7 text-ink-muted-soft" />
-                      <p className="text-label text-ink-muted">No original scan is available.</p>
-                    </div>
-                  )}
-                </div>
+                {receipt.sources?.length || receipt.storagePath ? (
+                  <DocumentSources
+                    token={token}
+                    shopId={activeShopId}
+                    sources={
+                      receipt.sources?.length
+                        ? receipt.sources
+                        : [
+                            {
+                              sourceId: receipt.id,
+                              storagePath: receipt.storagePath!,
+                              contentType: receipt.contentType ?? 'image/jpeg',
+                              originalFilename: receipt.originalFilename,
+                            },
+                          ]
+                    }
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 px-6 text-center">
+                    <IconReceipt className="h-7 w-7 text-ink-muted-soft" />
+                    <p className="text-label text-ink-muted">No original scan is available.</p>
+                  </div>
+                )}
               </SheetSection>
             </div>
           </>

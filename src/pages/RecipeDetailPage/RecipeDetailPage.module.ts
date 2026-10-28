@@ -138,6 +138,8 @@ export function useRecipeDetailPage() {
     openEditor(ingredient);
   };
   return {
+    token,
+    activeShopId,
     edit,
     recipe,
     verifyError,

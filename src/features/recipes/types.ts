@@ -1,3 +1,5 @@
+import type { DocumentSource } from '@/features/uploads/types';
+
 export type RecipeStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 
 export type RecipeIngredient = {
@@ -92,6 +94,7 @@ export type RecipeCosting = {
 };
 
 export type Recipe = {
+  sources?: DocumentSource[];
   id: string;
   shopId: string;
   name: string;

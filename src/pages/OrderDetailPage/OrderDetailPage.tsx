@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
+import { DocumentSources } from '@/components/DocumentSources/DocumentSources';
 import { Sheet, SheetBadge, SheetSection } from '@/components/Sheet/Sheet';
 import { ErrorState, InlineNotice, Skeleton } from '@/components/feedback';
 import { IconPin } from '@/components/icons';
@@ -9,6 +10,8 @@ import { useOrderDetailPage } from './OrderDetailPage.module';
 
 export function OrderDetailPage() {
   const {
+    token,
+    activeShopId,
     distanceFee,
     shop,
     order,
@@ -142,6 +145,11 @@ export function OrderDetailPage() {
               </div>
             </SheetSection>
 
+            {order.sources?.length ? (
+              <SheetSection title="Original scans">
+                <DocumentSources token={token} shopId={activeShopId} sources={order.sources} />
+              </SheetSection>
+            ) : null}
             {order.documentUrl ? (
               <a
                 href={order.documentUrl}

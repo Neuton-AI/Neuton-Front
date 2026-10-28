@@ -106,6 +106,8 @@ export function useOrderDetailPage() {
   const deleteOrderPending = deleteOrder.isPending;
   const distanceFee = toNumber(order?.deliveryDistanceKm) * toNumber(shop?.deliveryRatePerKm);
   return {
+    token,
+    activeShopId,
     distanceFee,
     shop,
     order,
