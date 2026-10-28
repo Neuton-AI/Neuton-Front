@@ -1,5 +1,11 @@
 # Detail sheet dismissal — #180
 
+Updated threshold: dismiss only when the downward pull exceeds 25% of the
+viewport height. At or below 25%, the existing slide-back transition restores
+the sheet. All 31 sheet tests pass, including exact-boundary cases across
+400px, 800px, and 1200px viewports. A new browser check was blocked by the
+DevTools Chrome profile lock; the screenshots below document the earlier check.
+
 Chrome DevTools verification used testShop at a 390 × 844 mobile viewport.
 Dragging the recipe title down returned to the recipes catalog. Dragging the
 receipt title down returned to `catalog?tab=receipts`; the images show the

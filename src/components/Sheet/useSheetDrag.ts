@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 
-const DISMISS_DISTANCE = 80;
+const DISMISS_VIEWPORT_FRACTION = 0.25;
 const DIRECTION_DISTANCE = 8;
 
 /** Keep native scrolling until a deliberate downward pull claims the gesture. */
@@ -59,7 +59,8 @@ export function useSheetDrag(ref: RefObject<HTMLDivElement>, open: boolean, onCl
       sheet.style.setProperty('--sheet-drag-y', `${gesture.distance}px`);
     };
     const finish = () => {
-      const dismiss = gesture && gesture.dragging && gesture.distance >= DISMISS_DISTANCE;
+      const dismiss =
+        gesture && gesture.dragging && gesture.distance > window.innerHeight * DISMISS_VIEWPORT_FRACTION;
       reset();
       if (dismiss) onClose();
     };

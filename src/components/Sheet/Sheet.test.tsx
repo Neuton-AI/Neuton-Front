@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
  */
 
 describe('Sheet', () => {
-  function swipe(target: Element, x = 0, y = 120) {
+  function swipe(target: Element, x = 0, y = window.innerHeight * 0.25 + 1) {
     fireEvent.touchStart(target, {
       touches: [{ identifier: 1, clientX: 100, clientY: 100 }],
     });
@@ -39,6 +39,23 @@ describe('Sheet', () => {
     );
     return { onClose, content: screen.getByTestId('scroll-content') };
   }
+
+  it.each([
+    [400, 99, false],
+    [400, 100, false],
+    [400, 101, true],
+    [800, 199, false],
+    [800, 200, false],
+    [800, 201, true],
+    [1200, 250, false],
+    [1200, 301, true],
+  ])('uses more than 25%% of a %ipx viewport for a %ipx pull', (height, distance, dismiss) => {
+    vi.stubGlobal('innerHeight', height);
+    const { onClose, content } = renderDraggable();
+    swipe(content, 0, distance);
+    expect(onClose).toHaveBeenCalledTimes(dismiss ? 1 : 0);
+    expect(screen.getByRole('dialog').style.getPropertyValue('--sheet-drag-y')).toBe('0px');
+  });
 
   it('dismisses when content is swiped down from the top', () => {
     const { onClose } = renderDraggable();
@@ -138,9 +155,10 @@ describe('Sheet', () => {
 
   it('dismisses with a mouse drag released outside the sheet', () => {
     const { onClose, content } = renderDraggable();
+    const endY = 100 + window.innerHeight * 0.25 + 1;
     fireEvent.mouseDown(content, { button: 0, clientX: 100, clientY: 100 });
-    fireEvent.mouseMove(window, { clientX: 100, clientY: 220 });
-    fireEvent.mouseUp(window, { clientX: 100, clientY: 220 });
+    fireEvent.mouseMove(window, { clientX: 100, clientY: endY });
+    fireEvent.mouseUp(window, { clientX: 100, clientY: endY });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
