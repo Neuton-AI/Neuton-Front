@@ -1,5 +1,9 @@
 import { analyticsKeys } from '@/features/analytics/keys';
-import type { ManualProduct, ManualProductInput, ManualProductUsage } from './types';
+import type {
+  ManualProduct,
+  ManualProductInput,
+  ManualProductUsage,
+} from './types';
 import { type OrderableRecipe } from '@/features/orders/types';
 import { recipesKeys } from '@/features/recipes/keys';
 import {
@@ -33,13 +37,6 @@ export function useRecipes(
         signal,
       }),
     enabled: enabled(token, shopId) && active,
-    refetchInterval: (query) => {
-      const recipes = query.state.data?.recipes ?? [];
-      const processing = recipes.some(
-        (recipe) => recipe.status === 'pending' || recipe.status === 'processing',
-      );
-      return processing ? 3000 : false;
-    },
   });
 }
 
@@ -53,12 +50,6 @@ export function useRecipe(
     queryFn: ({ signal }) =>
       apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, { token, shopId, signal }),
     enabled: enabled(token, shopId) && Boolean(id),
-    // The worker keeps writing extraction rows while a recipe is pending, so
-    // poll only in that window and stop the moment it lands anywhere else.
-    refetchInterval: (query) => {
-      const status = query.state.data?.recipe.status;
-      return status === 'pending' || status === 'processing' ? 3000 : false;
-    },
   });
 }
 

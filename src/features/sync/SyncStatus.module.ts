@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   supabase,
@@ -10,6 +9,7 @@ import { syncDocuments, syncActivity } from './engine';
 import { errorsFor, type SyncError } from './errors';
 import * as store from './store';
 import { scopeFor } from './types';
+import { connectLiveSync, createSyncScheduler } from './liveSync';
 
 const label = (value: string) =>
   value === 'metadata-check'
@@ -28,7 +28,6 @@ export function useSyncStatus() {
   const { token, user } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const client = useQueryClient();
-  const location = useLocation();
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [online, setOnline] = useState(navigator.onLine);
   const [opened, setOpened] = useState(false);
@@ -120,15 +119,22 @@ export function useSyncStatus() {
         refreshing = false;
       }
     };
-    const sync = () => {
+    const scheduler = createSyncScheduler(async () => {
+      if (!active) return;
       setOnline(navigator.onLine);
-      void syncDocuments(scope, { token, shopId: activeShopId })
-        .catch(() => undefined)
-        .finally(() => {
-          if (!active) return;
-          void refresh();
-        });
-    };
+      await syncDocuments(scope, { token, shopId: activeShopId });
+      if (active) await refresh();
+      if (
+        active &&
+        navigator.onLine &&
+        (await errorsFor(scope.key)).some(
+          (row) => row.state === 'unresolved' && row.retryable,
+        )
+      )
+        throw new Error('Synchronization is waiting for its retry backoff');
+    });
+    const sync = () => scheduler.request();
+    const disconnect = connectLiveSync({ token, shopId: activeShopId }, sync);
     const unsubscribe = store.subscribe(() => {
       void refresh();
     });
@@ -142,13 +148,15 @@ export function useSyncStatus() {
     window.addEventListener('focus', sync);
     return () => {
       active = false;
+      scheduler.stop();
+      disconnect();
       unsubscribe();
       clearInterval(displayTimer);
       window.removeEventListener('online', sync);
       window.removeEventListener('offline', sync);
       window.removeEventListener('focus', sync);
     };
-  }, [token, activeShopId, client, location.pathname]);
+  }, [token, activeShopId, client]);
   if (!token || !activeShopId) return null;
   const current = snapshot?.scope === scopeKey ? snapshot : undefined;
   const errors = current?.errors ?? [];
@@ -156,9 +164,9 @@ export function useSyncStatus() {
     current?.activity?.completedAt &&
     !current?.activity?.running &&
     Date.now() - current.activity.completedAt < 8000;
-  if (!errors.length && online && !succeeded && !localMessage)
-    return null;
-  const tone: 'error' | 'success' = errors.length || localMessage || !online ? 'error' : 'success';
+  if (!errors.length && online && !succeeded && !localMessage) return null;
+  const tone: 'error' | 'success' =
+    errors.length || localMessage || !online ? 'error' : 'success';
   const first = errors[0];
   const message =
     localMessage ||

@@ -21,6 +21,7 @@ import {
   type UIEvent,
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { mergeDraft } from "@/features/sync/merge";
 
 type IngredientDraft = {
   key: string;
@@ -92,6 +93,8 @@ export function useRecipeEditPage() {
   const [editingPhoto, setEditingPhoto] = useState(false);
   const [allergenResetKey, setAllergenResetKey] = useState(0);
   const initialized = useRef("");
+  const baseDraft = useRef<Draft | null>(null);
+  const [conflicts, setConflicts] = useState<string[]>([]);
   const nextKey = useRef(0);
   const scanRequest = useRef(0);
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -121,9 +124,27 @@ export function useRecipeEditPage() {
 
   useEffect(() => {
     const context = `${activeShopId}:${id}`;
-    if (!recipe || initialized.current === context) return;
+    if (!recipe) return;
+    const incoming = recipeDraft(recipe);
+    if (initialized.current === context) {
+      const base = baseDraft.current;
+      if (base)
+        setDraft((current) => {
+          if (!current) return incoming;
+          const merged = mergeDraft(base, current, incoming);
+          if (merged.conflicts.length)
+            setConflicts((previous) => [
+              ...new Set([...previous, ...merged.conflicts]),
+            ]);
+          return merged.data;
+        });
+      baseDraft.current = incoming;
+      return;
+    }
     initialized.current = context;
-    setDraft(recipeDraft(recipe));
+    baseDraft.current = incoming;
+    setDraft(incoming);
+    setConflicts([]);
     setPage(0);
     setError(null);
     setScanKey(null);
@@ -353,6 +374,10 @@ export function useRecipeEditPage() {
 
   async function save() {
     if (!draft || !canManage || !token || !activeShopId || busy) return;
+    if (conflicts.length) {
+      setError("Resolve the competing changes before saving.");
+      return;
+    }
     setError(null);
     if (
       !draft.name.trim() ||
@@ -428,6 +453,8 @@ export function useRecipeEditPage() {
     if (!recipe || busy) return;
     closeScanner();
     setDraft(recipeDraft(recipe));
+    baseDraft.current = recipeDraft(recipe);
+    setConflicts([]);
     setAllergenResetKey((current) => current + 1);
     setError(null);
     setEditingPhoto(false);
@@ -473,6 +500,18 @@ export function useRecipeEditPage() {
   }
 
   return {
+    conflicts,
+    resolveConflict: (field: string, choice: "local" | "server") => {
+      if (choice === "server" && baseDraft.current) {
+        const incoming = baseDraft.current;
+        setDraft((current) =>
+          current
+            ? { ...current, [field]: incoming[field as keyof Draft] }
+            : current,
+        );
+      }
+      setConflicts((current) => current.filter((key) => key !== field));
+    },
     draft,
     recipe,
     page,

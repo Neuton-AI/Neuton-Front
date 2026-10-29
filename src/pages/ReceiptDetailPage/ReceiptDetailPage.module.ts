@@ -46,9 +46,7 @@ export function useReceiptDetailPage() {
 
   const canVerify = role === "owner" || role === "admin";
 
-  // Polling while the worker is still chewing is baked into the query hook:
-  // only `processing` keeps a quiet 3s refetch. `unverified` is terminal for
-  // the worker — it hands over to a human and stops — so it never polls.
+  // Worker updates arrive through the shop event stream and refresh local queries.
 
   /**
    * Accepts every extracted line as the reviewer read it and lets the server do

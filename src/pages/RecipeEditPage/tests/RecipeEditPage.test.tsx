@@ -2,8 +2,9 @@ import { authState, resetAuth } from "@/test/auth";
 import { buildRecipe } from "@/test/factories/recipes.factory";
 import { apiPath } from "@/test/mocks/handlers/context";
 import { server } from "@/test/mocks/server";
-import { renderWithRouter } from "@/test/render";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { createTestQueryClient, renderWithRouter } from "@/test/render";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { recipesKeys } from "@/features/recipes/keys";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router-dom";
@@ -165,7 +166,8 @@ function renderEditor(allergens: string[] | null = null) {
   server.use(
     http.get(apiPath("/recipes/rp-1"), () => HttpResponse.json({ recipe })),
   );
-  return renderWithRouter(
+  const queryClient = createTestQueryClient();
+  const view = renderWithRouter(
     <Routes>
       <Route path="/catalog/recipes/:id/edit" element={<RecipeEditPage />} />
       <Route
@@ -174,9 +176,39 @@ function renderEditor(allergens: string[] | null = null) {
       />
       <Route path="/catalog" element={<h1>Catalog destination</h1>} />
     </Routes>,
-    { route: "/catalog/recipes/rp-1/edit?ingredient=ingredient-1" },
+    {
+      route: "/catalog/recipes/rp-1/edit?ingredient=ingredient-1",
+      queryClient,
+    },
   );
+  return { ...view, queryClient, recipe };
 }
+
+it("keeps an unsaved name, adopts untouched fields and requires explicit conflict resolution", async () => {
+  const user = userEvent.setup();
+  const editor = renderEditor();
+  const name = await screen.findByRole("textbox", { name: "RECIPE NAME" });
+  await user.clear(name);
+  await user.type(name, "My unsaved name");
+  await act(async () =>
+    editor.queryClient.setQueryData(recipesKeys.recipe("shop-1", "rp-1"), {
+      recipe: {
+        ...editor.recipe,
+        name: "Another device name",
+        yieldQuantity: 9,
+      },
+    }),
+  );
+  expect(name).toHaveValue("My unsaved name");
+  expect(
+    await screen.findByText("name changed elsewhere while you were editing."),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Use server change" }));
+  expect(name).toHaveValue("Another device name");
+  expect(
+    screen.queryByText("name changed elsewhere while you were editing."),
+  ).toBeNull();
+});
 
 it("shows only known allergens and adds filtered suggestions without duplicates", async () => {
   const user = userEvent.setup();

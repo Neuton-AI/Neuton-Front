@@ -55,8 +55,6 @@ export async function documentFetch<T>(
           ?.message ?? 'Sync failed',
       );
     }
-  } else {
-    void syncDocuments(scope, context).catch(() => undefined);
   }
   const records = (await store.documents(scope.key)).filter(
     (row) => row.kind === kind && !row.deleted,
@@ -131,6 +129,8 @@ async function mutate<T>(
       };
       docs.put({
         ...old,
+        serverVersion: old.serverVersion ?? old.updatedAt,
+        serverData: old.serverData ?? old.data,
         data,
         deleted,
         updatedAt,
@@ -147,6 +147,7 @@ async function mutate<T>(
         method: context.method,
         operation,
         body: context.body,
+        baseVersion: old.updatedAt,
       } satisfies PendingWrite);
       response = deleted
         ? { ok: true, mode: 'soft' }

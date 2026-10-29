@@ -8,7 +8,12 @@ import { act } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { receiptsKeys } from './keys';
-import { useDeleteReceipt, useReceipt, useReceipts, useVerifyReceipt } from './receiptsApi';
+import {
+  useDeleteReceipt,
+  useReceipt,
+  useReceipts,
+  useVerifyReceipt,
+} from './receiptsApi';
 
 describe('receipts API contracts', () => {
   it('does not request an inactive list or an unidentified detail', () => {
@@ -17,7 +22,7 @@ describe('receipts API contracts', () => {
     expect(list.result.current.fetchStatus).toBe('idle');
     expect(detail.result.current.fetchStatus).toBe('idle');
   });
-  it('polls processing receipts and stops at human review', async () => {
+  it('updates processing receipts on invalidation without periodic polling', async () => {
     vi.useFakeTimers();
     let calls = 0;
     server.use(
@@ -28,10 +33,19 @@ describe('receipts API contracts', () => {
         });
       }),
     );
-    const { result } = renderHookWithProviders(() => useReceipt('token-1', 'shop-1', 'rc-1'));
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useReceipt('token-1', 'shop-1', 'rc-1'),
+    );
     await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.receipt.status).toBe('processing');
     await act(() => vi.advanceTimersByTimeAsync(3020));
+    expect(calls).toBe(1);
+    await act(() =>
+      queryClient.invalidateQueries({
+        queryKey: receiptsKeys.receipt('shop-1', 'rc-1'),
+      }),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.receipt.status).toBe('unverified');
     await act(() => vi.advanceTimersByTimeAsync(6000));
     expect(calls).toBe(2);
@@ -41,12 +55,16 @@ describe('receipts API contracts', () => {
     server.use(
       http.post(apiPath('/receipts/rc-1/verify'), async ({ request }) => {
         body = await request.json();
-        return requireContext(request) ?? HttpResponse.json({ status: 'verified' });
+        return (
+          requireContext(request) ?? HttpResponse.json({ status: 'verified' })
+        );
       }),
     );
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
-    client.setQueryData(receiptsKeys.receipt('shop-1', 'rc-1'), { receipt: buildReceiptDetail() });
+    client.setQueryData(receiptsKeys.receipt('shop-1', 'rc-1'), {
+      receipt: buildReceiptDetail(),
+    });
     client.setQueryData(receiptsKeys.receipts('shop-1'), {});
     client.setQueryData(inventoryKeys.inventory('shop-1'), {});
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
@@ -59,11 +77,16 @@ describe('receipts API contracts', () => {
     expect(client.getQueryData(receiptsKeys.receipt('shop-1', 'rc-1'))).toEqual({
       receipt: { ...buildReceiptDetail(), status: 'verified' },
     });
-    expect(client.getQueryState(receiptsKeys.receipts('shop-1'))?.isInvalidated).toBe(true);
-    expect(client.getQueryState(inventoryKeys.inventory('shop-1'))?.isInvalidated).toBe(true);
-    expect(client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))?.isInvalidated).toBe(
-      true,
-    );
+    expect(
+      client.getQueryState(receiptsKeys.receipts('shop-1'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(inventoryKeys.inventory('shop-1'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
+        ?.isInvalidated,
+    ).toBe(true);
     client.clear();
   });
   it('removes deleted detail and invalidates receipt and inventory lists', async () => {
@@ -90,4 +113,6 @@ describe('receipts API contracts', () => {
 });
 
 // Domain hook contracts use the network adapter; persistent synchronization has its own integration suite.
-vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
+vi.mock('@/features/sync/documentsApi', async () => ({
+  documentFetch: (await import('@/lib/api')).apiFetch,
+}));

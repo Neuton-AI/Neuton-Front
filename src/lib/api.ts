@@ -35,7 +35,8 @@ type RequestOptions = {
   token?: string | null;
   shopId?: string | null;
   signal?: AbortSignal;
-  sync?: { id: string; updatedAt: number };
+  syncSnapshot?: boolean;
+  sync?: { id: string; updatedAt: number; baseVersion?: number };
 };
 
 /**
@@ -75,15 +76,18 @@ function readError(
 
 export async function apiFetch<T>(
   path: string,
-  { method = 'GET', body, token, shopId, signal, sync }: RequestOptions = {},
+  { method = 'GET', body, token, shopId, signal, sync, syncSnapshot }: RequestOptions = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   if (shopId) headers['x-shop-id'] = shopId;
+  if (syncSnapshot) headers['x-sync-snapshot'] = 'true';
   if (sync) {
     headers['x-sync-id'] = sync.id;
     headers['x-sync-version'] = String(sync.updatedAt);
+    if (sync.baseVersion !== undefined)
+      headers['x-sync-base-version'] = String(sync.baseVersion);
   }
   const traceId = faro.api.getTraceContext()?.trace_id;
   if (traceId) headers['x-trace-id'] = traceId;

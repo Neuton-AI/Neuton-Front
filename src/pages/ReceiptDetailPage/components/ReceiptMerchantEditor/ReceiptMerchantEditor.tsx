@@ -13,8 +13,16 @@ interface IReceiptMerchantEditor extends MerchantEditorProps {
 export const ReceiptMerchantEditor: React.FC<IReceiptMerchantEditor> = ({
   ...props
 }) => {
-  const { name, setName, error, save, pending, disabled } =
-    useReceiptMerchantEditor(props);
+  const {
+    name,
+    setName,
+    error,
+    save,
+    pending,
+    disabled,
+    conflict,
+    resolveConflict,
+  } = useReceiptMerchantEditor(props);
   return (
     <form
       onSubmit={(event) => void save(event)}
@@ -31,6 +39,25 @@ export const ReceiptMerchantEditor: React.FC<IReceiptMerchantEditor> = ({
           autoComplete="organization"
         />
       </Field>
+      {conflict && (
+        <div role="status">
+          Merchant name changed elsewhere.
+          <button
+            type="button"
+            className="mx-2 underline"
+            onClick={() => resolveConflict("local")}
+          >
+            Keep my change
+          </button>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => resolveConflict("server")}
+          >
+            Use server change
+          </button>
+        </div>
+      )}
       <Button
         type="submit"
         size="sm"
