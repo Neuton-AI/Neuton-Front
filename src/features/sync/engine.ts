@@ -5,6 +5,8 @@ import {
   type UploadSession,
 } from '@/features/uploads/uploadSources';
 import * as store from './store';
+import { mergeDraft } from './merge';
+import { rebaseBody } from './rebaseBody';
 import {
   errorsFor,
   recordError,
@@ -19,6 +21,7 @@ import {
   type LocalDocument,
   type PendingPull,
   type PendingScan,
+  type PendingWrite,
   type Scope,
 } from './types';
 
@@ -26,6 +29,7 @@ type Meta = { kind: Kind; id: string; updatedAt: number; deleted?: boolean };
 type Comparison = { toPush: Meta[]; toPull: Meta[] };
 const plural = { receipt: 'receipts', recipe: 'recipes', order: 'orders' };
 const running = new Map<string, Promise<void>>();
+const rerun = new Set<string>();
 export const syncActivity = new Map<
   string,
   {
@@ -50,13 +54,17 @@ export function syncDocuments(
     !authenticatedTokens.has(scope.key) ||
     authenticatedTokens.get(scope.key) !== context.token;
   authenticatedTokens.set(scope.key, context.token);
-  const run = synchronize(
-    scope,
-    // A caller may be saving a PATCH; sync downloads must start as GETs.
-    { token: context.token, shopId: context.shopId },
-    options.force ?? false,
-    reauthenticated,
-  ).finally(() => {
+  const run = (async () => {
+    do {
+      await synchronize(
+        scope,
+        // A caller may be saving a PATCH; sync downloads must start as GETs.
+        { token: context.token, shopId: context.shopId },
+        options.force ?? false,
+        reauthenticated,
+      );
+    } while (rerun.delete(scope.key));
+  })().finally(() => {
     running.delete(scope.key);
     const activity = syncActivity.get(scope.key);
     if (activity) syncActivity.set(scope.key, { ...activity, running: false });
@@ -198,20 +206,42 @@ async function transfer(
     const compare = async () => {
       const local = await store.documents(scope.key);
       comparedVersions = new Map(local.map((row) => [row.key, row.updatedAt]));
-      return apiFetch<Comparison>('/sync/check', {
-        ...context,
-        method: 'POST',
-        body: {
-          documents: local
-            .filter((row) => !row.localOnly)
-            .map(({ kind, id, updatedAt, deleted }) => ({
-              kind,
-              id,
-              updatedAt,
-              deleted,
-            })),
-        },
-      });
+      const metadataRows = local.filter((row) => !row.localOnly);
+      const known = new Set(metadataRows.map((row) => `${row.kind}:${row.id}`));
+      const toPull = new Map<string, Meta>(),
+        toPush = new Map<string, Meta>();
+      for (
+        let offset = 0;
+        offset < Math.max(1, metadataRows.length);
+        offset += 20000
+      ) {
+        const chunk = metadataRows.slice(offset, offset + 20000);
+        const included = new Set(chunk.map((row) => `${row.kind}:${row.id}`));
+        const result = await apiFetch<Comparison>('/sync/check', {
+          ...context,
+          method: 'POST',
+          body: {
+            documents: chunk.map(
+              ({ kind, id, updatedAt, deleted, serverVersion }) => ({
+                kind,
+                id,
+                updatedAt,
+                deleted,
+                ...(serverVersion === undefined
+                  ? {}
+                  : { baseUpdatedAt: serverVersion }),
+              }),
+            ),
+          },
+        });
+        for (const meta of result.toPush)
+          toPush.set(`${meta.kind}:${meta.id}`, meta);
+        for (const meta of result.toPull) {
+          const key = `${meta.kind}:${meta.id}`;
+          if (included.has(key) || !known.has(key)) toPull.set(key, meta);
+        }
+      }
+      return { toPush: [...toPush.values()], toPull: [...toPull.values()] };
     };
     let comparison: Comparison = { toPush: [], toPull: [] };
     if (
@@ -238,15 +268,21 @@ async function transfer(
     let acknowledged = false;
     const failedDocuments = new Set<string>();
     for (const write of pending) {
+      const document = await store.get<LocalDocument>(
+        'documents',
+        write.documentKey,
+      );
+      if (document?.conflicts?.length || document?.remoteDeleted) continue;
       if (
-        pullKeys.has(write.documentKey) ||
+        (pullKeys.has(write.documentKey) && write.baseVersion === undefined) ||
         failedDocuments.has(write.documentKey) ||
         write.updatedAt > (comparedVersions.get(write.documentKey) ?? 0)
       )
         continue;
       const identity = writeContext(scope, write);
       // An equal revision already exists remotely, including a successful push whose response was lost.
-      if (pushKeys.has(write.documentKey)) {
+      if (pushKeys.has(write.documentKey) || write.baseVersion !== undefined) {
+        let conflicted = false;
         const pushed = await attempt(identity, async () => {
           const response = await apiFetch<
             { syncConflict?: boolean } | undefined
@@ -254,11 +290,19 @@ async function transfer(
             ...context,
             method: write.method,
             body: write.body,
-            sync: { id: write.id, updatedAt: write.updatedAt },
+            sync: {
+              id: write.id,
+              updatedAt: write.updatedAt,
+              baseVersion: write.baseVersion,
+            },
           });
           // The server's version negotiation is a successful protocol response, not a rejected edit.
-          if (response?.syncConflict) return;
+          if (response?.syncConflict) conflicted = true;
         });
+        if (conflicted) {
+          failedDocuments.add(write.documentKey);
+          continue;
+        }
         if (!pushed) {
           failedDocuments.add(write.documentKey);
           continue;
@@ -268,13 +312,20 @@ async function transfer(
       const saved = await attempt(
         { ...identity, phase: 'local-persistence' },
         async () => {
-          await store.transaction(['writes', 'documents', 'pulls'], async (tx) => {
-            const current = await store.result(
-              tx.objectStore('documents').get(write.documentKey),
-            ) as LocalDocument | undefined;
-            // Recipe PATCH returns the saved row without calculated ingredient costs.
-            // Fetch the enriched detail even when revision negotiation now reports equality.
-            if (current?.kind === 'recipe' && !current.deleted &&
+          await store.transaction(
+            ['writes', 'documents', 'pulls'],
+            async (tx) => {
+              const current = (await store.result(
+                tx.objectStore('documents').get(write.documentKey),
+              )) as LocalDocument | undefined;
+              if (current)
+                tx.objectStore('documents').put({
+                  ...current,
+                  serverVersion: write.updatedAt,
+                });
+              // Recipe PATCH returns the saved row without calculated ingredient costs.
+              // Fetch the enriched detail even when revision negotiation now reports equality.
+              if (current?.kind === 'recipe' && !current.deleted &&
                 write.method === 'PATCH') {
               tx.objectStore('pulls').put({
                 key: current.key,
@@ -284,8 +335,9 @@ async function transfer(
                 updatedAt: write.updatedAt,
               } satisfies PendingPull);
             }
-            tx.objectStore('writes').delete(write.key);
-          });
+              tx.objectStore('writes').delete(write.key);
+            },
+          );
         },
       );
       if (!saved) {
@@ -337,6 +389,7 @@ async function transfer(
           revision: meta.updatedAt,
         },
         () => pull(scope, context, meta),
+        false,
       );
     }
     await store.transaction(['documents', 'settings', 'writes'], async (tx) => {
@@ -384,11 +437,12 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
   let deleted = Boolean(meta.deleted);
   if (!deleted) {
     try {
-      const response = await apiFetch<Record<string, LocalDocument['data']>>(
+      const response = await apiFetch<Record<string, LocalDocument['data']> & { syncVersion?: number }>(
         `/${plural[meta.kind]}/${meta.id}`,
-        context,
+        { ...context, syncSnapshot: true },
       );
       data = response[meta.kind];
+      if (response.syncVersion !== undefined) meta = { ...meta, updatedAt: response.syncVersion };
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) deleted = true;
       else throw error;
@@ -403,6 +457,70 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
         LocalDocument | undefined;
       tx.objectStore('pulls').delete(key);
       const placeholder = current?.localOnly === true;
+      const writes = (await store.result(
+        tx.objectStore('writes').index('scope').getAll(scope.key),
+      )) as PendingWrite[];
+      const pending = writes.filter((write) => write.documentKey === key);
+      if (current && pending.length) {
+        const base = current.serverData;
+        const merged = base
+          ? mergeDraft(base, current.data, data)
+          : { data: current.data, conflicts: ['$document'] };
+        const conflicts = new Set([
+          ...(current.conflicts ?? []),
+          ...merged.conflicts.filter((field) => field !== 'updatedAt'),
+        ]);
+        if (deleted) conflicts.add('$deleted');
+        // Complex domain commands must be reviewed rather than replayed against a changed document.
+        if (
+          pending.some(
+            (write) =>
+              write.method !== 'PATCH' ||
+              /\/(verify|deliver)$/.test(write.path),
+          )
+        )
+          conflicts.add('$document');
+        // A changed server document is rebased atomically with the durable queue.
+        let rebasedVersion = current.updatedAt;
+        if (!conflicts.size && current.serverVersion !== meta.updatedAt) {
+          let revision = Math.max(
+            Date.now(),
+            meta.updatedAt + 1,
+            current.updatedAt + 1,
+          );
+          let baseVersion = meta.updatedAt;
+          for (const write of pending.sort(
+            (a, b) => a.updatedAt - b.updatedAt,
+          )) {
+            const body = rebaseBody(write.body, merged.data);
+            tx.objectStore('writes').delete(write.key);
+            const id = crypto.randomUUID();
+            tx.objectStore('writes').put({
+              ...write,
+              key: id,
+              id,
+              body,
+              updatedAt: revision,
+              baseVersion,
+            });
+            baseVersion = revision++;
+          }
+          rebasedVersion = revision - 1;
+          rerun.add(scope.key);
+        }
+        docs.put({
+          ...current,
+          data: merged.data,
+          serverData: data,
+          serverVersion: meta.updatedAt,
+          updatedAt: rebasedVersion,
+          conflicts: [...conflicts],
+          remoteDeleted: deleted,
+          syncStatus: 'pending-push',
+        } satisfies LocalDocument);
+        updated = true;
+        return;
+      }
       if (
         current &&
         !placeholder &&
@@ -427,11 +545,10 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
         deleted,
         syncStatus: 'synced',
         lastSyncedAt: Date.now(),
+        serverVersion: meta.updatedAt,
+        serverData: data,
       } satisfies LocalDocument);
       const queue = tx.objectStore('writes');
-      const writes = (await store.result(
-        queue.index('scope').getAll(scope.key),
-      )) as { key: string; documentKey: string; updatedAt: number }[];
       for (const write of writes)
         if (
           write.documentKey === key &&

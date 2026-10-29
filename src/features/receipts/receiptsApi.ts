@@ -39,18 +39,24 @@ export function useReceipt(
   return useQuery({
     queryKey: receiptsKeys.receipt(shopId, id),
     queryFn: ({ signal }) =>
-      apiFetch<{ receipt: ReceiptDetail }>(`/receipts/${id}`, { token, shopId, signal }),
+      apiFetch<{ receipt: ReceiptDetail }>(`/receipts/${id}`, {
+        token,
+        shopId,
+        signal,
+      }),
     enabled: enabled(token, shopId) && Boolean(id),
-    // Only a receipt the worker is still chewing on gains lines asynchronously.
-    // `unverified` hands over to a human, so polling it would just spin.
-    refetchInterval: (query) => (query.state.data?.receipt.status === 'processing' ? 3000 : false),
+    // The shop event stream refreshes processing and review states alike.
   });
 }
 
 export function useVerifyReceipt(
   token: Token,
   shopId: ShopId,
-): UseMutationResult<VerifyReceiptOutcome, Error, { id: string; body: VerifyReceiptBody }> {
+): UseMutationResult<
+  VerifyReceiptOutcome,
+  Error,
+  { id: string; body: VerifyReceiptBody }
+> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }) =>
@@ -105,7 +111,11 @@ export function useDeleteReceipt(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }) =>
-      apiFetch<{ ok: true }>(`/receipts/${id}`, { method: 'DELETE', token, shopId }),
+      apiFetch<{ ok: true }>(`/receipts/${id}`, {
+        method: 'DELETE',
+        token,
+        shopId,
+      }),
     onSuccess: (_data, { id }) => {
       queryClient.removeQueries({ queryKey: receiptsKeys.receipt(shopId, id) });
       void queryClient.invalidateQueries({ queryKey: receiptsKeys.receipts(shopId) });
