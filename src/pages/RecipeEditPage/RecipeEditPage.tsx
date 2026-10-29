@@ -26,6 +26,25 @@ export const RecipeEditView: React.FC<IRecipeEditView> = ({ model }) => {
   return (
     <main className="mx-auto flex h-[100dvh] max-w-shell flex-col bg-surface-canvas pt-[max(var(--safe-top),16px)]">
       <RecipeEditHeader model={model} />
+      {model.conflicts?.map((field) => (
+        <div key={field} role="status" className="px-4 py-2 text-sm">
+          {field} changed elsewhere while you were editing.
+          <button
+            type="button"
+            className="mx-2 underline"
+            onClick={() => model.resolveConflict(field, "local")}
+          >
+            Keep my change
+          </button>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => model.resolveConflict(field, "server")}
+          >
+            Use server change
+          </button>
+        </div>
+      ))}
       {model.loading ? (
         <div
           role="status"
