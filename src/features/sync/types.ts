@@ -15,6 +15,10 @@ export type LocalDocument = {
   localOnly?: boolean;
   syncStatus: 'synced' | 'pending-push' | 'pending-pull';
   lastSyncedAt?: number;
+  serverVersion?: number;
+  serverData?: DocumentData;
+  conflicts?: string[];
+  remoteDeleted?: boolean;
 };
 export type PendingWrite = {
   operation?: import('./errors').Operation;
@@ -26,6 +30,7 @@ export type PendingWrite = {
   path: string;
   method: RequestOptions['method'];
   body?: unknown;
+  baseVersion?: number;
 };
 export type PendingScan = {
   upload?: {
