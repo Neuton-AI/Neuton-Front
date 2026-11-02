@@ -12,7 +12,7 @@ The shop membership cache is keyed by user so a previously authenticated PWA can
 reopen while offline. Every server request still validates current membership.
 
 The UI refreshes after local commits and pulls, including changes from another
-tab. Sync runs on startup, screen entry, focus, reconnect and every 30 seconds.
+tab. Sync runs on startup, screen entry, focus, reconnect and SSE reconciliation hints.
 Web Locks serialize tabs, with an in-process single-flight guard and server retry
 receipts protecting retries. Equal revisions do not transfer full documents.
 Pending push acknowledgements remove only the transmitted revision. Pulls cannot
@@ -53,3 +53,25 @@ into the open screen. The configured storage CORS policy rejected the temporary
 preview origin's scan PUT, so the scan and its Blob correctly stayed queued with
 retry/export feedback. Successful upload/retry sequencing is covered by the
 automated upload and sync tests; live completion still needs an allowed origin.
+
+
+## Live sync traffic timing (#192)
+
+Each backend SSE connection batches change hints for 250 ms plus an independently
+sampled 0-4 second random delay. Further hints share the pending timer without
+restarting it. Initial reconciliation is immediate; change visibility can take up
+to roughly 4.25 seconds of server delay plus authorization and document transfer
+time, replacing the earlier roughly 1-2 second target for this path.
+
+Heartbeat comments still arrive every 15 seconds, independently of pending hints,
+without identity verification or database lookups. Initial and subsequent hints
+revalidate session and shop membership; failures close the stream. An expired or
+revoked session may receive empty heartbeats until the next authorization check,
+but cannot receive an authorized hint or fetch document data after access fails.
+Normal sync/document requests retain their existing authorization checks.
+
+SSE reconnect waits use exponential backoff plus random 0-2 second jitter, capped
+at 30 seconds overall. Reconciliation resets the backoff; authorization failures
+stop reconnecting. The 45-second no-bytes watchdog and disposal cleanup remain.
+At the 30-second cap, the specified additive-and-clamped formula no longer spreads
+retries; admission control and cross-tab leadership remain deferred to #193.

@@ -122,7 +122,10 @@ export function connectLiveSync(
         () => {
           void connect();
         },
-        Math.min(30000, 1000 * 2 ** Math.min(attempt++, 5)),
+        Math.min(
+          30000,
+          1000 * 2 ** Math.min(attempt++, 5) + Math.random() * 2000,
+        ),
       );
   };
   void connect();
