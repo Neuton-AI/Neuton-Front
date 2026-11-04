@@ -1,3 +1,6 @@
+import '@/features/auth/action-fragment';
+import '@/lib/telemetry';
+import { AuthProvider } from '@/features/auth/AuthProvider';
 import { App } from '@/App';
 import '@/index.css';
 import '@fontsource/inter/latin-400.css';
@@ -22,11 +25,13 @@ const queryClient = createQueryClient();
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <InstallProvider>
-          <App />
-        </InstallProvider>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <InstallProvider>
+            <App />
+          </InstallProvider>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

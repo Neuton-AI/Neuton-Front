@@ -11,10 +11,7 @@ import { Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RecipeEditPage } from "../RecipeEditPage";
 
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 vi.mock("@/components/BarcodeScanner/BarcodeScanner", () => ({
   BarcodeScanner: ({
     onDetected,

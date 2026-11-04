@@ -7,6 +7,8 @@ export type ControlField<V extends FormValues> = {
   id: string;
   label: string;
   hint?: string;
+  minCodePoints?: number;
+  maxCodePoints?: number;
   dense?: boolean;
   rows?: number;
   inputClassName?: string;
@@ -53,30 +55,50 @@ export function validateFields<V extends FormValues>(
     }
     if (field.kind === "custom" || field.visible?.(values) === false) continue;
     const value = values[field.name];
-    if (field.required && !value.trim())
+    const requiredValue = field.type === "password" ? value : value.trim();
+    const codePoints = Array.from(value).length;
+    if (
+      field.minCodePoints !== undefined &&
+      value &&
+      codePoints < field.minCodePoints
+    ) {
+      errors[field.name] =
+        `${field.label} must contain at least ${field.minCodePoints} characters.`;
+      continue;
+    }
+    if (field.maxCodePoints !== undefined && codePoints > field.maxCodePoints) {
+      errors[field.name] =
+        `${field.label} must contain at most ${field.maxCodePoints} characters.`;
+      continue;
+    }
+    if (field.required && !requiredValue) {
       errors[field.name] = `${field.label} is required.`;
-    else if (
+    } else if (
       value &&
       field.minLength !== undefined &&
       value.length < field.minLength
-    )
+    ) {
       errors[field.name] = `${field.label} is too short.`;
-    else if (field.maxLength !== undefined && value.length > field.maxLength)
+    } else if (
+      field.maxLength !== undefined &&
+      value.length > field.maxLength
+    ) {
       errors[field.name] = `${field.label} is too long.`;
-    else if (
+    } else if (
       field.type === "email" &&
       value &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-    )
+    ) {
       errors[field.name] = "Enter a valid email.";
-    else if (
+    } else if (
       field.type === "number" &&
       value &&
       (!Number.isFinite(Number(value)) ||
         (field.min !== undefined && Number(value) < Number(field.min)) ||
         (field.max !== undefined && Number(value) > Number(field.max)))
-    )
+    ) {
       errors[field.name] = `${field.label} is outside the allowed range.`;
+    }
   }
   return errors;
 }

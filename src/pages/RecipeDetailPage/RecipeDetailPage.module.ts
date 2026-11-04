@@ -1,9 +1,5 @@
 import { useRecipeNavigation } from "@/features/recipes/recipeNavigation";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import {
   useDeleteRecipe,
   useRecipe,
@@ -19,13 +15,13 @@ import { useNavigate, useParams } from "react-router-dom";
 export function useRecipeDetailPage() {
   const { id = "" } = useParams();
 
-  const { user, token } = useAuth();
+  const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const recipeQuery = useRecipe(token, activeShopId, id);
+  const recipeQuery = useRecipe(identity, activeShopId, id);
 
   const sourceRecipe = recipeQuery.data?.recipe;
   const recipe = sourceRecipe
@@ -41,9 +37,9 @@ export function useRecipeDetailPage() {
       }
     : null;
 
-  const verifyMutation = useVerifyRecipe(token, activeShopId);
+  const verifyMutation = useVerifyRecipe(identity, activeShopId);
 
-  const deleteMutation = useDeleteRecipe(token, activeShopId);
+  const deleteMutation = useDeleteRecipe(identity, activeShopId);
 
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the recipe. */
@@ -83,13 +79,14 @@ export function useRecipeDetailPage() {
    */
   const verify = async () => {
     if (
-      !token ||
+      !identity ||
       !activeShopId ||
       !id ||
       !canVerify ||
       verifyMutation.isPending
-    )
+    ) {
       return;
+    }
 
     setVerifyError(null);
     try {
@@ -112,13 +109,14 @@ export function useRecipeDetailPage() {
    */
   const remove = async () => {
     if (
-      !token ||
+      !identity ||
       !activeShopId ||
       !id ||
       !canVerify ||
       deleteMutation.isPending
-    )
+    ) {
       return;
+    }
     if (
       !window.confirm(
         "Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.",
@@ -180,7 +178,7 @@ export function useRecipeDetailPage() {
     openEditor(ingredient);
   };
   return {
-    token,
+    identity,
     activeShopId,
     edit,
     recipe,

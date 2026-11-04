@@ -8,10 +8,7 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useProfilePage } from "../ProfilePage.module";
 const navigate = vi.hoisted(() => vi.fn());
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useNavigate: () => navigate,
@@ -33,7 +30,8 @@ describe("useProfilePage", () => {
     server.use(
       http.post(apiPath("/shops"), async ({ request }) => {
         body = await request.json();
-        expect(request.headers.get("authorization")).toBe("Bearer token-1");
+        expect(request.credentials).toBe("include");
+        expect(request.headers.get("authorization")).toBeNull();
         return HttpResponse.json({
           shop: buildShop({ id: "new-shop", name: "Bakery" }),
         });

@@ -1,9 +1,5 @@
 import { useSheetClose } from "@/components/Sheet/Sheet.module";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import {
   useDeleteOrder,
   useMarkOrderDelivered,
@@ -20,13 +16,13 @@ export function useOrderDetailPage() {
 
   const navigate = useNavigate();
 
-  const { user, token } = useAuth();
+  const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const orderQuery = useOrder(token, activeShopId, id);
+  const orderQuery = useOrder(identity, activeShopId, id);
 
   const sourceOrder = orderQuery.data?.order;
   const order = sourceOrder
@@ -39,9 +35,9 @@ export function useOrderDetailPage() {
       }
     : null;
 
-  const markOrder = useMarkOrderDelivered(token, activeShopId);
+  const markOrder = useMarkOrderDelivered(identity, activeShopId);
 
-  const deleteOrder = useDeleteOrder(token, activeShopId);
+  const deleteOrder = useDeleteOrder(identity, activeShopId);
 
   /** A failed delete belongs in the load-error slot whose retry refetches. */
   const [actionError, setActionError] = useState<string | null>(null);
@@ -74,7 +70,7 @@ export function useOrderDetailPage() {
     (location.state as { fresh?: boolean } | null)?.fresh === true;
 
   const remove = async () => {
-    if (!token || !activeShopId || !id || deleteOrder.isPending) return;
+    if (!identity || !activeShopId || !id || deleteOrder.isPending) return;
     setConfirmingDelete(false);
 
     setActionError(null);
@@ -97,7 +93,9 @@ export function useOrderDetailPage() {
    * twice while the refetch is still in flight.
    */
   const markDelivered = async () => {
-    if (!token || !activeShopId || !id || markOrder.isPending || !order) return;
+    if (!identity || !activeShopId || !id || markOrder.isPending || !order) {
+      return;
+    }
 
     setMarkError(null);
     try {
@@ -122,7 +120,7 @@ export function useOrderDetailPage() {
   const distanceFee =
     toNumber(order?.deliveryDistanceKm) * toNumber(shop?.deliveryRatePerKm);
   return {
-    token,
+    identity,
     activeShopId,
     distanceFee,
     shop,

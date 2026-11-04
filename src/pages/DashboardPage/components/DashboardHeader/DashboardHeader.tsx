@@ -38,7 +38,7 @@ export const DashboardHeader: React.FC<IDashboardHeader> = ({
             >
               {memberships.map((row) => (
                 <option key={row.shopId} value={row.shopId}>
-                  {row.shops.name}
+                  {row.shop.name}
                 </option>
               ))}
             </select>

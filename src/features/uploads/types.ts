@@ -7,7 +7,10 @@ export type UploadCompleteResponse = {
   reason?: string;
 };
 
-export type UploadContext = { token: string | null; shopId: string | null };
+export type UploadContext = {
+  identity: import("@/lib/api-context").AuthIdentity | null;
+  shopId: string | null;
+};
 
 export type PresignedUploadSource = {
   sourceId: string;
@@ -23,15 +26,15 @@ export type GroupPresignResponse = {
   receiptId: string | null;
   recipeId: string | null;
   sources: PresignedUploadSource[];
-  method: 'PUT';
+  method: "PUT";
   expiresIn: number;
 };
 
-export type MediaKind = 'receipt' | 'recipe' | 'product' | 'order';
+export type MediaKind = "receipt" | "recipe" | "product" | "order";
 
 export type SourcePreview = {
   storagePath: string;
-  contentType: 'image/webp';
+  contentType: "image/webp";
   width: number;
   height: number;
 };
@@ -46,9 +49,9 @@ export type DocumentSource = {
 };
 
 export const ALLOWED_CONTENT_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'application/pdf',
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "application/pdf",
 ] as const;

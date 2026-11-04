@@ -7,10 +7,7 @@ import { screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
 import { CatalogPage } from "../CatalogPage";
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 beforeEach(resetAuth);
 it("shows a price for supermarket-linked ingredients without optional server counts", async () => {
   const recipe = buildRecipe();

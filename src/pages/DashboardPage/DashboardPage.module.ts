@@ -2,11 +2,7 @@ import { useFabNavigation } from "@/components/Fab/Fab.module";
 import { useDashboardSummary } from "@/features/analytics/analyticsApi";
 import type { DashboardPeriod } from "@/features/analytics/types";
 import { useChartSeries } from "@/features/analytics/usePeriodSeries";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 export const DASHBOARD_PERIODS: { key: DashboardPeriod; label: string }[] = [
@@ -16,7 +12,7 @@ export const DASHBOARD_PERIODS: { key: DashboardPeriod; label: string }[] = [
   { key: "12m", label: "1Y" },
 ];
 export function useDashboardPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, identity, loading: authLoading } = useAuth();
 
   const {
     memberships,
@@ -39,7 +35,7 @@ export function useDashboardPage() {
   );
 
   const { data, isLoading, error, refetch } = useDashboardSummary(
-    token,
+    identity,
     activeShopId,
     period,
   );

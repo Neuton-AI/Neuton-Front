@@ -8,10 +8,8 @@ const boundary = vi.hoisted(() => ({
   signUp: vi.fn(),
   navigate: vi.fn(),
 }));
-vi.mock("@/features/auth/supabase", () => ({
-  supabase: {
-    auth: { signInWithPassword: boundary.signIn, signUp: boundary.signUp },
-  },
+vi.mock("@/features/auth", () => ({
+  useAuth: () => ({ login: boundary.signIn, register: boundary.signUp }),
 }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
@@ -34,7 +32,7 @@ it("rejects invalid credentials before calling authentication", async () => {
   expect(boundary.signIn).not.toHaveBeenCalled();
 });
 it("reports failed authentication and resets errors when the route mode changes", async () => {
-  boundary.signIn.mockResolvedValue({ error: new Error("Wrong password") });
+  boundary.signIn.mockRejectedValue(new Error("Wrong password"));
   const { result, rerender } = renderHookWithProviders(
     ({ mode }) => useAuthPage({ mode }),
     {
@@ -43,7 +41,7 @@ it("reports failed authentication and resets errors when the route mode changes"
   );
   act(() => {
     result.current.handleFieldChange("email", "testtest@gmail.com");
-    result.current.handleFieldChange("password", "testtest");
+    result.current.handleFieldChange("password", "testtest-password-123");
   });
   await act(() => result.current.submit(event));
   expect(result.current.error).toBe("Wrong password");
@@ -58,7 +56,7 @@ it("shows confirmation instructions when signup has no session", async () => {
   );
   act(() => {
     result.current.handleFieldChange("email", "testtest@gmail.com");
-    result.current.handleFieldChange("password", "testtest");
+    result.current.handleFieldChange("password", "testtest-password-123");
     result.current.handleFieldChange("fullName", "Test User");
   });
   await act(() => result.current.submit(event));

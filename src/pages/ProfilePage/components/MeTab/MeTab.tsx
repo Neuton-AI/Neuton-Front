@@ -32,14 +32,14 @@ export const MeTab: React.FC<IMeTab> = ({
           {memberships.length === 0 ? (
             <CreateShopForm busy={creating} onSubmit={onCreateShop} />
           ) : (
-            memberships.map(({ shopId, role, shops }) => {
+            memberships.map(({ shopId, role, shop }) => {
               const selected = shopId === activeShopId;
               return (
                 <button
                   key={shopId}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => onSelectShop(shopId, shops.name)}
+                  onClick={() => onSelectShop(shopId, shop.name)}
                   className={`pressable flex w-full items-center gap-3 rounded-card p-4 text-left ${
                     selected
                       ? "bg-surface-dark text-ink-on-dark"
@@ -53,7 +53,7 @@ export const MeTab: React.FC<IMeTab> = ({
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-display text-[20px] leading-tight">
-                      {shops.name}
+                      {shop.name}
                     </span>
                     <span
                       className={`block text-label ${
@@ -61,7 +61,7 @@ export const MeTab: React.FC<IMeTab> = ({
                       }`}
                     >
                       {role[0]?.toUpperCase()}
-                      {role.slice(1)} · {shops.currency}
+                      {role.slice(1)} · {shop.currency}
                     </span>
                   </span>
                 </button>

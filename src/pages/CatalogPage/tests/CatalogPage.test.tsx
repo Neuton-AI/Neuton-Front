@@ -22,7 +22,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   apiFetch: api.apiFetch,
 }));
 
-vi.mock("@/features/auth/supabase", async () => {
+vi.mock("@/features/auth", async () => {
   const { buildShop } = await import("@/test/factories/shops.factory");
   const shop = buildShop();
   return {
@@ -32,7 +32,7 @@ vi.mock("@/features/auth/supabase", async () => {
       session: null,
       loading: false,
       user: { id: "u1" },
-      token: "token-1",
+      identity: { environment: "test", userId: "u1", sessionId: "session-1" },
     }),
     useShopMemberships: () => ({
       memberships: [{ shopId: "shop-1", role: "owner", shops: shop }],

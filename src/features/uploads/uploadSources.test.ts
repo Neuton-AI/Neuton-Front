@@ -1,11 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setApiIdentity } from '@/lib/api-context';
+import { resetCsrf } from '@/features/auth/csrf';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import {
   uploadSources,
   validateUploadFiles,
   type UploadSession,
 } from './uploadSources';
 
-const context = { token: 'jwt', shopId: 'shop-1' };
+const context = {
+  identity: { environment: 'test', userId: 'u1', sessionId: 's1' },
+  shopId: 'shop-1',
+};
 const first = new File(['page one'], 'first.jpg', { type: 'image/jpeg' });
 const second = new File(['page two'], 'second.pdf', {
   type: 'application/pdf',
@@ -38,12 +43,21 @@ const json = (body: unknown, status = 200) =>
 function stub(...responses: Response[]) {
   const fetchMock = vi.fn();
   for (const response of responses) fetchMock.mockResolvedValueOnce(response);
-  vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+    if (url.endsWith('/auth/csrf')) {
+      return Promise.resolve(json({ csrfToken: 'A'.repeat(43) }));
+    }
+    return fetchMock(url, init);
+  });
   return fetchMock;
 }
 function body(fetchMock: ReturnType<typeof vi.fn>, index: number) {
   return JSON.parse(fetchMock.mock.calls[index][1].body);
 }
+beforeEach(() => {
+  resetCsrf();
+  setApiIdentity(context.identity);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe('uploadSources', () => {
@@ -124,7 +138,12 @@ describe('uploadSources', () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('Network disconnected'));
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (url.endsWith('/auth/csrf')) {
+        return Promise.resolve(json({ csrfToken: 'A'.repeat(43) }));
+      }
+      return fetchMock(url, init);
+    });
     let session: UploadSession | undefined;
     await expect(
       uploadSources([first], 'receipt', {

@@ -158,8 +158,9 @@ export function normalizeError(
   if (
     (error instanceof Error || error instanceof DOMException) &&
     error.name === 'AbortError'
-  )
+  ) {
     return null;
+  }
   const api = error instanceof ApiError ? error : undefined;
   const status = api?.status;
   let category: Category = 'unknown';
@@ -169,24 +170,25 @@ export function normalizeError(
       ['QuotaExceededError', 'InvalidStateError', 'NotFoundError'].includes(
         error.name,
       ))
-  )
+  ) {
     category = 'storage';
-  else if (status === 401) category = 'session_expired';
-  else if (status === 403) category = 'permission_denied';
+  } else if (status === 401 || api?.code === 'ACCOUNT_CHANGED') {
+    category = 'session_expired';
+  } else if (status === 403) category = 'permission_denied';
   else if (status === 409) category = 'conflict';
   else if (status === 429) category = 'rate_limit';
   else if (status === 404) category = 'missing_resource';
   else if (status === 408) category = 'network';
-  else if (status !== undefined && status >= 400 && status < 500)
+  else if (status !== undefined && status >= 400 && status < 500) {
     category = 'validation';
-  else if (
+  } else if (
     status === 0 ||
     error instanceof TypeError ||
     ((error instanceof Error || error instanceof DOMException) &&
       error.name === 'TimeoutError')
-  )
+  ) {
     category = 'network';
-  else if (status !== undefined && status >= 500) category = 'server';
+  } else if (status !== undefined && status >= 500) category = 'server';
   const selected = policy[category];
   const now = Date.now();
   const attempts = (previous?.attempts ?? 0) + 1;

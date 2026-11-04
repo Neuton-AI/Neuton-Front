@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useAuth, useShopMemberships } from '@/features/auth/supabase';
+import { useAuth, useShopMemberships } from '@/features/auth';
 import * as store from './store';
 import { scopeFor, type LocalDocument } from './types';
 import { resolveDocumentConflict } from './conflicts';
 import { syncDocuments } from './engine';
 
 export function SyncConflicts() {
-  const { token, user } = useAuth();
+  const { identity, user } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const [documents, setDocuments] = useState<LocalDocument[]>([]);
   const [error, setError] = useState('');
   const scope =
-    token && activeShopId ? scopeFor(token, activeShopId).key : null;
+    identity && activeShopId ? scopeFor(identity, activeShopId).key : null;
   useEffect(() => {
     let active = true;
     const refresh = () => {
@@ -68,12 +68,12 @@ export function SyncConflicts() {
                 className="underline"
                 disabled={choice === 'local' && row.remoteDeleted}
                 onClick={() => {
-                  if (!token || !activeShopId) return;
+                  if (!identity || !activeShopId) return;
                   setError('');
                   void resolveDocumentConflict(row.key, field, choice)
                     .then(() =>
-                      syncDocuments(scopeFor(token, activeShopId), {
-                        token,
+                      syncDocuments(scopeFor(identity, activeShopId), {
+                        identity,
                         shopId: activeShopId,
                       }),
                     )

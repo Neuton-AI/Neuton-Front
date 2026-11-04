@@ -19,22 +19,35 @@ const authState = vi.hoisted(() => ({
   loading: false,
 }));
 
-const supabaseAuth = vi.hoisted(() => ({
-  signInWithPassword: vi.fn(async () => ({ error: null })),
+const passwordFlows = vi.hoisted(() => ({
+  signInWithPassword: vi.fn(
+    async (_credentials: { email: string; password: string }) => ({
+      error: null,
+    }),
+  ),
   signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
 }));
 
-vi.mock("@/features/auth/supabase", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/features/auth/supabase")>()),
+vi.mock("@/features/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/auth")>()),
   // A fake client so AuthPage renders its real form regardless of whether the
   // developer's machine happens to have a .env with Supabase keys.
-  supabase: { auth: supabaseAuth },
-  isSupabaseConfigured: true,
   useAuth: () => ({
-    session: authState.session,
+    session: authState.session
+      ? { ...authState.session, memberships: [{ shopId: "shop-1" }] }
+      : null,
+    status: authState.session ? "authenticated" : "anonymous",
+    login: async (email: string, password: string) => {
+      await passwordFlows.signInWithPassword({ email, password });
+      return {
+        user: { status: "active" },
+        memberships: [{ shopId: "shop-1" }],
+      };
+    },
+    register: passwordFlows.signUp,
     loading: authState.loading,
     user: authState.session?.user ?? null,
-    token: null,
+    identity: null,
   }),
 }));
 
@@ -234,7 +247,7 @@ describe("routing", () => {
 describe("deep-link round trip", () => {
   beforeEach(() => {
     authState.session = null;
-    supabaseAuth.signInWithPassword.mockClear();
+    passwordFlows.signInWithPassword.mockClear();
   });
 
   it("brings the user back to the deep link they originally asked for", async () => {
@@ -243,9 +256,9 @@ describe("deep-link round trip", () => {
     // after they sign in.
     const user = userEvent.setup();
 
-    // Stand in for supabase's onAuthStateChange, which is what makes the guard
+    // Stand in for the provider refresh, which is what makes the guard
     // let them through in the real app.
-    supabaseAuth.signInWithPassword.mockImplementationOnce(async () => {
+    passwordFlows.signInWithPassword.mockImplementationOnce(async () => {
       authState.session = { user: { id: "u1" } };
       return { error: null };
     });
@@ -257,7 +270,7 @@ describe("deep-link round trip", () => {
     );
 
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.type(screen.getByLabelText("Password"), "testTest-password-123");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>

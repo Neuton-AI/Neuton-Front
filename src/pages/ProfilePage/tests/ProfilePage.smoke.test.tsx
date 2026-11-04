@@ -4,10 +4,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ProfilePage } from "../ProfilePage";
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 beforeEach(resetAuth);
 it("loads shop settings through real HTTP and renders members read-only", async () => {
   authState.role = "member";

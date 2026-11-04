@@ -3,10 +3,7 @@ import { renderHookWithProviders } from "@/test/render";
 import { act, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useDashboardPage } from "../DashboardPage.module";
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 beforeEach(resetAuth);
 it("loads analytics and switches derived profitability without another view calculation", async () => {
   const { result } = renderHookWithProviders(() => useDashboardPage());

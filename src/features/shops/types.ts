@@ -13,8 +13,4 @@ export type Shop = {
   updatedAt: string;
 };
 
-export type ShopMembership = {
-  shopId: string;
-  role: 'owner' | 'admin' | 'member';
-  shops: Shop;
-};
+export type ShopMembership = import("@/features/auth/types").ShopMembershipDto;

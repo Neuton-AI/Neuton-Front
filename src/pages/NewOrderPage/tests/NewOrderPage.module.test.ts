@@ -15,10 +15,7 @@ import { buildRecipe } from "@/test/factories/recipes.factory";
 import { recipesKeys } from "@/features/recipes/keys";
 
 const navigate = vi.hoisted(() => vi.fn());
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 vi.mock("@/features/sync/documentsApi", async () => ({
   documentFetch: (await import("@/lib/api")).apiFetch,
 }));
@@ -183,7 +180,7 @@ describe("useNewOrderPage", () => {
     });
     await act(() => result.current.submit(event));
     expect(result.current.itemsError).toMatch(/outside the allowed range/);
-    authState.token = null;
+    authState.identity = null;
     await act(() => result.current.submit(event));
     expect(navigate).not.toHaveBeenCalled();
   });

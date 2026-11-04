@@ -1,3 +1,6 @@
+import { setApiIdentity } from '@/lib/api-context';
+import { beforeEach } from 'vitest';
+beforeEach(() => setApiIdentity({ environment: 'test', userId: 'u1' }));
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   connectLiveSync,
@@ -18,13 +21,19 @@ describe('live sync', () => {
     );
     vi.stubGlobal('fetch', fetch);
     const receive = vi.fn();
-    const stop = connectLiveSync({ token: 'fixture', shopId: 'shop' }, receive);
+    const stop = connectLiveSync(
+      {
+        identity: { environment: 'test', userId: 'u1', sessionId: 'session-1' },
+        shopId: 'shop',
+      },
+      receive,
+    );
     await vi.advanceTimersByTimeAsync(0);
     expect(receive).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1000);
     expect(receive).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls[0][1].headers).toMatchObject({
-      Authorization: 'Bearer fixture',
+      'x-client-user-id': 'u1',
       'x-shop-id': 'shop',
     });
     stop();
@@ -36,7 +45,13 @@ describe('live sync', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.75);
     const fetch = vi.fn().mockRejectedValue(new Error('offline'));
     vi.stubGlobal('fetch', fetch);
-    const stop = connectLiveSync({ token: 'fixture', shopId: 'shop' }, vi.fn());
+    const stop = connectLiveSync(
+      {
+        identity: { environment: 'test', userId: 'u1', sessionId: 'session-1' },
+        shopId: 'shop',
+      },
+      vi.fn(),
+    );
     await vi.advanceTimersByTimeAsync(0);
     for (const delay of [2500, 3500, 5500, 9500, 17500, 30000, 30000]) {
       const calls = fetch.mock.calls.length;
@@ -65,7 +80,13 @@ describe('live sync', () => {
       .mockRejectedValue(new Error('offline again'));
     vi.stubGlobal('fetch', fetch);
     const receive = vi.fn();
-    const stop = connectLiveSync({ token: 'fixture', shopId: 'shop' }, receive);
+    const stop = connectLiveSync(
+      {
+        identity: { environment: 'test', userId: 'u1', sessionId: 'session-1' },
+        shopId: 'shop',
+      },
+      receive,
+    );
     await vi.advanceTimersByTimeAsync(2000);
     expect(receive).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1999);
@@ -82,7 +103,14 @@ describe('live sync', () => {
       const fetch = vi.fn().mockResolvedValue(new Response(null, { status }));
       vi.stubGlobal('fetch', fetch);
       const stop = connectLiveSync(
-        { token: 'fixture', shopId: 'shop' },
+        {
+          identity: {
+            environment: 'test',
+            userId: 'u1',
+            sessionId: 'session-1',
+          },
+          shopId: 'shop',
+        },
         vi.fn(),
       );
       await vi.advanceTimersByTimeAsync(60000);

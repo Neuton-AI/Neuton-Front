@@ -12,7 +12,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 function mockFetch(...responses: Response[]) {
   const fn = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>();
   for (const response of responses) fn.mockResolvedValueOnce(response);
-  vi.stubGlobal('fetch', fn);
+  vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+    if (input.endsWith('/auth/csrf')) {
+      return Promise.resolve(json({ csrfToken: 'A'.repeat(43) }));
+    }
+    return fn(input, init);
+  });
   return fn;
 }
 
@@ -40,31 +45,55 @@ async function loadApi(env: Record<string, string> = {}) {
 }
 
 describe('base URL', () => {
-  it.each(['90', 'Wed, 21 Oct 2026 12:01:30 GMT'])('preserves Retry-After %s and the response trace ID for classification', async (retryAfter) => {
-    const { apiFetch } = await loadApi();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-21T12:00:00Z'));
-    mockFetch(new Response(JSON.stringify({ error: { code: 'LIMITED', message: 'Rate limited' } }), {
-      status: 429, headers: { 'Retry-After': retryAfter, 'x-trace-id': 'trace-123' },
-    }));
-    await expect(apiFetch('/sync/check')).rejects.toMatchObject({ status: 429, code: 'LIMITED', retryAfterMs: 90_000, traceId: 'trace-123' });
-    clock.mockRestore();
-  });
+  it.each(['90', 'Wed, 21 Oct 2026 12:01:30 GMT'])(
+    'preserves Retry-After %s and the response trace ID for classification',
+    async (retryAfter) => {
+      const { apiFetch } = await loadApi();
+      const clock = vi
+        .spyOn(Date, 'now')
+        .mockReturnValue(Date.parse('2026-10-21T12:00:00Z'));
+      mockFetch(
+        new Response(
+          JSON.stringify({
+            error: { code: 'LIMITED', message: 'Rate limited' },
+          }),
+          {
+            status: 429,
+            headers: { 'Retry-After': retryAfter, 'x-trace-id': 'trace-123' },
+          },
+        ),
+      );
+      await expect(apiFetch('/sync/check')).rejects.toMatchObject({
+        status: 429,
+        code: 'LIMITED',
+        retryAfterMs: 90_000,
+        traceId: 'trace-123',
+      });
+      clock.mockRestore();
+    },
+  );
   it('prefixes the versioned API root onto the requested path', async () => {
     const { apiFetch } = await loadApi();
     const fetchMock = mockFetch(json({ ok: true }));
 
     await apiFetch('/receipts?limit=50');
 
-    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.test/api/v1/receipts?limit=50');
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      `${window.location.origin}/api/v1/receipts?limit=50`,
+    );
   });
 
   it('strips a trailing slash so paths never double up', async () => {
-    const { apiFetch } = await loadApi({ VITE_API_BASE_URL: 'https://api.test/' });
+    const { apiFetch } = await loadApi({
+      VITE_API_BASE_URL: 'https://api.test/',
+    });
     const fetchMock = mockFetch(json({}));
 
     await apiFetch('/recipes');
 
-    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.test/api/v1/recipes');
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      `${window.location.origin}/api/v1/recipes`,
+    );
   });
 
   it('falls back to the local API when the env var is absent', async () => {
@@ -80,16 +109,45 @@ describe('base URL', () => {
 });
 
 describe('apiFetch', () => {
-  it('sends the auth context as a bearer token and the shop header', async () => {
+  it('does not request another refresh when session discovery returns anonymous', async () => {
+    const { apiFetch } = await loadApi();
+    const reload = vi.fn();
+    window.addEventListener('neuton-shop-access-lost', reload);
+    mockFetch(
+      json({ error: { code: 'UNAUTHORIZED', message: 'Sign in' } }, 401),
+    );
+    try {
+      await expect(apiFetch('/session')).rejects.toMatchObject({ status: 401 });
+      expect(reload).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('neuton-shop-access-lost', reload);
+    }
+  });
+  it('reports a rejected mutation without replaying its body', async () => {
+    const { apiFetch } = await loadApi();
+    const fetchMock = mockFetch(
+      json({ error: { code: 'FORBIDDEN', message: 'Reload' } }, 403),
+    );
+    await expect(
+      apiFetch('/shops', { method: 'POST', body: { name: 'One shop' } }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('sends cookies and a restrictive account precondition with the shop header', async () => {
     const { apiFetch } = await loadApi();
     const fetchMock = mockFetch(json({ ok: true }));
 
-    await apiFetch('/receipts?limit=50', { token: 'jwt-123', shopId: 'shop-abc' });
+    const identity = { environment: 'test', userId: 'user-123' };
+    const { setApiIdentity } = await import('@/lib/api-context');
+    setApiIdentity(identity);
+    await apiFetch('/receipts?limit=50', { identity, shopId: 'shop-abc' });
 
     const init = fetchMock.mock.calls[0]![1];
     expect(init?.method).toBe('GET');
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).not.toHaveProperty('Authorization');
     expect(init?.headers).toMatchObject({
-      Authorization: 'Bearer jwt-123',
+      'x-client-user-id': 'user-123',
       'x-shop-id': 'shop-abc',
     });
     // A GET with no body must not claim to be JSON.
@@ -100,7 +158,10 @@ describe('apiFetch', () => {
     const { apiFetch } = await loadApi();
     const fetchMock = mockFetch(json({ receiptId: 'r1' }));
 
-    await apiFetch('/uploads/complete', { method: 'POST', body: { path: 'a/b.jpg' } });
+    await apiFetch('/uploads/complete', {
+      method: 'POST',
+      body: { path: 'a/b.jpg' },
+    });
 
     const init = fetchMock.mock.calls[0]![1];
     expect(init?.body).toBe('{"path":"a/b.jpg"}');
@@ -111,14 +172,18 @@ describe('apiFetch', () => {
     const { apiFetch } = await loadApi();
     mockFetch(new Response(null, { status: 204 }));
 
-    await expect(apiFetch('/receipts/r1', { method: 'DELETE' })).resolves.toBeUndefined();
+    await expect(
+      apiFetch('/receipts/r1', { method: 'DELETE' }),
+    ).resolves.toBeUndefined();
   });
 
   it('returns the parsed payload on success', async () => {
     const { apiFetch } = await loadApi();
     mockFetch(json({ recipes: [{ id: 'x' }] }));
 
-    await expect(apiFetch<{ recipes: { id: string }[] }>('/recipes')).resolves.toEqual({
+    await expect(
+      apiFetch<{ recipes: { id: string }[] }>('/recipes'),
+    ).resolves.toEqual({
       recipes: [{ id: 'x' }],
     });
   });
@@ -126,9 +191,16 @@ describe('apiFetch', () => {
   describe('error contract', () => {
     it('reads the app shape {error:{code,message}}', async () => {
       const { apiFetch, ApiError } = await loadApi();
-      mockFetch(json({ error: { code: 'NOT_FOUND', message: 'Receipt not found' } }, 404));
+      mockFetch(
+        json(
+          { error: { code: 'NOT_FOUND', message: 'Receipt not found' } },
+          404,
+        ),
+      );
 
-      const error = await apiFetch('/receipts/nope').catch((cause: unknown) => cause);
+      const error = await apiFetch('/receipts/nope').catch(
+        (cause: unknown) => cause,
+      );
       expect(error).toBeInstanceOf(ApiError);
       expect(error).toMatchObject({
         name: 'ApiError',
@@ -149,7 +221,7 @@ describe('apiFetch', () => {
             statusCode: 401,
             code: 'UNAUTHORIZED',
             error: 'Unauthorized',
-            message: 'Missing bearer token',
+            message: 'Missing bearer identity',
           },
           401,
         ),
@@ -158,7 +230,7 @@ describe('apiFetch', () => {
       await expect(apiFetch('/receipts')).rejects.toMatchObject({
         status: 401,
         code: 'UNAUTHORIZED',
-        message: 'Missing bearer token',
+        message: 'Missing bearer identity',
       });
     });
 
@@ -195,18 +267,25 @@ describe('apiFetch', () => {
 
     it('reports an unreachable server as a status-0 ApiError with actionable copy', async () => {
       const { apiFetch } = await loadApi();
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      );
 
       await expect(apiFetch('/receipts')).rejects.toMatchObject({
         name: 'ApiError',
         status: 0,
-        message: 'Cannot reach the server. Check your connection and try again.',
+        message:
+          'Cannot reach the server. Check your connection and try again.',
       });
     });
 
     it('rethrows an AbortError unchanged so callers can ignore it', async () => {
       const { apiFetch } = await loadApi();
-      const aborted = new DOMException('The operation was aborted', 'AbortError');
+      const aborted = new DOMException(
+        'The operation was aborted',
+        'AbortError',
+      );
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(aborted));
 
       await expect(apiFetch('/receipts/r1')).rejects.toBe(aborted);
@@ -219,7 +298,10 @@ describe('apiFetch', () => {
 
       await apiFetch('/receipts/r1', { signal: controller.signal });
 
-      expect(fetchMock.mock.calls[0]![1]?.signal).toBe(controller.signal);
+      const forwarded = fetchMock.mock.calls[0]![1]?.signal;
+      expect(forwarded?.aborted).toBe(false);
+      // The request combines caller cancellation with account-transition cancellation.
+      expect(forwarded).toBeInstanceOf(AbortSignal);
     });
   });
 });

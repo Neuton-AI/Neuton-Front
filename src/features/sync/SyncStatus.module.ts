@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  supabase,
-  useAuth,
-  useShopMemberships,
-} from '@/features/auth/supabase';
+import { useAuth, useShopMemberships } from '@/features/auth';
 import { syncDocuments, syncActivity } from './engine';
 import { errorsFor, type SyncError } from './errors';
 import * as store from './store';
@@ -25,7 +21,7 @@ type Snapshot = {
 };
 
 export function useSyncStatus() {
-  const { token, user } = useAuth();
+  const { identity, user, logout } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const client = useQueryClient();
   const [snapshot, setSnapshot] = useState<Snapshot>();
@@ -34,7 +30,7 @@ export function useSyncStatus() {
   const [localMessage, setLocalMessage] = useState('');
   const popup = useRef<HTMLElement>(null);
   const scopeKey =
-    token && activeShopId ? scopeFor(token, activeShopId).key : null;
+    identity && activeShopId ? scopeFor(identity, activeShopId).key : null;
   useEffect(() => {
     setOpened(false);
     setLocalMessage('');
@@ -63,8 +59,8 @@ export function useSyncStatus() {
     return () => window.removeEventListener('neuton-account-change', clear);
   }, [client]);
   useEffect(() => {
-    if (!token || !activeShopId) return;
-    const scope = scopeFor(token, activeShopId);
+    if (!identity || !activeShopId) return;
+    const scope = scopeFor(identity, activeShopId);
     let active = true;
     let refreshing = false;
     let documentVersion: string | undefined;
@@ -79,7 +75,7 @@ export function useSyncStatus() {
           errorsFor(scope.key),
           store.documents(scope.key),
         ]);
-        if (active)
+        if (active) {
           setSnapshot({
             scope: scope.key,
             errors: errors.filter((row) => row.state === 'unresolved'),
@@ -91,6 +87,7 @@ export function useSyncStatus() {
                 ['pending', 'processing'].includes(String(row.data.status)),
             ).length,
           });
+        }
         const nextVersion = documents
           .map((row) => `${row.key}:${row.updatedAt}:${row.syncStatus}`)
           .join('|');
@@ -122,7 +119,7 @@ export function useSyncStatus() {
     const scheduler = createSyncScheduler(async () => {
       if (!active) return;
       setOnline(navigator.onLine);
-      await syncDocuments(scope, { token, shopId: activeShopId });
+      await syncDocuments(scope, { identity, shopId: activeShopId });
       if (active) await refresh();
       if (
         active &&
@@ -130,11 +127,15 @@ export function useSyncStatus() {
         (await errorsFor(scope.key)).some(
           (row) => row.state === 'unresolved' && row.retryable,
         )
-      )
+      ) {
         throw new Error('Synchronization is waiting for its retry backoff');
+      }
     });
     const sync = () => scheduler.request();
-    const disconnect = connectLiveSync({ token, shopId: activeShopId }, sync);
+    const disconnect = connectLiveSync(
+      { identity, shopId: activeShopId },
+      sync,
+    );
     const unsubscribe = store.subscribe(() => {
       void refresh();
     });
@@ -156,8 +157,8 @@ export function useSyncStatus() {
       window.removeEventListener('offline', sync);
       window.removeEventListener('focus', sync);
     };
-  }, [token, activeShopId, client]);
-  if (!token || !activeShopId) return null;
+  }, [identity, activeShopId, client]);
+  if (!identity || !activeShopId) return null;
   const current = snapshot?.scope === scopeKey ? snapshot : undefined;
   const errors = current?.errors ?? [];
   const succeeded =
@@ -182,13 +183,13 @@ export function useSyncStatus() {
   const retry = () => {
     setLocalMessage('');
     void syncDocuments(
-      scopeFor(token, activeShopId),
-      { token, shopId: activeShopId },
+      scopeFor(identity, activeShopId),
+      { identity, shopId: activeShopId },
       { force: true },
     ).catch(() => undefined);
   };
   const exportPending = async () => {
-    const scope = scopeFor(token, activeShopId);
+    const scope = scopeFor(identity, activeShopId);
     try {
       const [documents, writes, scans, blobs] = await Promise.all([
         store.documents(scope.key),
@@ -241,7 +242,7 @@ export function useSyncStatus() {
     retry,
     exportPending,
     onSignIn: () => {
-      void supabase?.auth.signOut();
+      void logout().catch(() => undefined);
     },
   };
 }

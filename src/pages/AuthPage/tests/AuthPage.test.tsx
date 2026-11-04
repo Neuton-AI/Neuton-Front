@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * AuthPage owns one behaviour that nothing else in the app can cover: after a
  * successful sign-in it must return the user to wherever RequireAuth bounced
  * them from. That round trip is why the guard stores `state.from`, so the two
- * halves are pinned here against a fake Supabase client.
+ * halves are pinned here against a provider boundary.
  */
 
 const auth = vi.hoisted(() => ({
@@ -16,10 +16,19 @@ const auth = vi.hoisted(() => ({
   signUp: vi.fn(),
 }));
 
-vi.mock("@/features/auth/supabase", () => ({
-  supabase: { auth },
-  isSupabaseConfigured: true,
-  useAuth: () => ({ session: null, loading: false, user: null, token: null }),
+vi.mock("@/features/auth", () => ({
+  useAuth: () => ({
+    login: async (email: string, password: string) => {
+      const result = await auth.signInWithPassword({ email, password });
+      if (result?.error) throw result.error;
+      return {
+        user: { status: "active" },
+        memberships: [{ shopId: "shop-1" }],
+      };
+    },
+    register: (email: string, password: string, fullName?: string) =>
+      auth.signUp(email, password, fullName),
+  }),
 }));
 
 const { AuthPage } = await import("@/pages/AuthPage/AuthPage");
@@ -62,21 +71,21 @@ describe("AuthPage sign in", () => {
     // current-password, not new-password: the password manager must offer to
     // fill an existing credential instead of generating one.
     expect(password).toHaveAttribute("autocomplete", "current-password");
-    expect(password).toHaveAttribute("minlength", "8");
+    expect(password).toHaveAttribute("maxlength", "256");
   });
 
-  it("submits the typed credentials to Supabase", async () => {
+  it("submits the typed credentials to the shared provider", async () => {
     const user = userEvent.setup();
     renderAuth("/signin");
 
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.type(screen.getByLabelText("Password"), "testTest-password-123");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
       expect(auth.signInWithPassword).toHaveBeenCalledWith({
         email: "testtest@gmail.com",
-        password: "testTest",
+        password: "testTest-password-123",
       }),
     );
   });
@@ -89,7 +98,10 @@ describe("AuthPage sign in", () => {
     renderAuth("/signin");
 
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "wrongpass");
+    await user.type(
+      screen.getByLabelText("Password"),
+      "wrongpass-password-123",
+    );
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -109,7 +121,7 @@ describe("AuthPage sign in", () => {
     renderAuth("/signin");
 
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.type(screen.getByLabelText("Password"), "testTest-password-123");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     // Without this, a double-tap fires two sign-in requests.
@@ -132,7 +144,7 @@ describe("AuthPage sign in", () => {
     );
 
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.type(screen.getByLabelText("Password"), "testTest-password-123");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
@@ -147,10 +159,10 @@ describe("AuthPage sign in", () => {
     ).toHaveAttribute("href", "/forgot-password");
   });
 
-  it("shows Google and Apple buttons", () => {
+  it("reserves provider buttons for their implementation phase", () => {
     renderAuth("/signin");
-    expect(screen.getByRole("button", { name: "Google" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apple" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Google" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Apple" })).toBeNull();
   });
 
   it("has segment control with Sign In active", () => {
@@ -165,21 +177,21 @@ describe("AuthPage sign in", () => {
 });
 
 describe("AuthPage sign up", () => {
-  it("adds the full name field and sends it as signup metadata", async () => {
+  it("adds the full name field and submits it as the optional signup name", async () => {
     const user = userEvent.setup();
     renderWithRouter(<AuthPage mode="signup" />, { route: "/signup" });
 
     await user.type(screen.getByLabelText("Full name"), "Test User");
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.type(screen.getByLabelText("Password"), "testTest-password-123");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() =>
-      expect(auth.signUp).toHaveBeenCalledWith({
-        email: "testtest@gmail.com",
-        password: "testTest",
-        options: { data: { fullName: "Test User" } },
-      }),
+      expect(auth.signUp).toHaveBeenCalledWith(
+        "testtest@gmail.com",
+        "testTest-password-123",
+        "Test User",
+      ),
     );
   });
 
@@ -190,7 +202,7 @@ describe("AuthPage sign up", () => {
 
     await user.type(screen.getByLabelText("Full name"), "Test User");
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "testTest");
+    await user.type(screen.getByLabelText("Password"), "testTest-password-123");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     // Signing in here would fail, so this must be a status message and not a
@@ -215,10 +227,10 @@ describe("AuthPage sign up", () => {
     expect(screen.getByLabelText("Full name")).toBeInTheDocument();
   });
 
-  it("shows Google and Apple buttons", () => {
+  it("reserves provider buttons for their implementation phase", () => {
     renderAuth("/signup", "signup");
-    expect(screen.getByRole("button", { name: "Google" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apple" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Google" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Apple" })).toBeNull();
   });
 
   it("has segment control with Create Account active", () => {

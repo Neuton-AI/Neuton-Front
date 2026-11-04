@@ -37,7 +37,7 @@ export const ReceiptDetailPage: React.FC = () => {
               <ReceiptMerchantEditor
                 key={`${receipt.id}:${receipt.merchantName}`}
                 receipt={receipt}
-                token={model.token}
+                identity={model.identity}
                 shopId={model.activeShopId}
               />
             ) : null}
@@ -51,7 +51,7 @@ export const ReceiptDetailPage: React.FC = () => {
             />
             <ReceiptScan
               receipt={receipt}
-              token={model.token}
+              identity={model.identity}
               shopId={model.activeShopId}
             />
           </>

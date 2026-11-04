@@ -5,10 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCapturePage } from "../CapturePage.module";
 
 const boundary = vi.hoisted(() => ({ upload: vi.fn(), navigate: vi.fn() }));
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 vi.mock("@/features/sync/documentsApi", () => ({ saveScan: boundary.upload }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
@@ -267,21 +264,32 @@ describe("capture collection", () => {
       expect(boundary.upload).toHaveBeenCalledWith(
         files,
         kind,
-        { token: "token-1", shopId: "shop-1" },
+        {
+          identity: {
+            environment: "test",
+            userId: "u1",
+            sessionId: "session-1",
+          },
+          shopId: "shop-1",
+        },
         "00000000-0000-4000-8000-000000000001",
       );
       expect(boundary.navigate).toHaveBeenCalled();
     },
   );
   it("retains failed upload state for retry and refuses unauthenticated submissions", async () => {
-    authState.token = null;
+    authState.identity = null;
     const { result, rerender } = renderHookWithProviders(() =>
       useCapturePage(),
     );
     act(() => result.current.onPick([photo()]));
     await act(async () => result.current.submit());
     expect(boundary.upload).not.toHaveBeenCalled();
-    authState.token = "token-1";
+    authState.identity = {
+      environment: "test",
+      userId: "u1",
+      sessionId: "session-1",
+    };
     rerender();
     boundary.upload.mockRejectedValueOnce(new Error("Source 1 failed"));
     await act(async () => result.current.submit());

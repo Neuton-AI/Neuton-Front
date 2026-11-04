@@ -1,5 +1,38 @@
 # Neuton-Front
 
+## Authentication and local routing
+
+The application uses Neuton's HttpOnly cookie session through a single root
+`AuthProvider`. Browser requests use the current application origin and include
+credentials. Local development opens `http://localhost:5173`; Vite proxies `/api`
+to `http://localhost:4000`, matching the backend's default port. Keep `APP_ORIGIN`
+on the backend equal to the browser origin. Hosted installations must route
+`/api` to the API under the same HTTPS origin. Browser auth needs no Supabase,
+Google client-secret, SMTP, or database variables in the frontend bundle.
+
+The provider restores authority from `GET /api/v1/session`, distinguishes
+anonymous, pending confirmation, active and unavailable states, and locks a cold
+offline launch. Pending accounts reach `/auth/confirm`; active accounts without
+memberships reach `/profile` to create their first shop. Signup gives a generic
+email notice, confirmation requires a deliberate POST, and users sign in normally
+after confirming. Recovery, account-security screens and Google sign-in belong
+to the subsequent migration phases.
+
+CSRF secrets stay in module memory, with one shared acquisition request and no
+mutation replay after failures. Action-link fragments are captured and removed
+before telemetry initializes; they are never persisted or placed in navigation
+state. `x-client-user-id` restricts a prepared operation to its original account;
+it does not authorize anything. The backend cookie and current database state
+remain authoritative.
+
+Shop selection and local document partitions include environment and internal
+user ID. Membership summaries come only from `/session`; cached memberships do
+not grant access. Query caches and pending requests are cleared before another
+account is exposed. Logout retains unsent work in its original partition and
+removes that account's synced local records. A failed sign-out leaves a locked,
+explicitly unconfirmed state with retry controls. Cross-tab notifications contain
+only a reload hint, never credentials or an authoritative identity.
+
 ## PWA installation and offline shell
 
 `npm run build` generates `manifest.webmanifest`, the Workbox service worker and

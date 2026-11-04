@@ -1,3 +1,4 @@
+import { authState } from '@/test/auth';
 import { analyticsKeys } from '@/features/analytics/keys';
 import { buildRecipe } from '@/test/factories/recipes.factory';
 import { apiPath, requireContext } from '@/test/mocks/handlers/context';
@@ -7,7 +8,14 @@ import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { recipesKeys } from './keys';
-import { useBarcodePrice, useDeleteRecipe, useRecipe, useRecipes, useUpdateRecipe, useVerifyRecipe } from './recipesApi';
+import {
+  useBarcodePrice,
+  useDeleteRecipe,
+  useRecipe,
+  useRecipes,
+  useUpdateRecipe,
+  useVerifyRecipe,
+} from './recipesApi';
 
 describe('recipes API contracts', () => {
   it('saves recipe edits without replacing costed detail with the partial PATCH response', async () => {
@@ -30,12 +38,26 @@ describe('recipes API contracts', () => {
       }),
     );
     const body = {
-      name: 'Edited soup', imageUrl: null, prepTimeMinutes: 30,
-      yieldQuantity: 4, yieldUnit: 'portions', allergens: ['Dairy'], steps: [],
-      ingredients: [{ rawName: 'Original tomatoes', rawMaterialName: 'Tomato', quantity: 2, rawSrcUnit: 'kg', inventoryItemId: null, generalPriceId: 'price-1' }],
+      name: 'Edited soup',
+      imageUrl: null,
+      prepTimeMinutes: 30,
+      yieldQuantity: 4,
+      yieldUnit: 'portions',
+      allergens: ['Dairy'],
+      steps: [],
+      ingredients: [
+        {
+          rawName: 'Original tomatoes',
+          rawMaterialName: 'Tomato',
+          quantity: 2,
+          rawSrcUnit: 'kg',
+          inventoryItemId: null,
+          generalPriceId: 'price-1',
+        },
+      ],
     };
     const { result } = renderHookWithProviders(
-      () => useUpdateRecipe('token-1', 'shop-1'),
+      () => useUpdateRecipe(authState.identity, 'shop-1'),
       { queryClient: client },
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1', body }));
@@ -43,7 +65,12 @@ describe('recipes API contracts', () => {
     expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
       recipe,
     });
-    for (const key of [recipesKeys.recipe('shop-1', 'rp-1'), recipesKeys.recipes('shop-1'), recipesKeys.orderableRecipes('shop-1'), analyticsKeys.dashboardRoot]) {
+    for (const key of [
+      recipesKeys.recipe('shop-1', 'rp-1'),
+      recipesKeys.recipes('shop-1'),
+      recipesKeys.orderableRecipes('shop-1'),
+      analyticsKeys.dashboardRoot,
+    ]) {
       expect(client.getQueryState(key)?.isInvalidated).toBe(true);
     }
   });
@@ -71,7 +98,7 @@ describe('recipes API contracts', () => {
       }),
     );
     const { result } = renderHookWithProviders(
-      () => useBarcodePrice('token-1', 'shop-1'),
+      () => useBarcodePrice(authState.identity, 'shop-1'),
       { queryClient: client },
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1', body }));
@@ -80,8 +107,12 @@ describe('recipes API contracts', () => {
   });
 
   it('enables only active lists with credentials and a shop', () => {
-    const list = renderHookWithProviders(() => useRecipes('token-1', 'shop-1', false));
-    const detail = renderHookWithProviders(() => useRecipe('token-1', null, 'rp-1'));
+    const list = renderHookWithProviders(() =>
+      useRecipes(authState.identity, 'shop-1', false),
+    );
+    const detail = renderHookWithProviders(() =>
+      useRecipe(authState.identity, null, 'rp-1'),
+    );
     expect(list.result.current.fetchStatus).toBe('idle');
     expect(detail.result.current.fetchStatus).toBe('idle');
   });
@@ -92,12 +123,14 @@ describe('recipes API contracts', () => {
       http.get(apiPath('/recipes/rp-1'), () => {
         calls += 1;
         return HttpResponse.json({
-          recipe: buildRecipe({ status: calls === 1 ? 'processing' : 'verified' }),
+          recipe: buildRecipe({
+            status: calls === 1 ? 'processing' : 'verified',
+          }),
         });
       }),
     );
     const { result, queryClient } = renderHookWithProviders(() =>
-      useRecipe('token-1', 'shop-1', 'rp-1'),
+      useRecipe(authState.identity, 'shop-1', 'rp-1'),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.recipe.status).toBe('processing');
@@ -120,12 +153,14 @@ describe('recipes API contracts', () => {
       http.get(apiPath('/recipes'), () => {
         calls += 1;
         return HttpResponse.json({
-          recipes: [buildRecipe({ status: calls === 1 ? 'pending' : 'failed' })],
+          recipes: [
+            buildRecipe({ status: calls === 1 ? 'pending' : 'failed' }),
+          ],
         });
       }),
     );
     const { result, queryClient } = renderHookWithProviders(() =>
-      useRecipes('token-1', 'shop-1'),
+      useRecipes(authState.identity, 'shop-1'),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.recipes[0]?.status).toBe('pending');
@@ -161,9 +196,12 @@ describe('recipes API contracts', () => {
     client.setQueryData(recipesKeys.orderableRecipes('shop-1'), {
       recipes: [],
     });
-    const { result } = renderHookWithProviders(() => useVerifyRecipe('token-1', 'shop-1'), {
-      queryClient: client,
-    });
+    const { result } = renderHookWithProviders(
+      () => useVerifyRecipe(authState.identity, 'shop-1'),
+      {
+        queryClient: client,
+      },
+    );
     await act(() => result.current.mutateAsync({ id: 'rp-1' }));
     expect(body).toEqual({});
     expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
@@ -182,23 +220,35 @@ describe('recipes API contracts', () => {
     server.use(
       http.delete(
         apiPath('/recipes/rp-1'),
-        ({ request }) => requireContext(request) ?? HttpResponse.json({ ok: true, mode: 'soft' }),
+        ({ request }) =>
+          requireContext(request) ??
+          HttpResponse.json({ ok: true, mode: 'soft' }),
       ),
     );
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
-    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), { recipe: buildRecipe() });
+    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), {
+      recipe: buildRecipe(),
+    });
     client.setQueryData(recipesKeys.recipes('shop-1'), {});
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
-    const { result } = renderHookWithProviders(() => useDeleteRecipe('token-1', 'shop-1'), {
-      queryClient: client,
-    });
-    await act(() => result.current.mutateAsync({ id: 'rp-1' }));
-    expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toBeUndefined();
-    expect(client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated).toBe(true);
-    expect(client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))?.isInvalidated).toBe(
-      true,
+    const { result } = renderHookWithProviders(
+      () => useDeleteRecipe(authState.identity, 'shop-1'),
+      {
+        queryClient: client,
+      },
     );
+    await act(() => result.current.mutateAsync({ id: 'rp-1' }));
+    expect(
+      client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1')),
+    ).toBeUndefined();
+    expect(
+      client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
+        ?.isInvalidated,
+    ).toBe(true);
     client.clear();
   });
   it('propagates rejected reads as typed API errors', async () => {
@@ -207,9 +257,14 @@ describe('recipes API contracts', () => {
         HttpResponse.json({ error: { message: 'Forbidden' } }, { status: 403 }),
       ),
     );
-    const { result } = renderHookWithProviders(() => useRecipe('token-1', 'shop-1', 'rp-1'));
+    const { result } = renderHookWithProviders(() =>
+      useRecipe(authState.identity, 'shop-1', 'rp-1'),
+    );
     await waitFor(() =>
-      expect(result.current.error).toMatchObject({ status: 403, message: 'Forbidden' }),
+      expect(result.current.error).toMatchObject({
+        status: 403,
+        message: 'Forbidden',
+      }),
     );
   });
 });

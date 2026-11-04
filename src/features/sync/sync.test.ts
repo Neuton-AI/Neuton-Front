@@ -18,9 +18,13 @@ vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
   apiFetch: api.fetch,
 }));
-const token = `header.${btoa(JSON.stringify({ sub: 'user-one' }))}.signature`;
-const context = { token, shopId: 'shop-one' };
-const scope = scopeFor(token, context.shopId);
+const identity = {
+  environment: 'test',
+  userId: 'user-one',
+  sessionId: 'session-one',
+};
+const context = { identity, shopId: 'shop-one' };
+const scope = scopeFor(identity, context.shopId);
 const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const key = documentKey(scope, 'recipe', id);
 const original: LocalDocument = {
@@ -44,14 +48,14 @@ beforeEach(async () => {
   });
   await store.transaction(
     [
-        'documents',
-        'writes',
-        'pulls',
-        'scans',
-        'blobs',
-        'settings',
-        'syncErrors',
-      ],
+      'documents',
+      'writes',
+      'pulls',
+      'scans',
+      'blobs',
+      'settings',
+      'syncErrors',
+    ],
     (tx) => {
       for (const name of [
         'documents',
@@ -127,18 +131,25 @@ const online = () =>
 it('recipe Save completes offline and persists a pending edit before reconnect', async () => {
   onlineManager.setOnline(false);
   const { result, queryClient } = renderHookWithProviders(() =>
-    useUpdateRecipe(context.token, context.shopId),
+    useUpdateRecipe(context.identity, context.shopId),
   );
   const body = {
-    name: 'Saved offline', imageUrl: null, prepTimeMinutes: 5,
-    yieldQuantity: 1, yieldUnit: 'portion', allergens: [], steps: [], ingredients: [],
+    name: 'Saved offline',
+    imageUrl: null,
+    prepTimeMinutes: 5,
+    yieldQuantity: 1,
+    yieldUnit: 'portion',
+    allergens: [],
+    steps: [],
+    ingredients: [],
   };
   try {
     act(() => result.current.mutate({ id, body }));
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.isPaused).toBe(false);
     expect(await store.get('documents', key)).toMatchObject({
-      data: { name: 'Saved offline' }, syncStatus: 'pending-push',
+      data: { name: 'Saved offline' },
+      syncStatus: 'pending-push',
     });
     expect(await store.writes(scope.key)).toMatchObject([
       { path: `/recipes/${id}`, method: 'PATCH', body },
@@ -154,21 +165,49 @@ describe('classified queue recovery', () => {
   it.each([false, true])(
     'refreshes calculated recipe costs after an acknowledged edit (already pushed: %s)',
     async (alreadyPushed) => {
-      await documentFetch(`/recipes/${id}`, { ...context, method: 'PATCH', body: {
-      ingredients: [{ rawName: 'Manual butter', quantity: 150, rawSrcUnit: 'g', generalPriceId: 'manual-price' }],
-    } });
+      await documentFetch(`/recipes/${id}`, {
+        ...context,
+        method: 'PATCH',
+        body: {
+          ingredients: [
+            {
+              rawName: 'Manual butter',
+              quantity: 150,
+              rawSrcUnit: 'g',
+              generalPriceId: 'manual-price',
+            },
+          ],
+        },
+      });
       const [write] = await store.writes(scope.key);
       let pushed = alreadyPushed;
-      const recipe = { id, name: 'Original', costing: {
-      ingredientsCost: 3, ingredients: [{ name: 'Manual butter', baseUnitAmount: '150.000', lineCost: 3 }],
-    } };
-      api.fetch.mockImplementation(async (path: string, options?: { method?: string }) => {
-      if (path === '/sync/check') return {
-        toPush: pushed ? [] : [{ kind: 'recipe', id, updatedAt: write!.updatedAt }], toPull: [],
+      const recipe = {
+        id,
+        name: 'Original',
+        costing: {
+          ingredientsCost: 3,
+          ingredients: [
+            { name: 'Manual butter', baseUnitAmount: '150.000', lineCost: 3 },
+          ],
+        },
       };
-      if (options?.method === 'PATCH') { pushed = true; return { recipe: { id } }; }
-      return { recipe };
-    });
+      api.fetch.mockImplementation(
+        async (path: string, options?: { method?: string }) => {
+          if (path === '/sync/check') {
+            return {
+              toPush: pushed
+                ? []
+                : [{ kind: 'recipe', id, updatedAt: write!.updatedAt }],
+              toPull: [],
+            };
+          }
+          if (options?.method === 'PATCH') {
+            pushed = true;
+            return { recipe: { id } };
+          }
+          return { recipe };
+        },
+      );
       online();
       await syncDocuments(scope, {
         ...context,
@@ -190,15 +229,25 @@ describe('classified queue recovery', () => {
       body: { name: 'Updated' },
     });
     let failRefresh = true;
-    api.fetch.mockImplementation(async (path: string, options?: { method?: string }) => {
-      if (path === '/sync/check') return {
-        toPush: (await store.writes(scope.key)).map((write) => ({ kind: 'recipe', id, updatedAt: write.updatedAt })),
-        toPull: [],
-      };
-      if (options?.method === 'PATCH') return { recipe: { id } };
-      if (failRefresh) throw new ApiError('Refresh unavailable', 503);
-      return { recipe: { id, name: 'Updated', costing: { ingredientsCost: 3 } } };
-    });
+    api.fetch.mockImplementation(
+      async (path: string, options?: { method?: string }) => {
+        if (path === '/sync/check') {
+          return {
+            toPush: (await store.writes(scope.key)).map((write) => ({
+              kind: 'recipe',
+              id,
+              updatedAt: write.updatedAt,
+            })),
+            toPull: [],
+          };
+        }
+        if (options?.method === 'PATCH') return { recipe: { id } };
+        if (failRefresh) throw new ApiError('Refresh unavailable', 503);
+        return {
+          recipe: { id, name: 'Updated', costing: { ingredientsCost: 3 } },
+        };
+      },
+    );
     online();
     await expect(syncDocuments(scope, context)).rejects.toThrow(
       'Refresh unavailable',
@@ -255,7 +304,7 @@ describe('classified queue recovery', () => {
     documentId = id,
     kind: 'recipe' | 'receipt' = 'recipe',
   ) {
-    if (documentId !== id)
+    if (documentId !== id) {
       await store.transaction(['documents'], (tx) => {
         tx.objectStore('documents').put({
           ...original,
@@ -266,6 +315,7 @@ describe('classified queue recovery', () => {
           updatedAt: 100,
         });
       });
+    }
     await documentFetch(`/${kind}s/${documentId}`, {
       ...context,
       method: 'PATCH',
@@ -274,7 +324,7 @@ describe('classified queue recovery', () => {
   }
   function compareAndPush(fail: (path: string) => unknown) {
     api.fetch.mockImplementation(async (path: string) => {
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return {
           toPush: (await store.writes(scope.key)).map((write) => ({
             kind: write.path.startsWith('/receipts') ? 'receipt' : 'recipe',
@@ -283,6 +333,7 @@ describe('classified queue recovery', () => {
           })),
           toPull: [],
         };
+      }
       const error = fail(path);
       if (error) throw error;
       return { recipe: { ...original.data, name: 'Changed' } };
@@ -334,7 +385,10 @@ describe('classified queue recovery', () => {
     expect(api.fetch).toHaveBeenCalledTimes(calls);
     expect(await store.writes(scope.key)).toHaveLength(2);
     compareAndPush(() => undefined);
-    await syncDocuments(scope, { ...context, token: token + '-refreshed' });
+    await syncDocuments(scope, {
+      ...context,
+      identity: { ...identity, sessionId: 'session-refreshed' },
+    });
     expect(await store.writes(scope.key)).toEqual([]);
   });
   it('backs off transient failures without accumulating duplicates', async () => {
@@ -382,10 +436,13 @@ describe('classified queue recovery', () => {
   });
   it('keeps cancellation, version negotiation and pull tombstones out of user errors', async () => {
     await queueEdit();
-    api.fetch.mockImplementation(async (path: string, options?: { method?: string }) =>
-      path === '/sync/check'
-        ? { toPush: [{ kind: 'recipe', id, updatedAt: 100 }], toPull: [] }
-        : options?.method === 'PATCH' ? { syncConflict: true } : { recipe: original.data },
+    api.fetch.mockImplementation(
+      async (path: string, options?: { method?: string }) =>
+        path === '/sync/check'
+          ? { toPush: [{ kind: 'recipe', id, updatedAt: 100 }], toPull: [] }
+          : options?.method === 'PATCH'
+            ? { syncConflict: true }
+            : { recipe: original.data },
     );
     online();
     await syncDocuments(scope, context);
@@ -408,10 +465,10 @@ describe('local-first persistence and synchronization', () => {
     expect(await documentFetch(`/recipes/${id}`, context)).toEqual({
       recipe: original.data,
     });
-    expect(await store.documents(scopeFor(token, 'another-shop').key)).toEqual(
-      [],
-    );
-    const another = `header.${btoa(JSON.stringify({ sub: 'another-user' }))}.signature`;
+    expect(
+      await store.documents(scopeFor(identity, 'another-shop').key),
+    ).toEqual([]);
+    const another = { environment: 'test', userId: 'another-user' };
     expect(
       await store.documents(scopeFor(another, context.shopId).key),
     ).toEqual([]);
@@ -592,7 +649,9 @@ describe('local-first persistence and synchronization', () => {
     online();
     api.fetch.mockResolvedValue({ toPush: [], toPull: [] });
     await syncDocuments(scope, context);
-    expect(api.fetch.mock.calls.every(([path]) => path === '/sync/check')).toBe(true);
+    expect(api.fetch.mock.calls.every(([path]) => path === '/sync/check')).toBe(
+      true,
+    );
   });
 
   it('replays the same mutation identity before acknowledging an equal queued revision', async () => {
@@ -603,8 +662,11 @@ describe('local-first persistence and synchronization', () => {
     });
     const [queued] = await store.writes(scope.key);
     online();
-    api.fetch.mockImplementation(async (path: string) => path === '/sync/check'
-      ? { toPush: [], toPull: [] } : { recipe: { ...original.data, name: 'Already on server' } });
+    api.fetch.mockImplementation(async (path: string) =>
+      path === '/sync/check'
+        ? { toPush: [], toPull: [] }
+        : { recipe: { ...original.data, name: 'Already on server' } },
+    );
     await syncDocuments(scope, context);
     const replay = api.fetch.mock.calls.find(
       ([, options]) => options?.method === 'PATCH',
@@ -622,8 +684,9 @@ describe('local-first persistence and synchronization', () => {
   it('persists pending downloads when a full-document request fails', async () => {
     online();
     api.fetch.mockImplementation(async (path: string) => {
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 200 }] };
+      }
       throw new ApiError('Connection dropped during pull', 0);
     });
     await expect(syncDocuments(scope, context)).rejects.toThrow(
@@ -644,7 +707,7 @@ describe('local-first persistence and synchronization', () => {
       'receipt',
       context,
     );
-    await store.logoutCleanup(scope.userId);
+    await store.logoutCleanup(identity);
     expect(await store.get('documents', key)).toBeUndefined();
     expect(await store.scans(scope.key)).toHaveLength(1);
     expect(await store.documents(scope.key)).toHaveLength(1);
@@ -658,8 +721,9 @@ describe('local-first persistence and synchronization', () => {
         this: IDBObjectStore,
         ...args: Parameters<typeof put>
       ) {
-        if (this.name === 'writes')
+        if (this.name === 'writes') {
           throw new DOMException('No space', 'QuotaExceededError');
+        }
         return put.apply(this, args);
       });
     await expect(
@@ -691,7 +755,7 @@ describe('local-first persistence and synchronization', () => {
         if (completionCalls === 2) throw new ApiError('Response lost', 0);
         return { queued: true, receiptId: id };
       }
-      if (path === '/uploads/presign')
+      if (path === '/uploads/presign') {
         return {
           uploadId: scan.id,
           receiptId: id,
@@ -705,6 +769,7 @@ describe('local-first persistence and synchronization', () => {
             },
           ],
         };
+      }
       return { toPush: [], toPull: [] };
     });
     const upload = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
@@ -800,13 +865,18 @@ describe('upload document continuity', () => {
     const scan = await queueScan('receipt');
     api.fetch.mockImplementation(async (path: string) => {
       if (path === '/uploads/complete') return { queued: true };
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return {
           toPush: [],
           toPull: [{ kind: 'receipt', id: scan.id, updatedAt: 50 }],
         };
+      }
       return {
-        receipt: { id: scan.id, status: 'processing', progressMessage: 'Reading' },
+        receipt: {
+          id: scan.id,
+          status: 'processing',
+          progressMessage: 'Reading',
+        },
       };
     });
     online();
@@ -816,7 +886,11 @@ describe('upload document continuity', () => {
     ).toMatchObject({
       id: scan.id,
       deleted: false,
-      data: { name: 'scan.jpg', status: 'processing', progressMessage: 'Reading' },
+      data: {
+        name: 'scan.jpg',
+        status: 'processing',
+        progressMessage: 'Reading',
+      },
     });
   });
 
@@ -824,13 +898,19 @@ describe('upload document continuity', () => {
     const scan = await queueScan('recipe');
     api.fetch.mockImplementation(async (path: string) => {
       if (path === '/uploads/complete') return { queued: true };
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return {
           toPush: [],
           toPull: [{ kind: 'recipe', id: scan.id, updatedAt: 50 }],
         };
+      }
       return {
-        recipe: { id: scan.id, name: 'Unreadable', status: 'failed', errorMessage: 'Try again' },
+        recipe: {
+          id: scan.id,
+          name: 'Unreadable',
+          status: 'failed',
+          errorMessage: 'Try again',
+        },
       };
     });
     online();
@@ -849,14 +929,17 @@ describe('upload document continuity', () => {
     let ready = false;
     api.fetch.mockImplementation(async (path: string) => {
       if (path === '/uploads/complete') return { queued: true };
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return {
           toPush: [],
           toPull: ready
             ? [{ kind: 'receipt', id: scan.id, updatedAt: 50 }]
             : [],
         };
-      return { receipt: { id: scan.id, name: 'Extracted later', status: 'unverified' } };
+      }
+      return {
+        receipt: { id: scan.id, name: 'Extracted later', status: 'unverified' },
+      };
     });
     online();
     await syncDocuments(scope, context);
@@ -902,13 +985,14 @@ describe('upload document continuity', () => {
     const scan = await queueScan('recipe');
     api.fetch.mockImplementation(async (path: string) => {
       if (path === '/uploads/complete') return { queued: true };
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return {
           toPush: [],
           toPull: [
             { kind: 'recipe', id: scan.id, updatedAt: Date.now() + 1000 },
           ],
         };
+      }
       throw new ApiError('Connection dropped during pull', 0);
     });
     online();
@@ -925,13 +1009,14 @@ describe('upload document continuity', () => {
     const scan = await queueScan('product');
     api.fetch.mockImplementation(async (path: string) => {
       if (path === '/uploads/complete') return { queued: true };
-      if (path === '/sync/check')
+      if (path === '/sync/check') {
         return {
           toPush: [],
           toPull: [
             { kind: 'recipe', id: scan.id, updatedAt: Date.now() + 1000 },
           ],
         };
+      }
       return {
         recipe: { id: scan.id, name: 'Saved', status: 'unverified' },
       };
@@ -946,8 +1031,9 @@ describe('upload document continuity', () => {
         if (
           this.name === 'documents' &&
           (args[0] as LocalDocument | undefined)?.data?.status === 'unverified'
-        )
+        ) {
           throw new DOMException('No space', 'QuotaExceededError');
+        }
         return put.apply(this, args);
       });
     online();
@@ -968,7 +1054,9 @@ describe('upload document continuity', () => {
     expect(
       await store.get<LocalDocument>('documents', scan.documentKey),
     ).toMatchObject({ data: { name: 'scan.jpg' }, deleted: false });
-    expect(await store.get<LocalDocument>('documents', scan.documentKey)).toMatchObject({
+    expect(
+      await store.get<LocalDocument>('documents', scan.documentKey),
+    ).toMatchObject({
       id: scan.id,
     });
   });
@@ -976,7 +1064,10 @@ describe('upload document continuity', () => {
   it('does not report placeholders as owned documents, so a missing server row is not a deletion', async () => {
     const scan = await queueScan('receipt');
     api.fetch.mockImplementation(
-      async (path: string, options?: { body?: { documents?: { id: string }[] } }) => {
+      async (
+        path: string,
+        options?: { body?: { documents?: { id: string }[] } },
+      ) => {
         if (path === '/uploads/complete') return { queued: true };
         if (path === '/sync/check') {
           expect(
@@ -1016,14 +1107,18 @@ describe('upload document continuity', () => {
 
   it('does not let another account sync remove this shop card', async () => {
     const scan = await queueScan('receipt');
-    const otherToken = `header.${btoa(JSON.stringify({ sub: 'user-two' }))}.signature`;
+    const otherToken = {
+      environment: 'test',
+      userId: 'user-two',
+      sessionId: 'session-two',
+    };
     online();
     api.fetch.mockResolvedValue({
       toPush: [],
       toPull: [{ kind: 'receipt', id: scan.id, updatedAt: 50, deleted: true }],
     });
     await syncDocuments(scopeFor(otherToken, 'shop-two'), {
-      token: otherToken,
+      identity: otherToken,
       shopId: 'shop-two',
     });
     expect(

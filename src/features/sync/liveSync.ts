@@ -1,3 +1,8 @@
+import {
+  apiOrigin,
+  beginApiRequest,
+  type AuthIdentity,
+} from "@/lib/api-context";
 /** One active run plus a trailing run for hints received while it is busy. */
 export function createSyncScheduler(run: () => Promise<void>) {
   let dirty = false,
@@ -12,11 +17,12 @@ export function createSyncScheduler(run: () => Promise<void>) {
         await run();
       }
     } catch {
-      if (!stopped)
+      if (!stopped) {
         retry = setTimeout(() => {
           dirty = true;
           if (!running) void drain();
         }, 3000);
+      }
     } finally {
       running = false;
     }
@@ -41,7 +47,7 @@ export async function readSyncEvents(
 ) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
   try {
     for (;;) {
       const { value, done } = await reader.read();
@@ -53,7 +59,7 @@ export async function readSyncEvents(
         buffer = buffer.slice(boundary.index + boundary[0].length);
         if (/^event: (reconcile|document-change)\r?$/m.test(frame)) receive();
       }
-      if (buffer.length > 65536) throw new Error('Invalid sync event stream');
+      if (buffer.length > 65536) throw new Error("Invalid sync event stream");
     }
   } finally {
     await reader.cancel().catch(() => undefined);
@@ -63,41 +69,42 @@ export async function readSyncEvents(
 
 /** Provider-independent HTTP stream; authorization stays in headers. */
 export function connectLiveSync(
-  context: { token: string; shopId: string },
+  context: { identity: AuthIdentity; shopId: string },
   receive: () => void,
 ) {
   const controller = new AbortController();
   let retry: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   let attempt = 0;
-  const base = (
-    import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
-  ).replace(/\/$/, '');
   const connect = async () => {
     const connection = new AbortController();
     const abort = () => connection.abort();
-    controller.signal.addEventListener('abort', abort, { once: true });
+    controller.signal.addEventListener("abort", abort, { once: true });
     const touch = () => {
       clearTimeout(watchdog);
       watchdog = setTimeout(() => connection.abort(), 45000);
     };
+    const request = beginApiRequest(context.identity, connection.signal);
     try {
+      request.assertCurrent();
       touch();
-      const response = await fetch(`${base}/api/v1/sync/events`, {
+      const response = await fetch(`${apiOrigin()}/api/v1/sync/events`, {
         headers: {
-          Authorization: `Bearer ${context.token}`,
-          'x-shop-id': context.shopId,
-          Accept: 'text/event-stream',
+          "x-client-user-id": context.identity.userId,
+          "x-shop-id": context.shopId,
+          Accept: "text/event-stream",
         },
-        signal: connection.signal,
+        signal: request.signal,
+        credentials: "include",
       });
       if (response.status === 401 || response.status === 403) return;
       if (
         !response.ok ||
         !response.body ||
-        !response.headers.get('content-type')?.includes('text/event-stream')
-      )
-        throw new Error('Sync stream unavailable');
+        !response.headers.get("content-type")?.includes("text/event-stream")
+      ) {
+        throw new Error("Sync stream unavailable");
+      }
       // Touch the watchdog on bytes, including heartbeat comments.
       const monitored = response.body.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
@@ -114,10 +121,11 @@ export function connectLiveSync(
     } catch {
       /* Reconnect and reconcile after transport failure. */
     } finally {
+      request.dispose();
       clearTimeout(watchdog);
-      controller.signal.removeEventListener('abort', abort);
+      controller.signal.removeEventListener("abort", abort);
     }
-    if (!controller.signal.aborted)
+    if (!controller.signal.aborted) {
       retry = setTimeout(
         () => {
           void connect();
@@ -127,6 +135,7 @@ export function connectLiveSync(
           1000 * 2 ** Math.min(attempt++, 5) + Math.random() * 2000,
         ),
       );
+    }
   };
   void connect();
   return () => {

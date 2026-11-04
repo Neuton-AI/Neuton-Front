@@ -1,10 +1,6 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import { useCreateOrder, useOrderQuote } from "@/features/orders/ordersApi";
 import type { OrderableRecipe } from "@/features/orders/types";
 import { useOrderableRecipes, useRecipes } from "@/features/recipes/recipesApi";
@@ -25,7 +21,7 @@ export type NewOrderRecipe = Omit<
 
 const today = () => new Date().toISOString().slice(0, 10);
 export function useNewOrderPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, identity, loading: authLoading } = useAuth();
 
   const {
     memberships,
@@ -51,8 +47,8 @@ export function useNewOrderPage() {
 
   const currency = shop?.currency ?? "USD";
 
-  const recipesQuery = useOrderableRecipes(token, activeShopId);
-  const catalogQuery = useRecipes(token, activeShopId);
+  const recipesQuery = useOrderableRecipes(identity, activeShopId);
+  const catalogQuery = useRecipes(identity, activeShopId);
 
   const orderable = recipesQuery.data?.recipes ?? [];
   const incompleteRecipes = (catalogQuery.data?.recipes ?? []).filter(
@@ -108,7 +104,7 @@ export function useNewOrderPage() {
 
   const debouncedDistanceKm = useDebouncedValue(deliveryDistanceKm, 250);
 
-  const quoteQuery = useOrderQuote(token, activeShopId, {
+  const quoteQuery = useOrderQuote(identity, activeShopId, {
     items: JSON.parse(debouncedItemsKey) as {
       recipeId: string;
       quantity: number;
@@ -133,7 +129,7 @@ export function useNewOrderPage() {
 
   const quoting = quoteQuery.isFetching;
 
-  const createOrder = useCreateOrder(token, activeShopId);
+  const createOrder = useCreateOrder(identity, activeShopId);
 
   const quantityOf = (recipeId: string) =>
     lines.find((line) => line.recipe.id === recipeId)?.quantity ?? 0;
@@ -146,8 +142,9 @@ export function useNewOrderPage() {
       const existing = current.find((line) => line.recipe.id === recipe.id);
       const next = Math.max(0, (existing?.quantity ?? 0) + delta);
 
-      if (next === 0)
+      if (next === 0) {
         return current.filter((line) => line.recipe.id !== recipe.id);
+      }
       if (existing) {
         return current.map((line) =>
           line.recipe.id === recipe.id ? { ...line, quantity: next } : line,
@@ -159,8 +156,14 @@ export function useNewOrderPage() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!token || !activeShopId || items.length === 0 || createOrder.isPending)
+    if (
+      !identity ||
+      !activeShopId ||
+      items.length === 0 ||
+      createOrder.isPending
+    ) {
       return;
+    }
 
     const validationError = Object.values(
       validateFields(fields, formValues),

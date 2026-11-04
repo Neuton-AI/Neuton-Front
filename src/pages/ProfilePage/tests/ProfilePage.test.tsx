@@ -11,7 +11,7 @@ it("renders account status and forwards tab and sign-out actions", async () => {
     handleSelectShop: vi.fn(),
     handleSaved: vi.fn(),
     user: null,
-    token: null,
+    identity: null,
     memberships: [],
     activeShopId: null,
     activeShop: null,

@@ -1,4 +1,4 @@
-import { useAuth, useShopMemberships } from "@/features/auth/supabase";
+import { useAuth, useShopMemberships } from "@/features/auth";
 import {
   useBarcodePrice,
   useManualProduct,
@@ -71,7 +71,7 @@ export function useRecipeEditPage() {
   const { id = "" } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, identity, loading: authLoading } = useAuth();
   const {
     memberships,
     activeShopId,
@@ -79,12 +79,12 @@ export function useRecipeEditPage() {
   } = useShopMemberships(user?.id);
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
   const canManage = role === "owner" || role === "admin";
-  const query = useRecipe(token, activeShopId, id);
+  const query = useRecipe(identity, activeShopId, id);
   const recipe = query.data?.recipe;
-  const update = useUpdateRecipe(token, activeShopId);
-  const deletion = useDeleteRecipe(token, activeShopId);
-  const barcode = useBarcodePrice(token, activeShopId);
-  const manual = useManualProduct(token, activeShopId);
+  const update = useUpdateRecipe(identity, activeShopId);
+  const deletion = useDeleteRecipe(identity, activeShopId);
+  const barcode = useBarcodePrice(identity, activeShopId);
+  const manual = useManualProduct(identity, activeShopId);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -128,16 +128,18 @@ export function useRecipeEditPage() {
     const incoming = recipeDraft(recipe);
     if (initialized.current === context) {
       const base = baseDraft.current;
-      if (base)
+      if (base) {
         setDraft((current) => {
           if (!current) return incoming;
           const merged = mergeDraft(base, current, incoming);
-          if (merged.conflicts.length)
+          if (merged.conflicts.length) {
             setConflicts((previous) => [
               ...new Set([...previous, ...merged.conflicts]),
             ]);
+          }
           return merged.data;
         });
+      }
       baseDraft.current = incoming;
       return;
     }
@@ -153,13 +155,15 @@ export function useRecipeEditPage() {
 
   useEffect(() => {
     const context = `${activeShopId}:${id}:${focusIngredient}`;
-    if (!draft || !focusIngredient || focusedContext.current === context)
+    if (!draft || !focusIngredient || focusedContext.current === context) {
       return;
+    }
     const selected =
       draft.ingredients.find((row) => row.key === focusIngredient) ??
       draft.ingredients[Number(focusIngredient)];
-    if (selected)
+    if (selected) {
       document.getElementById(`ingredient-${selected.key}`)?.focus();
+    }
     focusedContext.current = context;
   }, [draft, focusIngredient, activeShopId, id]);
 
@@ -235,11 +239,12 @@ export function useRecipeEditPage() {
   }
 
   function changeStep(index: number, value: string) {
-    if (draft)
+    if (draft) {
       changeField(
         "steps",
         draft.steps.map((step, i) => (i === index ? value : step)),
       );
+    }
   }
 
   function toggleAllergen(allergen: string) {
@@ -274,8 +279,9 @@ export function useRecipeEditPage() {
     const row = draft?.ingredients.find(
       (ingredient) => ingredient.key === scanKey,
     );
-    if (!row || !canManage || barcode.isPending || !token || !activeShopId)
+    if (!row || !canManage || barcode.isPending || !identity || !activeShopId) {
       return;
+    }
     const request = ++scanRequest.current;
     setScanError(null);
     try {
@@ -328,8 +334,9 @@ export function useRecipeEditPage() {
     const row = draft?.ingredients.find(
       (ingredient) => ingredient.key === scanKey,
     );
-    if (!row || !canManage || manual.isPending || !token || !activeShopId)
+    if (!row || !canManage || manual.isPending || !identity || !activeShopId) {
       return;
+    }
     const request = ++scanRequest.current;
     setScanError(null);
     try {
@@ -373,7 +380,7 @@ export function useRecipeEditPage() {
   }
 
   async function save() {
-    if (!draft || !canManage || !token || !activeShopId || busy) return;
+    if (!draft || !canManage || !identity || !activeShopId || busy) return;
     if (conflicts.length) {
       setError("Resolve the competing changes before saving.");
       return;
@@ -431,13 +438,14 @@ export function useRecipeEditPage() {
   }
 
   async function remove() {
-    if (!canManage || busy || !token || !activeShopId) return;
+    if (!canManage || busy || !identity || !activeShopId) return;
     if (
       !window.confirm(
         "Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.",
       )
-    )
+    ) {
       return;
+    }
     setError(null);
     try {
       await deletion.mutateAsync({ id });
@@ -545,7 +553,7 @@ export function useRecipeEditPage() {
       (ingredient) => ingredient.key === scanKey,
     ),
     scanCurrency:
-      memberships.find((row) => row.shopId === activeShopId)?.shops?.currency ??
+      memberships.find((row) => row.shopId === activeShopId)?.shop?.currency ??
       "USD",
     linkManualProduct,
     openScanner,

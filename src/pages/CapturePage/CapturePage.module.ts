@@ -1,4 +1,4 @@
-import { useAuth, useShopMemberships } from "@/features/auth/supabase";
+import { useAuth, useShopMemberships } from "@/features/auth";
 import { type MediaKind } from "@/features/uploads/types";
 import {
   MAX_UPLOAD_SOURCES,
@@ -30,7 +30,7 @@ export type CaptureSource = {
 type Collection = { sources: CaptureSource[]; currentId: string | null };
 
 export function useCapturePage() {
-  const { user, token } = useAuth();
+  const { user, identity } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const [params] = useSearchParams();
   const orderId = params.get("orderId") ?? undefined;
@@ -137,10 +137,11 @@ export function useCapturePage() {
         const track = stream.getVideoTracks?.()[0];
         if (track) autofocus.current = enableContinuousFocus(track);
       } catch {
-        if (active)
+        if (active) {
           setError(
             "Camera access denied or unavailable. You can still upload files.",
           );
+        }
       }
     })();
     return () => {
@@ -200,11 +201,12 @@ export function useCapturePage() {
       }
       accepted.push(makeSource(file));
     }
-    if (accepted.length)
+    if (accepted.length) {
       updateCollection({
         sources: [...previous.sources, ...accepted],
         currentId: accepted[accepted.length - 1].id,
       });
+    }
     setError(failure);
   };
   const handleShutter = async () => {
@@ -221,8 +223,9 @@ export function useCapturePage() {
       video.readyState < 2 ||
       !video.videoWidth ||
       !video.videoHeight
-    )
+    ) {
       return;
+    }
     capturingRef.current = true;
     setCapturing(true);
     const version = captureVersion.current;
@@ -234,11 +237,13 @@ export function useCapturePage() {
         version === captureVersion.current &&
         !busyRef.current &&
         !addingRef.current
-      )
+      ) {
         onPick([photo]);
+      }
     } catch {
-      if (alive.current && version === captureVersion.current)
+      if (alive.current && version === captureVersion.current) {
         setError("Could not take a photo. Try again or use your phone camera.");
+      }
     } finally {
       capturingRef.current = false;
       if (alive.current) setCapturing(false);
@@ -248,13 +253,21 @@ export function useCapturePage() {
     const video = videoRef.current;
     const stream = streamRef.current;
     const track = stream?.getVideoTracks?.()[0];
-    if (!video || !track || current || editingLocked() || focusPending.current)
+    if (
+      !video ||
+      !track ||
+      current ||
+      editingLocked() ||
+      focusPending.current
+    ) {
       return;
+    }
     focusPending.current = true;
     try {
       await autofocus.current;
-      if (streamRef.current === stream)
+      if (streamRef.current === stream) {
         await focusAtPoint(track, video, clientX, clientY);
+      }
     } catch {
       /* Unsupported and rejected focus remain silent. */
     } finally {
@@ -266,8 +279,9 @@ export function useCapturePage() {
       editingLocked() ||
       !collectionRef.current.currentId ||
       total >= MAX_UPLOAD_SOURCES
-    )
+    ) {
       return;
+    }
     addingRef.current = true;
     setAdding(true);
     const id = collectionRef.current.currentId;
@@ -300,8 +314,9 @@ export function useCapturePage() {
         animationRef.current = animation;
         await animation.finished;
       }
-      if (alive.current && collectionRef.current.currentId === id)
+      if (alive.current && collectionRef.current.currentId === id) {
         updateCollection({ ...collectionRef.current, currentId: null });
+      }
     } catch {
       /* Cancellation on navigation leaves the collection intact. */
     } finally {
@@ -372,13 +387,14 @@ export function useCapturePage() {
   const submit = async () => {
     if (
       !collectionRef.current.sources.length ||
-      !token ||
+      !identity ||
       !activeShopId ||
       busyRef.current ||
       addingRef.current ||
       capturingRef.current
-    )
+    ) {
       return;
+    }
     if (kind === "order" && !orderId) {
       setError("Open this capture from an order to attach its document.");
       return;
@@ -390,7 +406,7 @@ export function useCapturePage() {
       await saveScan(
         collectionRef.current.sources.map((source) => source.file),
         kind,
-        { token, shopId: activeShopId },
+        { identity, shopId: activeShopId },
         orderId,
       );
       navigate(kind === "receipt" ? "/catalog?tab=receipts" : "/catalog");
@@ -414,8 +430,9 @@ export function useCapturePage() {
   return {
     kind,
     setKind: (next: MediaKind) => {
-      if (!collectionRef.current.sources.length && !editingLocked())
+      if (!collectionRef.current.sources.length && !editingLocked()) {
         updateKind(next);
+      }
     },
     current,
     stacked,

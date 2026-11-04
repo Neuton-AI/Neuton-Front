@@ -24,7 +24,7 @@ const state = vi.hoisted(() => ({
   role: "owner" as "owner" | "admin" | "member",
 }));
 
-vi.mock("@/features/auth/supabase", async () => {
+vi.mock("@/features/auth", async () => {
   const { buildShop } = await import("@/test/factories/shops.factory");
   const shop = buildShop();
   return {
@@ -34,7 +34,7 @@ vi.mock("@/features/auth/supabase", async () => {
       session: null,
       loading: false,
       user: { id: "u1" },
-      token: "token-1",
+      identity: { environment: "test", userId: "u1", sessionId: "session-1" },
     }),
     useShopMemberships: () => ({
       memberships: [{ shopId: "shop-1", role: state.role, shops: shop }],
@@ -289,8 +289,9 @@ describe("RecipeDetailPage delete", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     api.apiFetch.mockImplementation(
       async (_path: string, init?: { method?: string }) => {
-        if (init?.method === "DELETE")
+        if (init?.method === "DELETE") {
           throw new Error("Could not delete the recipe.");
+        }
         return { recipe: makeRecipe("verified") };
       },
     );

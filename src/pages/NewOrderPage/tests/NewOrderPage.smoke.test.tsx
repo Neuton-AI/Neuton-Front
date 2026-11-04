@@ -9,10 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { NewOrderPage } from "../NewOrderPage";
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 beforeEach(resetAuth);
 it("loads a recipe, prices its quantity and opens the saved order through real HTTP", async () => {
   const user = userEvent.setup();
@@ -55,12 +52,13 @@ it.each([false, true])(
         HttpResponse.json({ recipes: [recipe] }),
       ),
     );
-    if (!mixed)
+    if (!mixed) {
       server.use(
         http.get(apiPath("/recipes/orderable"), () =>
           HttpResponse.json({ recipes: [] }),
         ),
       );
+    }
     const user = userEvent.setup();
     renderWithRouter(
       <Routes>
@@ -81,10 +79,11 @@ it.each([false, true])(
       within(row).getByRole("button", { name: "Remove one Brownies" }),
     ).toBeDisabled();
     expect(within(row).queryByText("$0.00")).toBeNull();
-    if (mixed)
+    if (mixed) {
       expect(
         screen.getByRole("button", { name: "Add one Soup" }),
       ).toBeEnabled();
+    }
     await user.click(within(row).getByRole("link", { name: "Complete" }));
     expect(
       await screen.findByRole("heading", { name: "Complete recipe costs" }),

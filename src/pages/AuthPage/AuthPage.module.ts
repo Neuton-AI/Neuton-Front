@@ -1,6 +1,7 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { supabase } from "@/features/auth/supabase";
+import { useAuth } from "@/features/auth";
+import { safeReturnPath } from "@/features/auth/client";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 type Mode = "signin" | "signup";
@@ -9,7 +10,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
 
   const location = useLocation();
 
-  const client = supabase;
+  const auth = useAuth();
 
   const [email, setEmail] = useState("");
 
@@ -28,12 +29,13 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   useEffect(() => {
     setError(null);
     setNotice(null);
+    setPassword("");
     setSegment(mode);
   }, [mode]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!client || busy) return;
+    if (busy) return;
     const validationError = Object.values(
       validateFields(fields, formValues),
     )[0];
@@ -46,27 +48,25 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     setNotice(null);
 
     try {
-      if (segment === "signin") {
-        const { error: signInError } = await client.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) throw signInError;
-      } else {
-        const { data, error: signUpError } = await client.auth.signUp({
-          email,
-          password,
-          options: { data: { fullName } },
-        });
-        if (signUpError) throw signUpError;
-        if (!data.session) {
-          setNotice("Check your inbox to confirm your email, then sign in.");
-          return;
-        }
+      if (segment === "signup") {
+        await auth.register(email, password, fullName.trim() || undefined);
+        setNotice(
+          "If registration can proceed, a confirmation email is on its way. Check your inbox, then sign in.",
+        );
+        return;
       }
-
+      const session = await auth.login(email, password);
+      if (!session) return;
+      if (session.user.status === "pending_email") {
+        navigate("/auth/confirm", { replace: true });
+        return;
+      }
+      if (!session.memberships.length) {
+        navigate("/profile", { replace: true });
+        return;
+      }
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from ?? "/dashboard", { replace: true });
+      navigate(safeReturnPath(from), { replace: true });
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -74,6 +74,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
           : "Something went wrong. Try again.",
       );
     } finally {
+      setPassword("");
       setBusy(false);
     }
   };
@@ -89,8 +90,8 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       label: "Full name",
       type: "text",
       autoComplete: "name",
-      required: true,
-      placeholder: "Your name",
+      maxLength: 100,
+      placeholder: "Your name (optional)",
       visible: () => !isSignIn,
     },
     {
@@ -110,7 +111,9 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       type: "password",
       autoComplete: isSignIn ? "current-password" : "new-password",
       required: true,
-      minLength: 8,
+      minCodePoints: 15,
+      maxCodePoints: 128,
+      maxLength: 256,
     },
   ];
   const handleFieldChange = (name: keyof typeof formValues, value: string) => {
@@ -122,7 +125,6 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     fields,
     formValues,
     handleFieldChange,
-    isConfigured: Boolean(client),
     busy,
     error,
     notice,

@@ -15,7 +15,7 @@ export const ProfilePage: React.FC = () => {
     handleSelectShop,
     handleSaved,
     user,
-    token,
+    identity,
     memberships,
     activeShopId,
     activeShop,
@@ -78,7 +78,7 @@ export const ProfilePage: React.FC = () => {
               />
             ) : (
               <ShopTab
-                token={token}
+                identity={identity}
                 shopId={activeShopId}
                 role={role}
                 fallbackName={activeShop?.name}

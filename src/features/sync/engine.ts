@@ -40,7 +40,7 @@ export const syncActivity = new Map<
     completedAt?: number;
   }
 >();
-const authenticatedTokens = new Map<string, string | null | undefined>();
+const authenticatedSessions = new Map<string, string | null | undefined>();
 
 export function syncDocuments(
   scope: Scope,
@@ -51,15 +51,15 @@ export function syncDocuments(
   const previous = running.get(scope.key);
   if (previous) return previous;
   const reauthenticated =
-    !authenticatedTokens.has(scope.key) ||
-    authenticatedTokens.get(scope.key) !== context.token;
-  authenticatedTokens.set(scope.key, context.token);
+    !authenticatedSessions.has(scope.key) ||
+    authenticatedSessions.get(scope.key) !== context.identity?.sessionId;
+  authenticatedSessions.set(scope.key, context.identity?.sessionId);
   const run = (async () => {
     do {
       await synchronize(
         scope,
         // A caller may be saving a PATCH; sync downloads must start as GETs.
-        { token: context.token, shopId: context.shopId },
+        { identity: context.identity, shopId: context.shopId },
         options.force ?? false,
         reauthenticated,
       );
@@ -83,9 +83,9 @@ async function synchronize(
   if (!navigator.onLine) return;
   // Web Locks serialize tabs as well as in-process runs. Server retry receipts also protect older browsers.
   const perform = () => transfer(scope, context, force, reauthenticated);
-  if (navigator.locks)
+  if (navigator.locks) {
     await navigator.locks.request(`neuton-sync:${scope.key}`, perform);
-  else await perform();
+  } else await perform();
 }
 
 async function transfer(
@@ -113,8 +113,9 @@ async function transfer(
     ) &&
     !reauthenticated &&
     !force
-  )
+  ) {
     return;
+  }
   const attempt = async (
     identity: ErrorContext,
     work: () => Promise<void>,
@@ -134,8 +135,9 @@ async function transfer(
           !(reauthenticated && row.category === 'session_expired') &&
           (!row.retryable || (row.nextRetryAt ?? 0) > Date.now()),
       )
-    )
+    ) {
       return false;
+    }
     syncActivity.set(scope.key, {
       running: true,
       entity: identity.entity,
@@ -146,7 +148,7 @@ async function transfer(
     try {
       await work();
       await resolveErrors(identity);
-      if (notify)
+      if (notify) {
         syncActivity.set(
           scope.key,
           (lastSuccess = {
@@ -160,13 +162,15 @@ async function transfer(
             completedAt: Date.now(),
           }),
         );
+      }
       return true;
     } catch (error) {
       if (
         (error instanceof Error || error instanceof DOMException) &&
         error.name === 'AbortError'
-      )
+      ) {
         return false;
+      }
       const upload = error instanceof UploadSourcesError ? error : null;
       if (upload?.failures.length) {
         for (const failure of upload.failures)
@@ -178,10 +182,12 @@ async function transfer(
           });
       } else await recordError(upload?.cause ?? error, identity);
       if (
-        (error instanceof ApiError && error.status === 401) ||
+        (error instanceof ApiError &&
+          (error.status === 401 || error.code === 'ACCOUNT_CHANGED')) ||
         (upload?.cause instanceof ApiError && upload.cause.status === 401)
-      )
+      ) {
         authenticationFailed = true;
+      }
       failures.push(error);
       return false;
     }
@@ -277,8 +283,9 @@ async function transfer(
         (pullKeys.has(write.documentKey) && write.baseVersion === undefined) ||
         failedDocuments.has(write.documentKey) ||
         write.updatedAt > (comparedVersions.get(write.documentKey) ?? 0)
-      )
+      ) {
         continue;
+      }
       const identity = writeContext(scope, write);
       // An equal revision already exists remotely, including a successful push whose response was lost.
       if (pushKeys.has(write.documentKey) || write.baseVersion !== undefined) {
@@ -318,23 +325,27 @@ async function transfer(
               const current = (await store.result(
                 tx.objectStore('documents').get(write.documentKey),
               )) as LocalDocument | undefined;
-              if (current)
+              if (current) {
                 tx.objectStore('documents').put({
                   ...current,
                   serverVersion: write.updatedAt,
                 });
+              }
               // Recipe PATCH returns the saved row without calculated ingredient costs.
               // Fetch the enriched detail even when revision negotiation now reports equality.
-              if (current?.kind === 'recipe' && !current.deleted &&
-                write.method === 'PATCH') {
-              tx.objectStore('pulls').put({
-                key: current.key,
-                scope: scope.key,
-                kind: current.kind,
-                id: current.id,
-                updatedAt: write.updatedAt,
-              } satisfies PendingPull);
-            }
+              if (
+                current?.kind === 'recipe' &&
+                !current.deleted &&
+                write.method === 'PATCH'
+              ) {
+                tx.objectStore('pulls').put({
+                  key: current.key,
+                  scope: scope.key,
+                  kind: current.kind,
+                  id: current.id,
+                  updatedAt: write.updatedAt,
+                } satisfies PendingPull);
+              }
               tx.objectStore('writes').delete(write.key);
             },
           );
@@ -370,11 +381,12 @@ async function transfer(
         const current = (await store.result(
           tx.objectStore('documents').get(key),
         )) as LocalDocument | undefined;
-        if (current && current.updatedAt <= meta.updatedAt)
+        if (current && current.updatedAt <= meta.updatedAt) {
           tx.objectStore('documents').put({
             ...current,
             syncStatus: 'pending-pull',
           });
+        }
       }
     });
     for (const meta of await store.rows<PendingPull>('pulls', scope.key)) {
@@ -423,8 +435,9 @@ async function transfer(
     if (acknowledged) store.changed();
     await pruneErrors(scope.key);
   } catch (error) {
-    if (!failures.includes(error))
+    if (!failures.includes(error)) {
       await recordError(error, { ...metadata, phase: 'local-persistence' });
+    }
     throw error;
   }
   if (failures.length) throw failures[0];
@@ -437,12 +450,13 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
   let deleted = Boolean(meta.deleted);
   if (!deleted) {
     try {
-      const response = await apiFetch<Record<string, LocalDocument['data']> & { syncVersion?: number }>(
-        `/${plural[meta.kind]}/${meta.id}`,
-        { ...context, syncSnapshot: true },
-      );
+      const response = await apiFetch<
+        Record<string, LocalDocument['data']> & { syncVersion?: number }
+      >(`/${plural[meta.kind]}/${meta.id}`, { ...context, syncSnapshot: true });
       data = response[meta.kind];
-      if (response.syncVersion !== undefined) meta = { ...meta, updatedAt: response.syncVersion };
+      if (response.syncVersion !== undefined) {
+        meta = { ...meta, updatedAt: response.syncVersion };
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) deleted = true;
       else throw error;
@@ -478,8 +492,9 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
               write.method !== 'PATCH' ||
               /\/(verify|deliver)$/.test(write.path),
           )
-        )
+        ) {
           conflicts.add('$document');
+        }
         // A changed server document is rebased atomically with the durable queue.
         let rebasedVersion = current.updatedAt;
         if (!conflicts.size && current.serverVersion !== meta.updatedAt) {
@@ -526,15 +541,17 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
         !placeholder &&
         !deleted &&
         current.updatedAt > meta.updatedAt
-      )
+      ) {
         return;
+      }
       if (
         placeholder &&
         current &&
         !deleted &&
         (data.status === 'pending' || data.status === 'processing')
-      )
+      ) {
         data = { ...current.data, ...data };
+      }
       docs.put({
         key,
         scope: scope.key,
@@ -553,8 +570,9 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
         if (
           write.documentKey === key &&
           (deleted || write.updatedAt <= meta.updatedAt)
-        )
+        ) {
           queue.delete(write.key);
+        }
       const errors = (await store.result(
         tx.objectStore('syncErrors').index('scope').getAll(scope.key),
       )) as import('./errors').SyncError[];
@@ -601,8 +619,9 @@ async function pushScan(
   scan: PendingScan,
 ) {
   const binary = await store.get<{ files: Blob[] }>('blobs', scan.key);
-  if (!binary)
+  if (!binary) {
     throw new DOMException('Saved scan files unavailable', 'NotFoundError');
+  }
   const files = binary.files.map(
     (blob, index) =>
       new File([blob], scan.filenames[index], { type: blob.type }),
@@ -617,8 +636,13 @@ async function pushScan(
     });
     completed = response.queued;
   } catch (error) {
-    if (!(error instanceof ApiError) || ![400, 404, 409].includes(error.status))
+    if (
+      !(error instanceof ApiError) ||
+      error.code === 'ACCOUNT_CHANGED' ||
+      ![400, 404, 409].includes(error.status)
+    ) {
       throw error;
+    }
   }
   if (!completed) {
     const session: UploadSession = {
@@ -647,7 +671,7 @@ async function pushScan(
       })),
     };
     await uploadSources(files, scan.kind, {
-      context: { token: context.token ?? null, shopId: scope.shopId },
+      context: { identity: context.identity ?? null, shopId: scope.shopId },
       session,
       orderId: scan.orderId,
       persistProgress: async (progress) => {

@@ -5,23 +5,23 @@ import { toNumber } from "@/lib/format";
 import { useEffect, useState } from "react";
 
 export function useShopTab({
-  token,
+  identity,
   shopId,
   role,
 
   onSaved,
   onNotice,
 }: {
-  token: string | null;
+  identity: import("@/lib/api-context").AuthIdentity | null;
   shopId: string | null;
   role: "owner" | "admin" | "member" | undefined;
   fallbackName: string | undefined;
   onSaved: () => void;
   onNotice: (message: string) => void;
 }) {
-  const shopQuery = useShopSettings(token, shopId);
+  const shopQuery = useShopSettings(identity, shopId);
 
-  const updateShop = useUpdateShop(token, shopId);
+  const updateShop = useUpdateShop(identity, shopId);
 
   const shop = shopQuery.data?.shop ?? null;
 
@@ -52,7 +52,7 @@ export function useShopTab({
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!token || !shopId || !canEdit || updateShop.isPending) return;
+    if (!identity || !shopId || !canEdit || updateShop.isPending) return;
 
     const validationError = Object.values(
       validateFields(fields, formValues),
@@ -84,12 +84,9 @@ export function useShopTab({
     void shopQuery.refetch();
   };
   const shopQueryIsLoading = shopQuery.isLoading;
-  const errorMessage =
-    shopQuery.error instanceof Error
-      ? shopQuery.error.message
-      : shopQuery.error
-        ? "Could not load shop settings."
-        : null;
+  let errorMessage: string | null = null;
+  if (shopQuery.error instanceof Error) errorMessage = shopQuery.error.message;
+  else if (shopQuery.error) errorMessage = "Could not load shop settings.";
 
   const formValues = form;
   const fields: readonly FormField<typeof formValues>[] = [
@@ -126,7 +123,7 @@ export function useShopTab({
       type: "number",
       inputMode: "decimal",
       min: 0,
-      step: 0.25,
+      step: 0.01,
     },
     {
       kind: "group",
@@ -149,7 +146,7 @@ export function useShopTab({
               type: "number",
               inputMode: "decimal",
               min: 0,
-              step: 0.25,
+              step: 0.01,
             },
             {
               kind: "input",
@@ -161,7 +158,7 @@ export function useShopTab({
               type: "number",
               inputMode: "decimal",
               min: 0,
-              step: 0.25,
+              step: 0.01,
             },
           ],
         },

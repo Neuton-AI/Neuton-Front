@@ -1,9 +1,5 @@
 import { useFabNavigation } from "@/components/Fab/Fab.module";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import { useOrders } from "@/features/orders/ordersApi";
 import type { Order, OrderStatus } from "@/features/orders/types";
 import { useMemo, useState } from "react";
@@ -16,7 +12,7 @@ function formatOrderHeader(order: Order): string {
 
 type StatusFilter = "all" | OrderStatus;
 export function useOrdersPage() {
-  const { user, token } = useAuth();
+  const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
@@ -27,7 +23,7 @@ export function useOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const { data, isLoading, error, refetch } = useOrders(
-    token,
+    identity,
     activeShopId,
     statusFilter,
   );

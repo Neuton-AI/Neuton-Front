@@ -2,13 +2,11 @@ import type React from "react";
 import { FormFields } from "@/components/FormFields/FormFields";
 import { Button } from "@/components/ui";
 import { Link } from "react-router-dom";
-import { AuthConfiguration } from "./components/AuthConfiguration/AuthConfiguration";
 import {
   AuthHeading,
   AuthModeTabs,
 } from "./components/AuthHeading/AuthHeading";
 import { useAuthPage } from "./AuthPage.module";
-import { AuthSocial } from "./components/AuthSocial/AuthSocial";
 
 type Mode = "signin" | "signup";
 
@@ -18,14 +16,20 @@ interface IAuthPage {
 
 export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
   const model = useAuthPage({ mode });
-  if (!model.isConfigured) return <AuthConfiguration />;
+  let submitLabel = model.isSignIn ? "Sign in" : "Create account";
+  if (model.busy) submitLabel = "Working…";
   return (
     <div className="shell">
       <div className="flex flex-1 flex-col justify-center px-6 pb-10">
         <AuthHeading isSignIn={model.isSignIn} />
         <AuthModeTabs isSignIn={model.isSignIn} onSelect={model.setSegment} />
-        <form onSubmit={model.submit} className="mt-6 flex flex-col gap-4">
+        <form
+          noValidate
+          onSubmit={model.submit}
+          className="mt-6 flex flex-col gap-4"
+        >
           <FormFields
+            disabled={model.busy}
             fields={model.fields}
             values={model.formValues}
             onChange={model.handleFieldChange}
@@ -55,11 +59,7 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
             loading={model.busy}
             className="h-12"
           >
-            {model.busy
-              ? "Working…"
-              : model.isSignIn
-                ? "Sign in"
-                : "Create account"}
+            {submitLabel}
           </Button>
         </form>
         {model.isSignIn && (
@@ -72,7 +72,6 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
             </Link>
           </p>
         )}
-        <AuthSocial />
       </div>
     </div>
   );

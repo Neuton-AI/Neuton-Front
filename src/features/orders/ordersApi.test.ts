@@ -1,3 +1,4 @@
+import { authState } from '@/test/auth';
 import { analyticsKeys } from '@/features/analytics/keys';
 import { buildOrder } from '@/test/factories/order.factory';
 import { apiPath, requireContext } from '@/test/mocks/handlers/context';
@@ -20,30 +21,46 @@ beforeEach(() => server.resetHandlers());
 describe('orders API contracts', () => {
   it.each([
     [null, 'shop-1'],
-    ['token-1', null],
+    [authState.identity, null],
     [null, null],
-  ])('does not request without token %s and shop %s', async (token, shop) => {
-    const { result } = renderHookWithProviders(() => useOrders(token, shop, 'all'));
-    expect(result.current.fetchStatus).toBe('idle');
-    expect(result.current.data).toBeUndefined();
-  });
+  ])(
+    'does not request without identity %s and shop %s',
+    async (identity, shop) => {
+      const { result } = renderHookWithProviders(() =>
+        useOrders(identity, shop, 'all'),
+      );
+      expect(result.current.fetchStatus).toBe('idle');
+      expect(result.current.data).toBeUndefined();
+    },
+  );
   it('sends tenant context and encodes the selected filter', async () => {
     let url = '';
     server.use(
       http.get(apiPath('/orders'), ({ request }) => {
         url = request.url;
-        return requireContext(request) ?? HttpResponse.json({ orders: [buildOrder()], total: 1 });
+        return (
+          requireContext(request) ??
+          HttpResponse.json({ orders: [buildOrder()], total: 1 })
+        );
       }),
     );
-    const { result } = renderHookWithProviders(() => useOrders('token-1', 'shop-1', 'delivered'));
+    const { result } = renderHookWithProviders(() =>
+      useOrders(authState.identity, 'shop-1', 'delivered'),
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(new URL(url).searchParams.get('status')).toBe('delivered');
     expect(new URL(url).searchParams.get('limit')).toBe('100');
   });
   it('keeps detail disabled without an ID and quote disabled without items', () => {
-    const detail = renderHookWithProviders(() => useOrder('token-1', 'shop-1', ''));
+    const detail = renderHookWithProviders(() =>
+      useOrder(authState.identity, 'shop-1', ''),
+    );
     const quote = renderHookWithProviders(() =>
-      useOrderQuote('token-1', 'shop-1', { items: [], distanceKm: 0, enabled: true }),
+      useOrderQuote(authState.identity, 'shop-1', {
+        items: [],
+        distanceKm: 0,
+        enabled: true,
+      }),
     );
     expect(detail.result.current.fetchStatus).toBe('idle');
     expect(quote.result.current.fetchStatus).toBe('idle');
@@ -53,34 +70,51 @@ describe('orders API contracts', () => {
     server.use(
       http.post(apiPath('/orders/quote'), async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ error: { message: 'Cannot price' } }, { status: 422 });
+        return HttpResponse.json(
+          { error: { message: 'Cannot price' } },
+          { status: 422 },
+        );
       }),
     );
     const { result } = renderHookWithProviders(() =>
-      useOrderQuote('token-1', 'shop-1', {
+      useOrderQuote(authState.identity, 'shop-1', {
         items: [{ recipeId: 'rp-1', quantity: 2 }],
         distanceKm: 5,
         enabled: true,
       }),
     );
-    await waitFor(() => expect(result.current.error?.message).toBe('Cannot price'));
-    expect(body).toEqual({ items: [{ recipeId: 'rp-1', quantity: 2 }], deliveryDistanceKm: 5 });
+    await waitFor(() =>
+      expect(result.current.error?.message).toBe('Cannot price'),
+    );
+    expect(body).toEqual({
+      items: [{ recipeId: 'rp-1', quantity: 2 }],
+      deliveryDistanceKm: 5,
+    });
   });
   it('posts a new order and invalidates sales and dashboard caches', async () => {
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
-    client.setQueryData(ordersKeys.orders('shop-1', 'all'), { orders: [], total: 0 });
+    client.setQueryData(ordersKeys.orders('shop-1', 'all'), {
+      orders: [],
+      total: 0,
+    });
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
     let body: unknown;
     server.use(
       http.post(apiPath('/orders'), async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ order: buildOrder(), totals: { netProfit: 1 } });
+        return HttpResponse.json({
+          order: buildOrder(),
+          totals: { netProfit: 1 },
+        });
       }),
     );
-    const { result } = renderHookWithProviders(() => useCreateOrder('token-1', 'shop-1'), {
-      queryClient: client,
-    });
+    const { result } = renderHookWithProviders(
+      () => useCreateOrder(authState.identity, 'shop-1'),
+      {
+        queryClient: client,
+      },
+    );
     const payload = {
       customerName: 'Ada',
       orderDate: '2026-10-16',
@@ -90,50 +124,80 @@ describe('orders API contracts', () => {
     };
     await act(() => result.current.mutateAsync(payload));
     expect(body).toEqual(payload);
-    expect(client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated).toBe(true);
-    expect(client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))?.isInvalidated).toBe(
-      true,
-    );
+    expect(
+      client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
+        ?.isInvalidated,
+    ).toBe(true);
   });
   it('removes deleted detail and invalidates sales and money', async () => {
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
-    client.setQueryData(ordersKeys.order('shop-1', 'o1'), { order: buildOrder() });
-    client.setQueryData(ordersKeys.orders('shop-1', 'all'), { orders: [], total: 0 });
+    client.setQueryData(ordersKeys.order('shop-1', 'o1'), {
+      order: buildOrder(),
+    });
+    client.setQueryData(ordersKeys.orders('shop-1', 'all'), {
+      orders: [],
+      total: 0,
+    });
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
     server.use(
       http.delete(
         apiPath('/orders/o1'),
-        ({ request }) => requireContext(request) ?? new HttpResponse(null, { status: 204 }),
+        ({ request }) =>
+          requireContext(request) ?? new HttpResponse(null, { status: 204 }),
       ),
     );
-    const { result } = renderHookWithProviders(() => useDeleteOrder('token-1', 'shop-1'), {
-      queryClient: client,
-    });
-    await act(() => result.current.mutateAsync({ id: 'o1' }));
-    expect(client.getQueryData(ordersKeys.order('shop-1', 'o1'))).toBeUndefined();
-    expect(client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated).toBe(true);
-    expect(client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))?.isInvalidated).toBe(
-      true,
+    const { result } = renderHookWithProviders(
+      () => useDeleteOrder(authState.identity, 'shop-1'),
+      {
+        queryClient: client,
+      },
     );
+    await act(() => result.current.mutateAsync({ id: 'o1' }));
+    expect(
+      client.getQueryData(ordersKeys.order('shop-1', 'o1')),
+    ).toBeUndefined();
+    expect(
+      client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
+        ?.isInvalidated,
+    ).toBe(true);
   });
   it('marks delivery without discarding cached line items', async () => {
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
     const items = [
-      { id: 'line', recipeId: 'rp-1', name: 'Soup', quantity: '1', unitCost: '3', unitPrice: '5' },
+      {
+        id: 'line',
+        recipeId: 'rp-1',
+        name: 'Soup',
+        quantity: '1',
+        unitCost: '3',
+        unitPrice: '5',
+      },
     ];
-    client.setQueryData(ordersKeys.order('shop-1', 'o1'), { order: { ...buildOrder(), items } });
+    client.setQueryData(ordersKeys.order('shop-1', 'o1'), {
+      order: { ...buildOrder(), items },
+    });
     server.use(
       http.post(
         apiPath('/orders/o1/verify'),
         ({ request }) =>
-          requireContext(request) ?? HttpResponse.json({ order: { status: 'delivered' } }),
+          requireContext(request) ??
+          HttpResponse.json({ order: { status: 'delivered' } }),
       ),
     );
-    const { result } = renderHookWithProviders(() => useMarkOrderDelivered('token-1', 'shop-1'), {
-      queryClient: client,
-    });
+    const { result } = renderHookWithProviders(
+      () => useMarkOrderDelivered(authState.identity, 'shop-1'),
+      {
+        queryClient: client,
+      },
+    );
     await act(() => result.current.mutateAsync({ id: 'o1' }));
     expect(client.getQueryData(ordersKeys.order('shop-1', 'o1'))).toEqual({
       order: { ...buildOrder(), status: 'delivered', items },
@@ -142,5 +206,7 @@ describe('orders API contracts', () => {
 });
 
 // Domain hook contracts use the network adapter; persistent synchronization has its own integration suite.
-vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
+vi.mock('@/features/sync/documentsApi', async () => ({
+  documentFetch: (await import('@/lib/api')).apiFetch,
+}));
 import { vi } from 'vitest';

@@ -7,10 +7,7 @@ import { act, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useCatalogPage } from "../CatalogPage.module";
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 beforeEach(resetAuth);
 it("prices supermarket-linked recipes consistently with detail", async () => {
   const recipe = buildRecipe();

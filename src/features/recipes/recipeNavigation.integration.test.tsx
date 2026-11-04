@@ -12,10 +12,7 @@ import { http, HttpResponse } from "msw";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
-vi.mock(
-  "@/features/auth/supabase",
-  async () => (await import("@/test/auth")).authMock,
-);
+vi.mock("@/features/auth", async () => (await import("@/test/auth")).authMock);
 vi.mock("@/components/BarcodeScanner/BarcodeScanner", () => ({
   BarcodeScanner: ({
     onClose,

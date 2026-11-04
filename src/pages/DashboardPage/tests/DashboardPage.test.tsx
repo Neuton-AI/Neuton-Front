@@ -21,14 +21,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SHOP_ID = "shop-1";
 
-vi.mock("@/features/auth/supabase", () => ({
-  useAuth: () => ({ user: { id: "u1" }, token: "test-token", loading: false }),
+vi.mock("@/features/auth", () => ({
+  useAuth: () => ({
+    user: { id: "u1" },
+    identity: { environment: "test", userId: "u1", sessionId: "session-1" },
+    loading: false,
+  }),
   useShopMemberships: () => ({
     memberships: [
       {
         shopId: SHOP_ID,
         role: "owner" as const,
-        shops: { id: SHOP_ID, name: "testShop", currency: "USD" },
+        shop: { id: SHOP_ID, name: "testShop", currency: "USD" },
       },
     ],
     activeShopId: SHOP_ID,

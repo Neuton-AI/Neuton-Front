@@ -40,11 +40,13 @@ export async function documentFetch<T>(
     id === 'quote' ||
     action === 'barcode-price' ||
     action === 'manual-product'
-  )
+  ) {
     return apiFetch<T>(path, context);
-  const scope = scopeFor(context.token, context.shopId);
-  if (context.method && context.method !== 'GET')
+  }
+  const scope = scopeFor(context.identity, context.shopId);
+  if (context.method && context.method !== 'GET') {
     return mutate<T>(path, kind, id, action, scope, context);
+  }
   const local = await store.documents(scope.key);
   if (!local.length && !(await store.get('settings', scope.key))) {
     try {
@@ -109,13 +111,15 @@ async function mutate<T>(
       const docs = tx.objectStore('documents');
       const old = (await store.result(docs.get(key))) as
         LocalDocument | undefined;
-      if (!old || old.deleted || old.localOnly)
+      if (!old || old.deleted || old.localOnly) {
         throw new ApiError('Sync required', 422, 'SYNC_REQUIRED');
+      }
       const updatedAt = Math.max(Date.now(), old.updatedAt + 1);
       const body = context.body as Record<string, unknown> | undefined;
       const deleted = context.method === 'DELETE';
-      if (deleted && kind === 'receipt' && old.data.status === 'verified')
+      if (deleted && kind === 'receipt' && old.data.status === 'verified') {
         throw new ApiError('Deletion unavailable', 422, 'VERIFIED_RECEIPT');
+      }
       const data: DocumentData = {
         ...(kind === 'recipe' && context.method === 'PATCH' && body
           ? optimisticRecipe(old.data, body)
@@ -187,7 +191,7 @@ export async function saveScan(
 ) {
   const error = validateUploadFiles(files);
   if (error) throw new Error(error);
-  const scope = scopeFor(context.token, context.shopId);
+  const scope = scopeFor(context.identity, context.shopId);
   const id = crypto.randomUUID();
   const documentKind: Kind = kind === 'product' ? 'recipe' : kind;
   const key = documentKey(scope, documentKind, id);
@@ -226,7 +230,7 @@ export async function saveScan(
   try {
     await store.transaction(['documents', 'scans', 'blobs'], (tx) => {
       // Attachments to an existing order do not create another order card.
-      if (kind !== 'order')
+      if (kind !== 'order') {
         tx.objectStore('documents').put({
           key,
           scope: scope.key,
@@ -238,6 +242,7 @@ export async function saveScan(
           localOnly: true,
           syncStatus: 'pending-push',
         } satisfies LocalDocument);
+      }
       tx.objectStore('scans').put({
         key: id,
         scope: scope.key,

@@ -1,7 +1,7 @@
 /**
  * Typed API client for the Neuton Fastify backend.
  *
- * Auth is a Supabase JWT; the active shop travels in `x-shop-id` because the
+ * Auth uses HttpOnly cookies; the active shop travels in `x-shop-id` because the
  * API resolves shop membership server-side from that header.
  *
  * The Faro trace id travels as `x-trace-id` so a browser session, the API log
@@ -11,28 +11,16 @@
  */
 
 import { faro } from '@grafana/faro-web-sdk';
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
-).replace(/\/$/, '');
-
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string,
-    readonly retryAfterMs?: number,
-    readonly traceId?: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+import { ApiError } from './api-error';
+export { ApiError } from './api-error';
+import { apiOrigin, beginApiRequest, type AuthIdentity } from './api-context';
+import { getCsrfToken, resetCsrf } from '@/features/auth/csrf';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
-  token?: string | null;
+  identity?: AuthIdentity | null;
+  expectedUserId?: string;
   shopId?: string | null;
   signal?: AbortSignal;
   syncSnapshot?: boolean;
@@ -50,8 +38,9 @@ function readError(
   status: number,
 ): { message: string; code?: string } {
   const fallback = `Request failed (${status})`;
-  if (typeof payload !== 'object' || payload === null)
+  if (typeof payload !== 'object' || payload === null) {
     return { message: fallback };
+  }
 
   const top = payload as { message?: unknown; error?: unknown; code?: unknown };
   const topCode = typeof top.code === 'string' ? top.code : undefined;
@@ -76,73 +65,110 @@ function readError(
 
 export async function apiFetch<T>(
   path: string,
-  { method = 'GET', body, token, shopId, signal, sync, syncSnapshot }: RequestOptions = {},
+  {
+    method = 'GET',
+    body,
+    identity,
+    expectedUserId,
+    shopId,
+    signal,
+    sync,
+    syncSnapshot,
+  }: RequestOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (shopId) headers['x-shop-id'] = shopId;
-  if (syncSnapshot) headers['x-sync-snapshot'] = 'true';
-  if (sync) {
-    headers['x-sync-id'] = sync.id;
-    headers['x-sync-version'] = String(sync.updatedAt);
-    if (sync.baseVersion !== undefined)
-      headers['x-sync-base-version'] = String(sync.baseVersion);
-  }
-  const traceId = faro.api.getTraceContext()?.trace_id;
-  if (traceId) headers['x-trace-id'] = traceId;
-
-  let response: Response;
+  const activeRequest = beginApiRequest(identity, signal);
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError')
-      throw error;
-    throw new ApiError(
-      'Cannot reach the server. Check your connection and try again.',
-      0,
-    );
-  }
-
-  if (response.status === 204) return undefined as T;
-
-  // A non-JSON body (HTML from a proxy, empty 502) must not throw out of
-  // JSON.parse, which would surface as an unhandled SyntaxError.
-  const text = await response.text();
-  let payload: unknown = null;
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = null;
+    activeRequest.assertCurrent();
+    const headers: Record<string, string> = {};
+    if (body !== undefined || method !== 'GET') {
+      headers['Content-Type'] = 'application/json';
     }
-  }
+    if (method !== 'GET') headers['x-csrf-token'] = await getCsrfToken();
+    activeRequest.assertCurrent();
 
-  if (!response.ok) {
-    const { message, code } = readError(payload, response.status);
-    const retryAfter = response.headers.get('Retry-After');
-    const seconds = retryAfter === null ? NaN : Number(retryAfter);
-    const retryAfterMs =
-      retryAfter === null
-        ? undefined
-        : Number.isFinite(seconds)
-          ? Math.max(0, seconds * 1000)
-          : Math.max(0, Date.parse(retryAfter) - Date.now());
-    throw new ApiError(
-      message,
-      response.status,
-      code,
-      Number.isFinite(retryAfterMs) ? retryAfterMs : undefined,
-      response.headers.get('x-trace-id') ?? traceId,
-    );
-  }
+    if (shopId) headers['x-shop-id'] = shopId;
+    const clientUserId = expectedUserId ?? identity?.userId;
+    if (clientUserId) headers['x-client-user-id'] = clientUserId;
+    if (syncSnapshot) headers['x-sync-snapshot'] = 'true';
+    if (sync) {
+      headers['x-sync-id'] = sync.id;
+      headers['x-sync-version'] = String(sync.updatedAt);
+      if (sync.baseVersion !== undefined) {
+        headers['x-sync-base-version'] = String(sync.baseVersion);
+      }
+    }
+    const traceId = faro.api.getTraceContext()?.trace_id;
+    if (traceId) headers['x-trace-id'] = traceId;
 
-  return payload as T;
+    let response: Response;
+    try {
+      response = await fetch(`${apiOrigin()}/api/v1${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: activeRequest.signal,
+        credentials: 'include',
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error;
+      }
+      throw new ApiError(
+        'Cannot reach the server. Check your connection and try again.',
+        0,
+      );
+    }
+
+    activeRequest.assertCurrent();
+    if (response.status === 204) return undefined as T;
+
+    // A non-JSON body (HTML from a proxy, empty 502) must not throw out of
+    // JSON.parse, which would surface as an unhandled SyntaxError.
+    const text = await response.text();
+    let payload: unknown = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = null;
+      }
+    }
+
+    activeRequest.assertCurrent();
+    if (!response.ok) {
+      if (response.status === 403) resetCsrf();
+      if (response.status === 403 && shopId) {
+        window.dispatchEvent(
+          new CustomEvent('neuton-shop-access-lost', { detail: shopId }),
+        );
+      }
+      const { message, code } = readError(payload, response.status);
+      if ((response.status === 401 && identity) || code === 'ACCOUNT_CHANGED') {
+        resetCsrf();
+        window.dispatchEvent(new Event('neuton-shop-access-lost'));
+      }
+      const retryAfter = response.headers.get('Retry-After');
+      const seconds = retryAfter === null ? NaN : Number(retryAfter);
+      let retryAfterMs: number | undefined;
+      if (retryAfter !== null) {
+        retryAfterMs = Math.max(0, Date.parse(retryAfter) - Date.now());
+        if (Number.isFinite(seconds)) {
+          retryAfterMs = Math.max(0, seconds * 1000);
+        }
+      }
+      throw new ApiError(
+        message,
+        response.status,
+        code,
+        Number.isFinite(retryAfterMs) ? retryAfterMs : undefined,
+        response.headers.get('x-trace-id') ?? traceId,
+      );
+    }
+
+    return payload as T;
+  } finally {
+    activeRequest.dispose();
+  }
 }
 
 export type { RequestOptions };

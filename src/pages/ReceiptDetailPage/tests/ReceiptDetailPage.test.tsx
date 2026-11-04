@@ -25,7 +25,7 @@ const state = vi.hoisted(() => ({
   role: "owner" as "owner" | "admin" | "member",
 }));
 
-vi.mock("@/features/auth/supabase", async () => {
+vi.mock("@/features/auth", async () => {
   const { buildShop } = await import("@/test/factories/shops.factory");
   const shop = buildShop();
   return {
@@ -35,7 +35,7 @@ vi.mock("@/features/auth/supabase", async () => {
       session: null,
       loading: false,
       user: { id: "u1" },
-      token: "token-1",
+      identity: { environment: "test", userId: "u1", sessionId: "session-1" },
     }),
     useShopMemberships: () => ({
       memberships: [{ shopId: "shop-1", role: state.role, shops: shop }],
@@ -96,10 +96,12 @@ it("saves a merchant correction during review and retains the filename in detail
       path: string,
       options?: { method?: string; body?: { merchantName: string } },
     ) => {
-      if (path.startsWith("/uploads/"))
+      if (path.startsWith("/uploads/")) {
         return { url: "https://cdn.test/rc-1.png", expiresIn: 60 };
-      if (options?.method === "PATCH")
+      }
+      if (options?.method === "PATCH") {
         detail = { ...detail, merchantName: options.body!.merchantName };
+      }
       return { receipt: detail };
     },
   );

@@ -6,6 +6,7 @@ import { useAppChrome } from "@/features/pwa/useAppChrome";
 import { Route, Routes } from "react-router-dom";
 import { RequireAuth, RootRedirect } from "./AppGate";
 import { AuthenticatedRoutes } from "./AppRoutes";
+import { ConfirmEmailPage } from "@/pages/ConfirmEmailPage/ConfirmEmailPage";
 
 export const App: React.FC = () => {
   useAppChrome();
@@ -17,6 +18,7 @@ export const App: React.FC = () => {
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/signin" element={<AuthPage mode="signin" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
+        <Route path="/auth/confirm" element={<ConfirmEmailPage />} />
         <Route
           path="/*"
           element={

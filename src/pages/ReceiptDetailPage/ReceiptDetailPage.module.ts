@@ -1,9 +1,5 @@
 import { useSheetClose } from "@/components/Sheet/Sheet.module";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import { useReceipt, useVerifyReceipt } from "@/features/receipts/receiptsApi";
 import type { VerifyReceiptBody } from "@/features/receipts/types";
 import { useState } from "react";
@@ -12,17 +8,17 @@ import { useParams } from "react-router-dom";
 export function useReceiptDetailPage() {
   const { id = "" } = useParams();
 
-  const { user, token } = useAuth();
+  const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const receiptQuery = useReceipt(token, activeShopId, id);
+  const receiptQuery = useReceipt(identity, activeShopId, id);
 
   const receipt = receiptQuery.data?.receipt ?? null;
 
-  const verifyMutation = useVerifyReceipt(token, activeShopId);
+  const verifyMutation = useVerifyReceipt(identity, activeShopId);
 
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the receipt. */
@@ -58,14 +54,15 @@ export function useReceiptDetailPage() {
    */
   const verify = async () => {
     if (
-      !token ||
+      !identity ||
       !activeShopId ||
       !id ||
       !canVerify ||
       verifyMutation.isPending ||
       !receipt
-    )
+    ) {
       return;
+    }
 
     setVerifyError(null);
     const body: VerifyReceiptBody = {
@@ -96,7 +93,7 @@ export function useReceiptDetailPage() {
   };
   const verifyPending = verifyMutation.isPending;
   return {
-    token,
+    identity,
     activeShopId,
     receipt,
     verifyError,

@@ -1,5 +1,12 @@
+import { setApiIdentity } from '@/lib/api-context';
+import { authState } from './auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, renderHook, type RenderOptions, type RenderResult } from '@testing-library/react';
+import {
+  render,
+  renderHook,
+  type RenderOptions,
+  type RenderResult,
+} from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { MemoryRouter, type MemoryRouterProps } from 'react-router-dom';
 
@@ -49,6 +56,7 @@ export function renderWithRouter(
     </QueryClientProvider>
   );
 
+  setApiIdentity(authState.identity);
   return render(ui, { wrapper: Wrapper, ...options });
 }
 
@@ -70,6 +78,7 @@ export function renderHookWithProviders<T, P>(
       </MemoryRouter>
     </QueryClientProvider>
   );
+  setApiIdentity(authState.identity);
   return { ...renderHook(hook, { wrapper, initialProps }), queryClient };
 }
 

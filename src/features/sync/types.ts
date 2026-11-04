@@ -2,7 +2,12 @@ import type { RequestOptions } from '@/lib/api';
 import type { MediaKind } from '@/features/uploads/types';
 
 export type Kind = 'receipt' | 'recipe' | 'order';
-export type Scope = { userId: string; shopId: string; key: string };
+export type Scope = {
+  environment?: string;
+  userId: string;
+  shopId: string;
+  key: string;
+};
 export type DocumentData = Record<string, unknown> & { id: string };
 export type LocalDocument = {
   key: string;
@@ -59,20 +64,17 @@ export type PendingPull = {
 export const documentKey = (scope: Scope, kind: Kind, id: string) =>
   `${scope.key}:${kind}:${id}`;
 
-/** JWT subject namespaces local data; server authorization remains the API's responsibility. */
+/** The server projection namespaces local data; only the cookie authorizes API access. */
 export function scopeFor(
-  token: string | null | undefined,
+  identity: import('@/lib/queryTypes').AuthenticatedContext,
   shopId: string | null | undefined,
 ): Scope {
-  if (!token || !shopId) throw new Error('Sign in');
-  const part = token.split('.')[1];
-  const userId = part
-    ? (
-        JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as {
-          sub?: string;
-        }
-      ).sub
-    : undefined;
-  if (!userId) throw new Error('Session expired');
-  return { userId, shopId, key: `${userId}:${shopId}` };
+  if (!identity || !shopId) throw new Error('Sign in');
+  const { environment, userId } = identity;
+  return {
+    environment,
+    userId,
+    shopId,
+    key: `${environment}:${userId}:${shopId}`,
+  };
 }

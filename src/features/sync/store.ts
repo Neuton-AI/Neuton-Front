@@ -108,7 +108,9 @@ export const writes = (scope: string) => rows<PendingWrite>('writes', scope);
 export const scans = (scope: string) => rows<PendingScan>('scans', scope);
 
 /** Retain private pending work for the same account; drop synced records on explicit sign-out. */
-export async function logoutCleanup(userId: string) {
+export async function logoutCleanup(
+  identity: import('@/lib/api-context').AuthIdentity,
+) {
   await transaction(['documents', 'settings'], async (tx) => {
     for (const name of ['documents', 'settings'] as const) {
       const store = tx.objectStore(name);
@@ -117,10 +119,13 @@ export async function logoutCleanup(userId: string) {
       })[];
       for (const value of values) {
         if (
-          value.scope.startsWith(`${userId}:`) &&
+          value.scope.startsWith(
+            `${identity.environment}:${identity.userId}:`,
+          ) &&
           (name === 'settings' || value.syncStatus === 'synced')
-        )
+        ) {
           store.delete(value.key);
+        }
       }
     }
   });

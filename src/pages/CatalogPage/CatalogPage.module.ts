@@ -1,9 +1,5 @@
 import { useFabNavigation, type MediaKind } from "@/components/Fab/Fab.module";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/supabase";
+import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import { useInventory } from "@/features/inventory/inventoryApi";
 import { useReceipts } from "@/features/receipts/receiptsApi";
 import { useRecipes } from "@/features/recipes/recipesApi";
@@ -24,7 +20,7 @@ const TAB_TO_KIND: Record<Tab, MediaKind> = {
 };
 export function useCatalogPage() {
   const location = useLocation();
-  const { user, token } = useAuth();
+  const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
@@ -44,11 +40,15 @@ export function useCatalogPage() {
   // Each tab is its own query, enabled only while visible: `/recipes` costs
   // every recipe against live inventory, so fetching all three on mount is both
   // wasteful and the reason one 404 could discard a successful receipts response.
-  const recipesQuery = useRecipes(token, activeShopId, tab === "recipes");
+  const recipesQuery = useRecipes(identity, activeShopId, tab === "recipes");
 
-  const inventoryQuery = useInventory(token, activeShopId, tab === "inventory");
+  const inventoryQuery = useInventory(
+    identity,
+    activeShopId,
+    tab === "inventory",
+  );
 
-  const receiptsQuery = useReceipts(token, activeShopId, tab === "receipts");
+  const receiptsQuery = useReceipts(identity, activeShopId, tab === "receipts");
 
   const recipes = (recipesQuery.data?.recipes ?? []).map((recipe) => ({
     ...recipe,

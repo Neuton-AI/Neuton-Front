@@ -11,7 +11,7 @@ import { useShopTab } from "../components/ShopTab/ShopTab.module";
 const onSaved = vi.fn();
 const onNotice = vi.fn();
 const props = {
-  token: "token-1",
+  identity: { environment: "test", userId: "u1", sessionId: "session-1" },
   shopId: "shop-1",
   role: "owner" as const,
   fallbackName: "testShop",

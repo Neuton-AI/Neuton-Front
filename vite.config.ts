@@ -51,15 +51,14 @@ export default defineConfig({
     },
   },
   server: {
+    host: 'localhost',
     port: 5173,
+    proxy: { '/api': { target: 'http://localhost:4000', changeOrigin: false } },
   },
   build: {
     rollupOptions: {
       output: {
-        // Supabase dwarfs the app code, so it gets its own long-lived chunk
-        // instead of invalidating the main bundle on every release.
         manualChunks: {
-          supabase: ['@supabase/supabase-js'],
           react: ['react', 'react-dom', 'react-router-dom'],
         },
       },

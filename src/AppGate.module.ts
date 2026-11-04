@@ -1,13 +1,8 @@
-import { useAuth } from "@/features/auth/supabase";
+import { useAuth } from "@/features/auth";
 import { useLocation } from "react-router-dom";
-
 export function useRootRedirect() {
-  const { session, loading } = useAuth();
-  return { session, loading };
+  return useAuth();
 }
-
 export function useRequireAuth() {
-  const { session, loading } = useAuth();
-  const location = useLocation();
-  return { session, loading, from: location.pathname };
+  return { ...useAuth(), from: useLocation().pathname };
 }

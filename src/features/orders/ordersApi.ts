@@ -1,9 +1,13 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
 import type { StatusFilter } from '@/features/orders/types';
-import { type Order, type OrderDetail, type OrderQuote } from '@/features/orders/types';
+import {
+  type Order,
+  type OrderDetail,
+  type OrderQuote,
+} from '@/features/orders/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
-import type { ShopId, Token } from '@/lib/queryTypes';
+import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {
   keepPreviousData,
@@ -15,7 +19,7 @@ import {
 } from '@tanstack/react-query';
 
 export function useOrders(
-  token: Token,
+  identity: AuthenticatedContext,
   shopId: ShopId,
   statusFilter: StatusFilter,
 ): UseQueryResult<{ orders: Order[]; total: number }> {
@@ -23,62 +27,84 @@ export function useOrders(
     queryKey: ordersKeys.orders(shopId, statusFilter),
     queryFn: ({ signal }) =>
       apiFetch<{ orders: Order[]; total: number }>(
-        statusFilter === 'all' ? '/orders?limit=100' : `/orders?limit=100&status=${statusFilter}`,
-        { token, shopId, signal },
+        statusFilter === 'all'
+          ? '/orders?limit=100'
+          : `/orders?limit=100&status=${statusFilter}`,
+        { identity, shopId, signal },
       ),
-    enabled: enabled(token, shopId),
+    enabled: enabled(identity, shopId),
   });
 }
 
 export function useOrder(
-  token: Token,
+  identity: AuthenticatedContext,
   shopId: ShopId,
   id: string,
 ): UseQueryResult<{ order: OrderDetail }> {
   return useQuery({
     queryKey: ordersKeys.order(shopId, id),
     queryFn: ({ signal }) =>
-      apiFetch<{ order: OrderDetail }>(`/orders/${id}`, { token, shopId, signal }),
-    enabled: enabled(token, shopId) && Boolean(id),
+      apiFetch<{ order: OrderDetail }>(`/orders/${id}`, {
+        identity,
+        shopId,
+        signal,
+      }),
+    enabled: enabled(identity, shopId) && Boolean(id),
   });
 }
 
 export function useOrderQuote(
-  token: Token,
+  identity: AuthenticatedContext,
   shopId: ShopId,
-  inputs: { items: { recipeId: string; quantity: number }[]; distanceKm: number; enabled: boolean },
+  inputs: {
+    items: { recipeId: string; quantity: number }[];
+    distanceKm: number;
+    enabled: boolean;
+  },
 ): UseQueryResult<OrderQuote> {
   return useQuery({
-    queryKey: ['order-quote', shopId, JSON.stringify(inputs.items), inputs.distanceKm],
+    queryKey: [
+      'order-quote',
+      shopId,
+      JSON.stringify(inputs.items),
+      inputs.distanceKm,
+    ],
     queryFn: ({ signal }) =>
       apiFetch<OrderQuote>('/orders/quote', {
         method: 'POST',
-        token,
+        identity,
         shopId,
         signal,
         body: { deliveryDistanceKm: inputs.distanceKm, items: inputs.items },
       }),
-    enabled: enabled(token, shopId) && inputs.enabled && inputs.items.length > 0,
+    enabled:
+      enabled(identity, shopId) && inputs.enabled && inputs.items.length > 0,
     placeholderData: keepPreviousData,
   });
 }
 
 export function useCreateOrder(
-  token: Token,
+  identity: AuthenticatedContext,
   shopId: ShopId,
-): UseMutationResult<{ order: Order; totals: { netProfit: number } }, Error, CreateOrderBody> {
+): UseMutationResult<
+  { order: Order; totals: { netProfit: number } },
+  Error,
+  CreateOrderBody
+> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateOrderBody) =>
       apiFetch<{ order: Order; totals: { netProfit: number } }>('/orders', {
         method: 'POST',
-        token,
+        identity,
         shopId,
         body,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
-      void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });
+      void queryClient.invalidateQueries({
+        queryKey: analyticsKeys.dashboardRoot,
+      });
     },
   });
 }
@@ -92,7 +118,7 @@ export type CreateOrderBody = {
 };
 
 export function useMarkOrderDelivered(
-  token: Token,
+  identity: AuthenticatedContext,
   shopId: ShopId,
 ): UseMutationResult<{ order: OrderDetail }, Error, { id: string }> {
   const queryClient = useQueryClient();
@@ -100,7 +126,7 @@ export function useMarkOrderDelivered(
     mutationFn: ({ id }) =>
       apiFetch<{ order: OrderDetail }>(`/orders/${id}/verify`, {
         method: 'POST',
-        token,
+        identity,
         shopId,
       }),
     onSuccess: (data, { id }) => {
@@ -117,17 +143,23 @@ export function useMarkOrderDelivered(
 }
 
 export function useDeleteOrder(
-  token: Token,
+  identity: AuthenticatedContext,
   shopId: ShopId,
 ): UseMutationResult<undefined, Error, { id: string }> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }) =>
-      apiFetch<undefined>(`/orders/${id}`, { method: 'DELETE', token, shopId }),
+      apiFetch<undefined>(`/orders/${id}`, {
+        method: 'DELETE',
+        identity,
+        shopId,
+      }),
     onSuccess: (_data, { id }) => {
       queryClient.removeQueries({ queryKey: ordersKeys.order(shopId, id) });
       void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
-      void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });
+      void queryClient.invalidateQueries({
+        queryKey: analyticsKeys.dashboardRoot,
+      });
     },
   });
 }
