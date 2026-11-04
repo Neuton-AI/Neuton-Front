@@ -1,3 +1,4 @@
+import { isApiIdentityCurrent } from '@/lib/api-context';
 import { analyticsKeys } from '@/features/analytics/keys';
 import type {
   ManualProduct,
@@ -93,6 +94,7 @@ export function useVerifyRecipe(
         body: {},
       }),
     onSuccess: (data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       const key = recipesKeys.recipe(identity, shopId, id);
       queryClient.setQueryData<{ recipe: Recipe }>(key, (old) =>
         old
@@ -133,6 +135,7 @@ export function useDeleteRecipe(
         shopId,
       }),
     onSuccess: (_data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       queryClient.removeQueries({
         queryKey: recipesKeys.recipe(identity, shopId, id),
       });
@@ -165,6 +168,7 @@ export function useUpdateRecipe(
         body,
       }),
     onSuccess: (_data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       void queryClient.invalidateQueries({
         queryKey: recipesKeys.recipe(identity, shopId, id),
       });

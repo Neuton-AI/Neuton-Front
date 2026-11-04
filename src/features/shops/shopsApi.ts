@@ -1,3 +1,4 @@
+import { isApiIdentityCurrent } from '@/lib/api-context';
 import { shopsKeys } from '@/features/shops/keys';
 import { type Shop } from '@/features/shops/types';
 import { apiFetch } from '@/lib/api';
@@ -47,6 +48,7 @@ export function useUpdateShop(
         body,
       }),
     onSuccess: (data) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       queryClient.setQueryData(shopsKeys.shop(identity, shopId), data);
     },
   });

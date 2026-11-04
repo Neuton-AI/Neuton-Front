@@ -1,3 +1,4 @@
+import { useCurrentOperation } from "@/features/auth/useCurrentOperation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useUpdateReceiptMerchant } from "@/features/receipts/receiptsApi";
 import type { Receipt } from "@/features/receipts/types";
@@ -13,6 +14,7 @@ export function useReceiptMerchantEditor({
   identity,
   shopId,
 }: MerchantEditorProps) {
+  const isCurrent = useCurrentOperation(identity, shopId);
   const [name, setName] = useState(receipt.merchantName?.trim() ?? "");
   const base = useRef({
     id: receipt.id,
@@ -40,7 +42,9 @@ export function useReceiptMerchantEditor({
     setError(null);
     try {
       await update.mutateAsync({ id: receipt.id, merchantName: trimmed });
+      if (!isCurrent()) return;
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(
         cause instanceof Error ? cause.message : "Could not save merchant.",
       );

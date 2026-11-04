@@ -1,3 +1,4 @@
+import { useCurrentOperation } from "@/features/auth/useCurrentOperation";
 import { useRecipeNavigation } from "@/features/recipes/recipeNavigation";
 import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import {
@@ -18,6 +19,7 @@ export function useRecipeDetailPage() {
   const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
+  const isCurrent = useCurrentOperation(identity, activeShopId);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
@@ -91,7 +93,9 @@ export function useRecipeDetailPage() {
     setVerifyError(null);
     try {
       await verifyMutation.mutateAsync({ id });
+      if (!isCurrent()) return;
     } catch (cause) {
+      if (!isCurrent()) return;
       setVerifyError(
         cause instanceof Error ? cause.message : "Could not verify the recipe.",
       );
@@ -128,8 +132,10 @@ export function useRecipeDetailPage() {
     setDeleteError(null);
     try {
       await deleteMutation.mutateAsync({ id });
+      if (!isCurrent()) return;
       navigate("/catalog?tab=recipes", { replace: true });
     } catch (cause) {
+      if (!isCurrent()) return;
       setDeleteError(
         cause instanceof Error ? cause.message : "Could not delete the recipe.",
       );

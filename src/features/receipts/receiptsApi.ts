@@ -1,3 +1,4 @@
+import { isApiIdentityCurrent } from '@/lib/api-context';
 import { analyticsKeys } from '@/features/analytics/keys';
 import { inventoryKeys } from '@/features/inventory/keys';
 import { receiptsKeys } from '@/features/receipts/keys';
@@ -74,6 +75,7 @@ export function useVerifyReceipt(
         body,
       }),
     onSuccess: (data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       const key = receiptsKeys.receipt(identity, shopId, id);
       queryClient.setQueryData<{ receipt: ReceiptDetail }>(key, (old) =>
         old ? { receipt: { ...old.receipt, status: data.status } } : old,
@@ -108,6 +110,7 @@ export function useUpdateReceiptMerchant(
         body: { merchantName },
       }),
     onSuccess: (data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       const key = receiptsKeys.receipt(identity, shopId, id);
       queryClient.setQueryData<{ receipt: ReceiptDetail }>(key, (old) =>
         old ? { receipt: { ...old.receipt, ...data.receipt } } : old,
@@ -134,6 +137,7 @@ export function useDeleteReceipt(
         shopId,
       }),
     onSuccess: (_data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       queryClient.removeQueries({
         queryKey: receiptsKeys.receipt(identity, shopId, id),
       });

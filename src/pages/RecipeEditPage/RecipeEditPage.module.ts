@@ -1,3 +1,4 @@
+import { useCurrentOperation } from "@/features/auth/useCurrentOperation";
 import { useAuth, useShopMemberships } from "@/features/auth";
 import {
   useBarcodePrice,
@@ -77,6 +78,7 @@ export function useRecipeEditPage() {
     activeShopId,
     loading: membershipsLoading,
   } = useShopMemberships(user?.id);
+  const isCurrent = useCurrentOperation(identity, activeShopId);
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
   const canManage = role === "owner" || role === "admin";
   const query = useRecipe(identity, activeShopId, id);
@@ -294,6 +296,7 @@ export function useRecipeEditPage() {
           rawSrcUnit: row.rawSrcUnit,
         },
       });
+      if (!isCurrent()) return;
       if (request !== scanRequest.current) return;
       setDraft((current) =>
         current
@@ -318,6 +321,7 @@ export function useRecipeEditPage() {
       );
       closeScanner();
     } catch (cause) {
+      if (!isCurrent()) return;
       if (request === scanRequest.current) {
         setScanError(
           cause instanceof Error
@@ -347,6 +351,7 @@ export function useRecipeEditPage() {
           rawMaterialName: row.rawMaterialName,
         },
       });
+      if (!isCurrent()) return;
       if (request !== scanRequest.current) return;
       setDraft((current) =>
         current
@@ -371,6 +376,7 @@ export function useRecipeEditPage() {
       );
       closeScanner();
     } catch (cause) {
+      if (!isCurrent()) return;
       if (request === scanRequest.current) {
         setScanError(
           cause instanceof Error ? cause.message : "Could not save product.",
@@ -429,8 +435,10 @@ export function useRecipeEditPage() {
     };
     try {
       await update.mutateAsync({ id, body });
+      if (!isCurrent()) return;
       showDetails();
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(
         cause instanceof Error ? cause.message : "Could not save the recipe.",
       );
@@ -449,8 +457,10 @@ export function useRecipeEditPage() {
     setError(null);
     try {
       await deletion.mutateAsync({ id });
+      if (!isCurrent()) return;
       navigate("/catalog?tab=recipes", { replace: true });
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(
         cause instanceof Error ? cause.message : "Could not delete the recipe.",
       );

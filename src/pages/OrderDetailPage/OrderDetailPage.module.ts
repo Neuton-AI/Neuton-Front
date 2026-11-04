@@ -1,3 +1,4 @@
+import { useCurrentOperation } from "@/features/auth/useCurrentOperation";
 import { useSheetClose } from "@/components/Sheet/Sheet.module";
 import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import {
@@ -19,6 +20,7 @@ export function useOrderDetailPage() {
   const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
+  const isCurrent = useCurrentOperation(identity, activeShopId);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
@@ -76,8 +78,10 @@ export function useOrderDetailPage() {
     setActionError(null);
     try {
       await deleteOrder.mutateAsync({ id });
+      if (!isCurrent()) return;
       navigate("/orders", { replace: true });
     } catch (cause) {
+      if (!isCurrent()) return;
       setActionError(
         cause instanceof Error ? cause.message : "Could not delete the order.",
       );
@@ -100,7 +104,9 @@ export function useOrderDetailPage() {
     setMarkError(null);
     try {
       await markOrder.mutateAsync({ id });
+      if (!isCurrent()) return;
     } catch (cause) {
+      if (!isCurrent()) return;
       setMarkError(
         cause instanceof Error
           ? cause.message

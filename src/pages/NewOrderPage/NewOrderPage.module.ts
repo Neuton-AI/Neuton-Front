@@ -1,3 +1,4 @@
+import { useCurrentOperation } from "@/features/auth/useCurrentOperation";
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
 import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
@@ -28,6 +29,7 @@ export function useNewOrderPage() {
     activeShopId,
     loading: shopsLoading,
   } = useShopMemberships(user?.id);
+  const isCurrent = useCurrentOperation(identity, activeShopId);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
@@ -181,8 +183,10 @@ export function useNewOrderPage() {
         deliveryDistanceKm: toNumber(deliveryDistanceKm),
         items,
       });
+      if (!isCurrent()) return;
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
+      if (!isCurrent()) return;
       setSubmitError(
         cause instanceof Error ? cause.message : "Could not save the order.",
       );

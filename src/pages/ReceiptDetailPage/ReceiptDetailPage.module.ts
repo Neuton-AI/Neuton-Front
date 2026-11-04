@@ -1,3 +1,4 @@
+import { useCurrentOperation } from "@/features/auth/useCurrentOperation";
 import { useSheetClose } from "@/components/Sheet/Sheet.module";
 import { useAuth, useCurrentShop, useShopMemberships } from "@/features/auth";
 import { useReceipt, useVerifyReceipt } from "@/features/receipts/receiptsApi";
@@ -11,6 +12,7 @@ export function useReceiptDetailPage() {
   const { user, identity } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
+  const isCurrent = useCurrentOperation(identity, activeShopId);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
@@ -70,7 +72,9 @@ export function useReceiptDetailPage() {
     };
     try {
       await verifyMutation.mutateAsync({ id, body });
+      if (!isCurrent()) return;
     } catch (cause) {
+      if (!isCurrent()) return;
       setVerifyError(
         cause instanceof Error
           ? cause.message

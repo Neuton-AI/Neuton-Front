@@ -1,3 +1,4 @@
+import { isApiIdentityCurrent } from '@/lib/api-context';
 import {
   sameQueryPartition,
   identityQueryKey,
@@ -114,6 +115,7 @@ export function useCreateOrder(
         body,
       }),
     onSuccess: () => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       void queryClient.invalidateQueries({
         queryKey: ordersKeys.ordersRoot(identity),
       });
@@ -146,6 +148,7 @@ export function useMarkOrderDelivered(
         shopId,
       }),
     onSuccess: (data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       const key = ordersKeys.order(identity, shopId, id);
       // The transition response carries the order row without its items, so
       // only the status is taken; the refetch brings back the full detail.
@@ -174,6 +177,7 @@ export function useDeleteOrder(
         shopId,
       }),
     onSuccess: (_data, { id }) => {
+      if (!isApiIdentityCurrent(identity, shopId)) return;
       queryClient.removeQueries({
         queryKey: ordersKeys.order(identity, shopId, id),
       });

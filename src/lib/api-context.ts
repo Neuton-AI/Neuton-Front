@@ -12,6 +12,23 @@ let epoch = 0;
 const pending = new Set<AbortController>();
 export const apiOrigin = () => window.location.origin;
 export const currentApiEpoch = () => epoch;
+export function isApiIdentityCurrent(
+  expected: AuthIdentity | null | undefined,
+  shopId?: string | null,
+): boolean {
+  return Boolean(
+    expected &&
+    identity &&
+    expected.userId === identity.userId &&
+    expected.environment === identity.environment &&
+    expected.sessionId === identity.sessionId &&
+    expected.generation === identity.generation &&
+    Boolean(expected.offline) === Boolean(identity.offline) &&
+    (identity.shopId === undefined ||
+      shopId === undefined ||
+      shopId === identity.shopId),
+  );
+}
 export function invalidateApiRequests(): void {
   epoch += 1;
   for (const controller of pending) controller.abort();
@@ -47,14 +64,7 @@ export function beginApiRequest(
       expected === null ||
       controller.signal.aborted ||
       capturedEpoch !== epoch ||
-      (expected &&
-        (expected.userId !== identity?.userId ||
-          expected.environment !== identity?.environment ||
-          expected.sessionId !== identity?.sessionId ||
-          expected.generation !== identity?.generation ||
-          (identity?.shopId !== undefined &&
-            shopId !== undefined &&
-            shopId !== identity.shopId)))
+      (expected && !isApiIdentityCurrent(expected, shopId))
     ) {
       throw new DOMException("Account context changed", "AbortError");
     }
