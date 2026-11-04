@@ -21,12 +21,20 @@ describe('recipes API contracts', () => {
   it('saves recipe edits without replacing costed detail with the partial PATCH response', async () => {
     const client = createTestQueryClient();
     const recipe = buildRecipe();
-    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), { recipe });
-    client.setQueryData(recipesKeys.recipes('shop-1'), { recipes: [recipe] });
-    client.setQueryData(recipesKeys.orderableRecipes('shop-1'), {
-      recipes: [],
+    client.setQueryData(
+      recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      { recipe },
+    );
+    client.setQueryData(recipesKeys.recipes(authState.identity, 'shop-1'), {
+      recipes: [recipe],
     });
-    client.setQueryData(analyticsKeys.dashboardRoot, {});
+    client.setQueryData(
+      recipesKeys.orderableRecipes(authState.identity, 'shop-1'),
+      {
+        recipes: [],
+      },
+    );
+    client.setQueryData(analyticsKeys.dashboardRoot(authState.identity), {});
     let submitted: unknown;
     server.use(
       http.patch(apiPath('/recipes/rp-1'), async ({ request }) => {
@@ -62,14 +70,18 @@ describe('recipes API contracts', () => {
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1', body }));
     expect(submitted).toEqual(body);
-    expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
+    expect(
+      client.getQueryData(
+        recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      ),
+    ).toEqual({
       recipe,
     });
     for (const key of [
-      recipesKeys.recipe('shop-1', 'rp-1'),
-      recipesKeys.recipes('shop-1'),
-      recipesKeys.orderableRecipes('shop-1'),
-      analyticsKeys.dashboardRoot,
+      recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      recipesKeys.recipes(authState.identity, 'shop-1'),
+      recipesKeys.orderableRecipes(authState.identity, 'shop-1'),
+      analyticsKeys.dashboardRoot(authState.identity),
     ]) {
       expect(client.getQueryState(key)?.isInvalidated).toBe(true);
     }
@@ -78,9 +90,12 @@ describe('recipes API contracts', () => {
   it('looks up barcode prices without invalidating saved recipes before the draft is saved', async () => {
     const client = createTestQueryClient();
     const invalidate = vi.spyOn(client, 'invalidateQueries');
-    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), {
-      recipe: buildRecipe(),
-    });
+    client.setQueryData(
+      recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      {
+        recipe: buildRecipe(),
+      },
+    );
     const body = {
       barcode: '0012345678901',
       rawMaterialName: 'Tomato',
@@ -138,7 +153,7 @@ describe('recipes API contracts', () => {
     expect(calls).toBe(1);
     await act(() =>
       queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipe('shop-1', 'rp-1'),
+        queryKey: recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
       }),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
@@ -168,7 +183,7 @@ describe('recipes API contracts', () => {
     expect(calls).toBe(1);
     await act(() =>
       queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipes('shop-1'),
+        queryKey: recipesKeys.recipes(authState.identity, 'shop-1'),
       }),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
@@ -189,13 +204,21 @@ describe('recipes API contracts', () => {
     );
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
-    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), {
-      recipe: buildRecipe(),
-    });
-    client.setQueryData(recipesKeys.recipes('shop-1'), { recipes: [] });
-    client.setQueryData(recipesKeys.orderableRecipes('shop-1'), {
+    client.setQueryData(
+      recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      {
+        recipe: buildRecipe(),
+      },
+    );
+    client.setQueryData(recipesKeys.recipes(authState.identity, 'shop-1'), {
       recipes: [],
     });
+    client.setQueryData(
+      recipesKeys.orderableRecipes(authState.identity, 'shop-1'),
+      {
+        recipes: [],
+      },
+    );
     const { result } = renderHookWithProviders(
       () => useVerifyRecipe(authState.identity, 'shop-1'),
       {
@@ -204,15 +227,21 @@ describe('recipes API contracts', () => {
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1' }));
     expect(body).toEqual({});
-    expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
+    expect(
+      client.getQueryData(
+        recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      ),
+    ).toEqual({
       recipe: buildRecipe({ status: 'verified' }),
     });
     expect(
-      client.getQueryState(recipesKeys.orderableRecipes('shop-1'))
-        ?.isInvalidated,
+      client.getQueryState(
+        recipesKeys.orderableRecipes(authState.identity, 'shop-1'),
+      )?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated,
+      client.getQueryState(recipesKeys.recipes(authState.identity, 'shop-1'))
+        ?.isInvalidated,
     ).toBe(true);
     client.clear();
   });
@@ -227,11 +256,17 @@ describe('recipes API contracts', () => {
     );
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
-    client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), {
-      recipe: buildRecipe(),
-    });
-    client.setQueryData(recipesKeys.recipes('shop-1'), {});
-    client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
+    client.setQueryData(
+      recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      {
+        recipe: buildRecipe(),
+      },
+    );
+    client.setQueryData(recipesKeys.recipes(authState.identity, 'shop-1'), {});
+    client.setQueryData(
+      analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      {},
+    );
     const { result } = renderHookWithProviders(
       () => useDeleteRecipe(authState.identity, 'shop-1'),
       {
@@ -240,14 +275,18 @@ describe('recipes API contracts', () => {
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1' }));
     expect(
-      client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1')),
+      client.getQueryData(
+        recipesKeys.recipe(authState.identity, 'shop-1', 'rp-1'),
+      ),
     ).toBeUndefined();
     expect(
-      client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated,
+      client.getQueryState(recipesKeys.recipes(authState.identity, 'shop-1'))
+        ?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
-        ?.isInvalidated,
+      client.getQueryState(
+        analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      )?.isInvalidated,
     ).toBe(true);
     client.clear();
   });

@@ -76,9 +76,22 @@ export async function apiFetch<T>(
     syncSnapshot,
   }: RequestOptions = {},
 ): Promise<T> {
-  const activeRequest = beginApiRequest(identity, signal);
+  const activeRequest = beginApiRequest(identity, signal, shopId);
   try {
     activeRequest.assertCurrent();
+    if (identity && (identity.offline || !navigator.onLine)) {
+      throw new ApiError(
+        'Connection required. Your saved work is kept on this device.',
+        0,
+      );
+    }
+    if (identity?.expiresAt !== undefined && identity.expiresAt <= Date.now()) {
+      window.dispatchEvent(new Event('neuton-shop-access-lost'));
+      throw new ApiError(
+        'Session expired. Sign in again to sync your saved work.',
+        401,
+      );
+    }
     const headers: Record<string, string> = {};
     if (body !== undefined || method !== 'GET') {
       headers['Content-Type'] = 'application/json';

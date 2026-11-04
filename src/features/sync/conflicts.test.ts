@@ -1,3 +1,9 @@
+import { setApiIdentity } from '@/lib/api-context';
+import { scopeFor } from './types';
+const context = {
+  identity: { environment: 'test', userId: 'conflict-user' },
+  shopId: 'conflict-shop',
+};
 import 'fake-indexeddb/auto';
 import { beforeEach, expect, it } from 'vitest';
 import * as store from './store';
@@ -6,7 +12,7 @@ import type { LocalDocument, PendingWrite } from './types';
 
 const document: LocalDocument = {
   key: 'conflict-doc',
-  scope: 'conflict-scope',
+  scope: scopeFor(context.identity, context.shopId).key,
   kind: 'receipt',
   id: 'receipt',
   updatedAt: 100,
@@ -18,6 +24,7 @@ const document: LocalDocument = {
   conflicts: ['merchantName'],
 };
 beforeEach(async () => {
+  setApiIdentity(context.identity);
   await store.transaction(['documents', 'writes'], (tx) => {
     tx.objectStore('documents').clear();
     tx.objectStore('writes').clear();
@@ -38,7 +45,12 @@ beforeEach(async () => {
 it.each(['local', 'server'] as const)(
   'resolves a field using %s and rebases the durable request',
   async (choice) => {
-    await resolveDocumentConflict(document.key, 'merchantName', choice);
+    await resolveDocumentConflict(
+      document.key,
+      'merchantName',
+      choice,
+      context,
+    );
     const saved = await store.get<LocalDocument>('documents', document.key);
     const [write] = await store.writes(document.scope);
     const name = choice === 'local' ? 'Mine' : 'Theirs';
@@ -57,10 +69,10 @@ it('retains remotely deleted work until deletion is explicitly accepted', async 
       .put({ ...document, remoteDeleted: true, conflicts: ['$deleted'] }),
   );
   await expect(
-    resolveDocumentConflict(document.key, '$deleted', 'local'),
+    resolveDocumentConflict(document.key, '$deleted', 'local', context),
   ).rejects.toThrow();
   expect(await store.writes(document.scope)).toHaveLength(1);
-  await resolveDocumentConflict(document.key, '$deleted', 'server');
+  await resolveDocumentConflict(document.key, '$deleted', 'server', context);
   expect(
     (await store.get<LocalDocument>('documents', document.key))?.deleted,
   ).toBe(true);
@@ -83,7 +95,7 @@ it('resolving a conflicting field does not overwrite an incoming change to anoth
       body: { merchantName: 'Mine', totalAmount: 10 },
     });
   });
-  await resolveDocumentConflict(document.key, 'merchantName', 'local');
+  await resolveDocumentConflict(document.key, 'merchantName', 'local', context);
   expect((await store.writes(document.scope))[0].body).toEqual({
     merchantName: 'Mine',
     totalAmount: 25,

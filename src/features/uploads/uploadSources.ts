@@ -1,3 +1,4 @@
+import { beginLocalOperation, isContextAbort } from '@/features/sync/authority';
 import {
   ALLOWED_CONTENT_TYPES,
   type GroupPresignResponse,
@@ -20,6 +21,7 @@ export type UploadSourceState = {
 };
 
 export type UploadSession = {
+  owner: string;
   /** Kept even if the initial presign response is lost, so retries cannot create another document. */
   clientRequestId: string;
   kind: MediaKind;
@@ -79,7 +81,7 @@ export function validateUploadFiles(files: readonly File[]): string | null {
 }
 
 /** Upload an ordered document; retrying its session preserves all successful PUTs. */
-export async function uploadSources(
+async function uploadCurrent(
   files: readonly File[],
   kind: MediaKind,
   {
@@ -89,7 +91,15 @@ export async function uploadSources(
     persistProgress,
     orderId,
   }: UploadSourcesOptions,
+  lease: ReturnType<typeof beginLocalOperation>,
 ): Promise<UploadCompleteResponse> {
+  lease.assertCurrent();
+  if (previous && previous.owner !== lease.scope.key) {
+    throw new DOMException(
+      'Upload belongs to another account or shop',
+      'AbortError',
+    );
+  }
   const validationError = validateUploadFiles(files);
   if (validationError) throw new Error(validationError);
   if (
@@ -109,6 +119,7 @@ export async function uploadSources(
         sources: previous.sources.map((source) => ({ ...source })),
       }
     : {
+        owner: lease.scope.key,
         clientRequestId: crypto.randomUUID(),
         kind,
         ...(orderId ? { orderId } : {}),
@@ -127,6 +138,7 @@ export async function uploadSources(
 
   // Every publication is a new snapshot so React and callers can retain prior states.
   async function publish(update: Partial<UploadSession> = {}) {
+    lease.assertCurrent();
     session = {
       ...session,
       ...update,
@@ -138,6 +150,7 @@ export async function uploadSources(
     });
     try {
       await persistProgress?.(session);
+      lease.assertCurrent();
     } catch (error) {
       failures.push({
         error,
@@ -189,6 +202,7 @@ export async function uploadSources(
             },
       });
 
+      lease.assertCurrent();
       session.uploadId = presign.uploadId;
       session.receiptId = presign.receiptId;
       session.recipeId = presign.recipeId;
@@ -200,10 +214,11 @@ export async function uploadSources(
               (signed) => signed.sourceId === source.presign!.sourceId,
             )
           : presign.sources[index];
-        if (!signedSource)
+        if (!signedSource) {
           throw new Error(
             'The server did not provide an upload link for every source.',
           );
+        }
         source.presign = signedSource;
         source.error = null;
         source.status = 'pending';
@@ -223,17 +238,23 @@ export async function uploadSources(
         try {
           const response = await fetch(source.presign!.uploadUrl, {
             method: presign.method,
+            credentials: 'omit',
+            signal: lease.signal,
             headers: { 'Content-Type': source.file.type },
             body: source.file,
           });
-          if (!response.ok)
+          lease.assertCurrent();
+          if (!response.ok) {
             throw new ApiError('Storage upload failed', response.status);
+          }
           session.sources[index] = {
             ...source,
             status: 'uploaded',
             error: null,
           };
         } catch (error) {
+          if (isContextAbort(error)) throw error;
+          lease.assertCurrent();
           failures.push({
             error,
             phase: 'storage-put',
@@ -271,11 +292,35 @@ export async function uploadSources(
     await publish({ phase: 'done', ratio: 1, result });
     return result;
   } catch (error) {
-    if (!failures.length)
+    if (isContextAbort(error)) throw error;
+    if (error instanceof ApiError && [401, 403].includes(error.status)) {
+      throw error;
+    }
+    lease.assertCurrent();
+    if (!failures.length) {
       failures.push({ error, phase, sourceIndex: null, sourceId: null });
+    }
     await publish({ phase: 'failed', ratio: uploadedRatio() }).catch(
       () => undefined,
     );
     throw new UploadSourcesError('Upload failed', session, error, failures);
+  }
+}
+
+export async function uploadSources(
+  files: readonly File[],
+  kind: MediaKind,
+  options: UploadSourcesOptions,
+): Promise<UploadCompleteResponse> {
+  const lease = beginLocalOperation(options.context);
+  try {
+    return await uploadCurrent(
+      files,
+      kind,
+      { ...options, context: { ...options.context, signal: lease.signal } },
+      lease,
+    );
+  } finally {
+    lease.dispose();
   }
 }

@@ -1,22 +1,31 @@
 import { logoutCleanup } from "@/features/sync/store";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "@/lib/api-error";
-import { setApiIdentity } from "@/lib/api-context";
+import { setApiIdentity, type AuthIdentity } from "@/lib/api-context";
 import { authClient } from "./client";
 import { AuthContext } from "./context";
 import { resetCsrf } from "./csrf";
 import type { AuthStatus, SessionDto } from "./types";
+import { identityPartition } from "./environment";
 
 type AuthState = {
   status: AuthStatus;
   session: SessionDto | null;
   error: string | null;
   activeShopId: string | null;
+  generation: number;
 };
 const preferenceKey = (session: SessionDto) =>
-  `neuton.activeShop:${session.environment}:${session.user.id}`;
+  `${identityPartition({ environment: session.environment, userId: session.user.id })}:activeShop`;
 function selectShop(session: SessionDto): string | null {
   let preferred: string | null = null;
   try {
@@ -30,11 +39,33 @@ function selectShop(session: SessionDto): string | null {
   const selected = matched ?? session.memberships[0]?.shopId;
   try {
     if (selected) localStorage.setItem(preferenceKey(session), selected);
-    else localStorage.removeItem(preferenceKey(session));
+    else {
+      localStorage.removeItem(preferenceKey(session));
+    }
   } catch {
     /* Selection remains in memory. */
   }
   return selected ?? null;
+}
+
+function sessionIdentity(
+  session: SessionDto,
+  generation: number,
+  shopId: string | null,
+  offline = false,
+): AuthIdentity {
+  return {
+    environment: session.environment,
+    userId: session.user.id,
+    sessionId: session.session.id,
+    generation,
+    shopId,
+    offline,
+    expiresAt: Math.min(
+      Date.parse(session.session.idleExpiresAt),
+      Date.parse(session.session.absoluteExpiresAt),
+    ),
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,10 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session: null,
     error: null,
     activeShopId: null,
+    generation: 0,
   });
   const current = useRef(state);
   const generation = useRef(0);
   const identityKey = useRef<string | null>(null);
+  const establishedIdentity = useRef<AuthIdentity | null>(null);
   const lastUserId = useRef<string | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
   const operation = useRef(false);
@@ -60,37 +93,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error: string | null = null,
       expectedGeneration = generation.current,
     ) => {
+      if (generation.current !== expectedGeneration) return;
+      const previous = current.current;
       const key =
         session?.user.status === "active"
-          ? `${session.environment}:${session.user.id}`
+          ? identityPartition({
+              environment: session.environment,
+              userId: session.user.id,
+            })
           : null;
-      if (identityKey.current !== key) {
+      let activeShopId: string | null = null;
+      if (session?.user.status === "active") {
+        activeShopId =
+          status === "offline" ? previous.activeShopId : selectShop(session);
+      }
+      if (
+        identityKey.current !== key ||
+        previous.activeShopId !== activeShopId
+      ) {
         setApiIdentity(null);
         window.dispatchEvent(new Event("neuton-account-change"));
         await queryClient.cancelQueries();
+        if (generation.current !== expectedGeneration) return;
         queryClient.clear();
+        if (establishedIdentity.current && identityKey.current !== key) {
+          await logoutCleanup(establishedIdentity.current).catch(
+            () => undefined,
+          );
+        }
       }
       if (generation.current !== expectedGeneration) return;
-      if (current.current.session?.session.id !== session?.session.id) {
+      if (
+        previous.session?.session.id !== session?.session.id ||
+        identityKey.current !== key ||
+        previous.activeShopId !== activeShopId
+      ) {
         resetCsrf();
       }
       identityKey.current = key;
+      establishedIdentity.current =
+        key && session
+          ? {
+              environment: session.environment,
+              userId: session.user.id,
+            }
+          : null;
       if (session) lastUserId.current = session.user.id;
       const next: AuthState = {
         session,
         status,
         error,
-        activeShopId:
-          session?.user.status === "active" ? selectShop(session) : null,
+        activeShopId,
+        generation: expectedGeneration,
       };
       current.current = next;
       setApiIdentity(
         key && session
-          ? {
-              environment: session.environment,
-              userId: session.user.id,
-              sessionId: session.session.id,
-            }
+          ? sessionIdentity(
+              session,
+              expectedGeneration,
+              activeShopId,
+              status === "offline",
+            )
           : null,
       );
       setState(next);
@@ -99,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(async (): Promise<SessionDto | null> => {
+    const previous = current.current;
     const expected = ++generation.current;
     setApiIdentity(null);
     request.current?.abort();
@@ -118,6 +183,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await apply(null, "anonymous", null, expected);
         return null;
       }
+      if (
+        previous.session &&
+        (previous.status === "authenticated" ||
+          previous.status === "offline") &&
+        (!navigator.onLine || (error instanceof ApiError && error.status === 0))
+      ) {
+        await apply(
+          previous.session,
+          "offline",
+          "Connection unavailable. Your saved work stays on this device.",
+          expected,
+        );
+        return previous.session;
+      }
       const message = navigator.onLine
         ? "Unable to verify your session. Please try again."
         : "Connect to the internet to verify your session.";
@@ -134,16 +213,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     operation.current = true;
     setApiIdentity(null);
     resetCsrf();
+    void queryClient.cancelQueries();
+    queryClient.clear();
     window.dispatchEvent(new Event("neuton-account-change"));
     const next: AuthState = {
       status: "loading",
       session: null,
       error: null,
       activeShopId: null,
+      generation: generation.current,
     };
     current.current = next;
     setState(next);
-  }, []);
+  }, [queryClient]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -194,23 +276,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [apply, begin]);
 
-  const setActiveShopId = useCallback((shopId: string) => {
-    const snapshot = current.current;
-    if (
-      snapshot.status !== "authenticated" ||
-      !snapshot.session?.memberships.some((row) => row.shopId === shopId)
-    ) {
-      return;
-    }
-    try {
-      localStorage.setItem(preferenceKey(snapshot.session), shopId);
-    } catch {
-      /* Selection can remain in memory. */
-    }
-    const next = { ...snapshot, activeShopId: shopId };
-    current.current = next;
-    setState(next);
-  }, []);
+  const setActiveShopId = useCallback(
+    (shopId: string) => {
+      const snapshot = current.current;
+      if (
+        snapshot.status !== "authenticated" ||
+        !snapshot.session?.memberships.some((row) => row.shopId === shopId)
+      ) {
+        return;
+      }
+      try {
+        localStorage.setItem(preferenceKey(snapshot.session), shopId);
+      } catch {
+        /* Selection can remain in memory. */
+      }
+      generation.current += 1;
+      setApiIdentity(null);
+      resetCsrf();
+      window.dispatchEvent(new Event("neuton-account-change"));
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      const next = {
+        ...snapshot,
+        activeShopId: shopId,
+        generation: generation.current,
+      };
+      current.current = next;
+      setApiIdentity(
+        sessionIdentity(snapshot.session, next.generation, shopId),
+      );
+      setState(next);
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     setApiIdentity(null);
@@ -226,6 +324,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const reload = () => {
       if (!operation.current) void refresh().catch(() => undefined);
     };
+    window.addEventListener("online", reload);
+    window.addEventListener("offline", reload);
     window.addEventListener("focus", reload);
     window.addEventListener("neuton-shop-access-lost", reload);
     void refresh().catch(() => undefined);
@@ -234,6 +334,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       request.current?.abort();
       channel.current?.close();
       channel.current = null;
+      window.removeEventListener("online", reload);
+      window.removeEventListener("offline", reload);
       window.removeEventListener("focus", reload);
       window.removeEventListener("neuton-shop-access-lost", reload);
       setApiIdentity(null);
@@ -262,11 +364,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       renewing = true;
       lastAttempt = now;
       void authClient
-        .renew({
-          environment: snapshot.session.environment,
-          userId: snapshot.session.user.id,
-          sessionId: snapshot.session.session.id,
-        })
+        .renew(
+          sessionIdentity(
+            snapshot.session,
+            snapshot.generation,
+            snapshot.activeShopId,
+          ),
+        )
         .then(() => {
           if (expected === generation.current) return refresh();
         })
@@ -289,14 +393,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const identity = useMemo(
     () =>
-      state.status === "authenticated" && state.session
-        ? {
-            userId: state.session.user.id,
-            environment: state.session.environment,
-            sessionId: state.session.session.id,
-          }
+      (state.status === "authenticated" || state.status === "offline") &&
+      state.session
+        ? sessionIdentity(
+            state.session,
+            state.generation,
+            state.activeShopId,
+            state.status === "offline",
+          )
         : null,
-    [state.status, state.session],
+    [state.status, state.session, state.generation, state.activeShopId],
   );
   const value = useMemo(
     () => ({
@@ -313,5 +419,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [state, identity, refresh, login, logout, setActiveShopId],
   );
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const boundary = identity
+    ? `${identityPartition(identity)}:${state.activeShopId ?? ""}`
+    : "locked";
+  return (
+    <AuthContext.Provider value={value}>
+      <Fragment key={boundary}>{children}</Fragment>
+    </AuthContext.Provider>
+  );
 }

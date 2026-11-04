@@ -1,6 +1,12 @@
-import type { DashboardPeriod } from '@/features/analytics/types';
-import type { ShopId } from '@/lib/queryTypes';
+import type { DashboardPeriod } from './types';
+import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
+import { identityQueryKey } from '@/features/auth/environment';
 export const analyticsKeys = {
-  dashboard: (shopId: ShopId, period: DashboardPeriod) => ['dashboard', shopId, period] as const,
-  dashboardRoot: ['dashboard'] as const,
+  dashboard: (
+    identity: AuthenticatedContext,
+    shopId: ShopId,
+    period: DashboardPeriod,
+  ) => identityQueryKey(identity, 'dashboard', shopId, period),
+  dashboardRoot: (identity: AuthenticatedContext) =>
+    identityQueryKey(identity, 'dashboard'),
 };

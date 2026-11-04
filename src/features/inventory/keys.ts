@@ -1,4 +1,6 @@
-import type { ShopId } from '@/lib/queryTypes';
+import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
+import { identityQueryKey } from '@/features/auth/environment';
 export const inventoryKeys = {
-  inventory: (shopId: ShopId) => ['inventory', shopId] as const,
+  inventory: (identity: AuthenticatedContext, shopId: ShopId) =>
+    identityQueryKey(identity, 'inventory', shopId),
 };

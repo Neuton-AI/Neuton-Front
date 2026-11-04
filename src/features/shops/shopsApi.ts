@@ -2,7 +2,7 @@ import { shopsKeys } from '@/features/shops/keys';
 import { type Shop } from '@/features/shops/types';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
-import { enabled } from '@/lib/queryTypes';
+import { networkEnabled } from '@/lib/queryTypes';
 import {
   useMutation,
   useQuery,
@@ -16,10 +16,11 @@ export function useShopSettings(
   shopId: ShopId,
 ): UseQueryResult<{ shop: Shop }> {
   return useQuery({
-    queryKey: shopsKeys.shop(shopId),
+    networkMode: 'always',
+    queryKey: shopsKeys.shop(identity, shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ shop: Shop }>('/shop', { identity, shopId, signal }),
-    enabled: enabled(identity, shopId),
+    enabled: networkEnabled(identity, shopId),
   });
 }
 
@@ -37,6 +38,7 @@ export function useUpdateShop(
 ): UseMutationResult<{ shop: Shop }, Error, UpdateShopBody> {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: (body: UpdateShopBody) =>
       apiFetch<{ shop: Shop }>('/shop', {
         method: 'PATCH',
@@ -45,7 +47,7 @@ export function useUpdateShop(
         body,
       }),
     onSuccess: (data) => {
-      queryClient.setQueryData(shopsKeys.shop(shopId), data);
+      queryClient.setQueryData(shopsKeys.shop(identity, shopId), data);
     },
   });
 }
@@ -54,6 +56,7 @@ export function useCreateShop(
   identity: AuthenticatedContext,
 ): UseMutationResult<{ shop: Shop }, Error, string> {
   return useMutation({
+    networkMode: 'always',
     mutationFn: (name: string) =>
       apiFetch<{ shop: Shop }>('/shops', {
         method: 'POST',

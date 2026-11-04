@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithRouter } from "@/test/render";
 import { DocumentSources } from "../DocumentSources";
+import { setApiIdentity } from "@/lib/api-context";
 
 const api = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock("@/lib/api", () => api);
@@ -28,6 +29,42 @@ beforeEach(() => {
         expiresIn: 3600,
       }),
     );
+});
+
+it("closes a pending original and discards its late URL after account changes", async () => {
+  let release!: (value: { url: string; expiresIn: number }) => void;
+  api.apiFetch.mockImplementation(
+    async (_path: string, options: { body: { path: string } }) => {
+      if (options.body.path === source.storagePath) {
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      return { url: "https://storage.test/preview.webp", expiresIn: 3600 };
+    },
+  );
+  const target = { opener: {}, location: { href: "" }, close: vi.fn() };
+  vi.spyOn(window, "open").mockReturnValue(target as unknown as Window);
+  renderWithRouter(
+    <DocumentSources
+      identity={{ environment: "test", userId: "u1", sessionId: "session-1" }}
+      shopId="shop"
+      sources={[source]}
+    />,
+  );
+  await screen.findByAltText("invoice.pdf");
+  fireEvent.click(
+    screen.getByRole("button", { name: "View original invoice.pdf" }),
+  );
+  await waitFor(() => expect(release).toBeDefined());
+  setApiIdentity({ environment: "test", userId: "someone-else" });
+  expect(target.close).toHaveBeenCalled();
+  release({
+    url: "https://storage.test/old-private-original.pdf",
+    expiresIn: 3600,
+  });
+  await waitFor(() => expect(target.close).toHaveBeenCalledTimes(2));
+  expect(target.location.href).toBe("");
 });
 
 it("loads only the WebP preview, and signs the original only after a click", async () => {

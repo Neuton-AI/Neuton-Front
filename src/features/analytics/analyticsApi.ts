@@ -1,3 +1,4 @@
+import { sameQueryPartition } from '@/features/auth/environment';
 import { analyticsKeys } from '@/features/analytics/keys';
 import {
   type DashboardPeriod,
@@ -5,12 +6,8 @@ import {
 } from '@/features/analytics/types';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
-import { enabled } from '@/lib/queryTypes';
-import {
-  keepPreviousData,
-  useQuery,
-  type UseQueryResult,
-} from '@tanstack/react-query';
+import { networkEnabled } from '@/lib/queryTypes';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 export function useDashboardSummary(
   identity: AuthenticatedContext,
@@ -18,16 +15,20 @@ export function useDashboardSummary(
   period: DashboardPeriod,
 ): UseQueryResult<DashboardSummary> {
   return useQuery({
-    queryKey: analyticsKeys.dashboard(shopId, period),
+    networkMode: 'always',
+    queryKey: analyticsKeys.dashboard(identity, shopId, period),
     queryFn: ({ signal }) =>
       apiFetch<DashboardSummary>(`/analytics/dashboard?period=${period}`, {
         identity,
         shopId,
         signal,
       }),
-    enabled: enabled(identity, shopId),
+    enabled: networkEnabled(identity, shopId),
     // Keep the previous period on screen while the next one loads, so a tab
     // switch never flashes the chart empty.
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) =>
+      sameQueryPartition(query?.queryKey, identity, shopId)
+        ? previous
+        : undefined,
   });
 }

@@ -1,3 +1,5 @@
+import { beginLocalOperation, isContextAbort } from './authority';
+import { sameQueryPartition } from '@/features/auth/environment';
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, useShopMemberships } from '@/features/auth';
@@ -60,7 +62,8 @@ export function useSyncStatus() {
   }, [client]);
   useEffect(() => {
     if (!identity || !activeShopId) return;
-    const scope = scopeFor(identity, activeShopId);
+    const lease = beginLocalOperation({ identity, shopId: activeShopId });
+    const { scope } = lease;
     let active = true;
     let refreshing = false;
     let documentVersion: string | undefined;
@@ -75,6 +78,7 @@ export function useSyncStatus() {
           errorsFor(scope.key),
           store.documents(scope.key),
         ]);
+        lease.assertCurrent();
         if (active) {
           setSnapshot({
             scope: scope.key,
@@ -105,7 +109,8 @@ export function useSyncStatus() {
                 'recipes',
                 'order',
                 'orders',
-              ].includes(String(query.queryKey[0])),
+              ].includes(String(query.queryKey[3])) &&
+              sameQueryPartition(query.queryKey, identity, activeShopId),
             refetchType: 'active',
           });
         }
@@ -117,7 +122,8 @@ export function useSyncStatus() {
       }
     };
     const scheduler = createSyncScheduler(async () => {
-      if (!active) return;
+      if (!active || identity.offline) return;
+      lease.assertCurrent();
       setOnline(navigator.onLine);
       await syncDocuments(scope, { identity, shopId: activeShopId });
       if (active) await refresh();
@@ -149,6 +155,7 @@ export function useSyncStatus() {
     window.addEventListener('focus', sync);
     return () => {
       active = false;
+      lease.dispose();
       scheduler.stop();
       disconnect();
       unsubscribe();
@@ -165,21 +172,22 @@ export function useSyncStatus() {
     current?.activity?.completedAt &&
     !current?.activity?.running &&
     Date.now() - current.activity.completedAt < 8000;
-  if (!errors.length && online && !succeeded && !localMessage) return null;
+  const available = online && !identity.offline;
+  if (!errors.length && available && !succeeded && !localMessage) return null;
   const tone: 'error' | 'success' =
-    errors.length || localMessage || !online ? 'error' : 'success';
+    errors.length || localMessage || !available ? 'error' : 'success';
   const first = errors[0];
   const message =
     localMessage ||
     first?.message ||
-    (!online
+    (!available
       ? 'Connection unavailable'
       : current?.activity?.message || 'Sync succeeded');
-  const title = first
-    ? `${label(first.entity)} · ${label(first.operation)}`
-    : current?.activity
-      ? `${label(current.activity.entity)} · ${label(current.activity.operation)}`
-      : 'Sync';
+  let title = 'Sync';
+  const operation = first ?? current?.activity;
+  if (operation) {
+    title = `${label(operation.entity)} · ${label(operation.operation)}`;
+  }
   const retry = () => {
     setLocalMessage('');
     void syncDocuments(
@@ -189,8 +197,10 @@ export function useSyncStatus() {
     ).catch(() => undefined);
   };
   const exportPending = async () => {
-    const scope = scopeFor(identity, activeShopId);
+    let lease: ReturnType<typeof beginLocalOperation> | undefined;
     try {
+      lease = beginLocalOperation({ identity, shopId: activeShopId });
+      const { scope } = lease;
       const [documents, writes, scans, blobs] = await Promise.all([
         store.documents(scope.key),
         store.writes(scope.key),
@@ -213,6 +223,7 @@ export function useSyncStatus() {
           ),
         })),
       );
+      lease.assertCurrent();
       const url = URL.createObjectURL(
         new Blob(
           [JSON.stringify({ documents, writes, scans, blobs: binary })],
@@ -224,8 +235,10 @@ export function useSyncStatus() {
       link.download = 'neuton-pending-work.json';
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      setLocalMessage('Export failed');
+    } catch (error) {
+      if (!isContextAbort(error)) setLocalMessage('Export failed');
+    } finally {
+      lease?.dispose();
     }
   };
   return {

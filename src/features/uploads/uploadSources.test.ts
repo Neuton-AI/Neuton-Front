@@ -85,6 +85,10 @@ describe('uploadSources', () => {
       })),
     });
     expect(fetchMock.mock.calls[1][1].body).toBe(second);
+    expect(fetchMock.mock.calls[1][1].credentials).toBe('omit');
+    expect(fetchMock.mock.calls[1][1].headers).toEqual({
+      'Content-Type': second.type,
+    });
     expect(fetchMock.mock.calls[2][1].body).toBe(first);
     expect(body(fetchMock, 3)).toEqual({ uploadId: 'group-1' });
     expect(progress[0].sources.map((source) => source.status)).toEqual([
@@ -276,4 +280,54 @@ describe('uploadSources', () => {
     ).rejects.toThrow('Sources changed');
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+});
+
+it('aborts storage PUTs and never completes or publishes late progress after authority changes', async () => {
+  let release!: (response: Response) => void;
+  const storage = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const fetchMock = stub(json(presign));
+  fetchMock.mockReturnValueOnce(storage);
+  const progress = vi.fn();
+  const pending = uploadSources([first, second], 'receipt', {
+    context,
+    onProgress: progress,
+  });
+  const rejected = expect(pending).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  const before = progress.mock.calls.length;
+  const signal = fetchMock.mock.calls[1][1].signal as AbortSignal;
+  setApiIdentity({ ...context.identity, userId: 'someone-else' });
+  expect(signal.aborted).toBe(true);
+  release(new Response(null));
+  await rejected;
+  expect(progress).toHaveBeenCalledTimes(before);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+it('rejects an upload retry owned by another shop before sending or returning its prior result', async () => {
+  const fetchMock = stub(
+    json(presign),
+    new Response(null),
+    new Response(null),
+    json(complete),
+  );
+  let session: UploadSession | undefined;
+  await uploadSources([first, second], 'receipt', {
+    context,
+    onProgress: (value) => {
+      session = value;
+    },
+  });
+  const calls = fetchMock.mock.calls.length;
+  await expect(
+    uploadSources([first, second], 'receipt', {
+      context: { ...context, shopId: 'another-shop' },
+      session,
+    }),
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(fetchMock).toHaveBeenCalledTimes(calls);
 });

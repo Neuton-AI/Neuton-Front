@@ -1,3 +1,4 @@
+import { beginLocalOperation, isContextAbort } from './authority';
 import { apiFetch, ApiError, type RequestOptions } from '@/lib/api';
 import { type MediaKind } from '@/features/uploads/types';
 import { validateUploadFiles } from '@/features/uploads/uploadSources';
@@ -43,40 +44,57 @@ export async function documentFetch<T>(
   ) {
     return apiFetch<T>(path, context);
   }
-  const scope = scopeFor(context.identity, context.shopId);
-  if (context.method && context.method !== 'GET') {
-    return mutate<T>(path, kind, id, action, scope, context);
-  }
-  const local = await store.documents(scope.key);
-  if (!local.length && !(await store.get('settings', scope.key))) {
-    try {
-      await syncDocuments(scope, context);
-    } catch {
-      throw new Error(
-        (await errorsFor(scope.key)).find((row) => row.state === 'unresolved')
-          ?.message ?? 'Sync failed',
+  const lease = beginLocalOperation(context);
+  const { scope } = lease;
+  context = { ...context, signal: lease.signal };
+  try {
+    if (context.method && context.method !== 'GET') {
+      return await mutate<T>(
+        path,
+        kind,
+        id,
+        action,
+        scope,
+        context,
+        lease.assertCurrent,
       );
     }
+    const local = await store.documents(scope.key);
+    if (!local.length && !(await store.get('settings', scope.key))) {
+      try {
+        await syncDocuments(scope, context);
+      } catch (error) {
+        if (isContextAbort(error)) throw error;
+        lease.assertCurrent();
+        throw new Error(
+          (await errorsFor(scope.key)).find((row) => row.state === 'unresolved')
+            ?.message ?? 'Sync failed',
+        );
+      }
+    }
+    const records = (await store.documents(scope.key)).filter(
+      (row) => row.kind === kind && !row.deleted,
+    );
+    lease.assertCurrent();
+    if (id) {
+      const record = records.find((row) => row.id === id);
+      if (!record) throw new Error('Document unavailable');
+      return { [kind]: record.data } as T;
+    }
+    const status = url.searchParams.get('status');
+    const data = records
+      .filter((row) => !status || row.data.status === status)
+      .sort((a, b) =>
+        String(b.data.createdAt).localeCompare(String(a.data.createdAt)),
+      )
+      .map((row) => row.data);
+    return {
+      [collection]: data,
+      ...(kind === 'order' ? { total: data.length } : {}),
+    } as T;
+  } finally {
+    lease.dispose();
   }
-  const records = (await store.documents(scope.key)).filter(
-    (row) => row.kind === kind && !row.deleted,
-  );
-  if (id) {
-    const record = records.find((row) => row.id === id);
-    if (!record) throw new Error('Document unavailable');
-    return { [kind]: record.data } as T;
-  }
-  const status = url.searchParams.get('status');
-  const data = records
-    .filter((row) => !status || row.data.status === status)
-    .sort((a, b) =>
-      String(b.data.createdAt).localeCompare(String(a.data.createdAt)),
-    )
-    .map((row) => row.data);
-  return {
-    [collection]: data,
-    ...(kind === 'order' ? { total: data.length } : {}),
-  } as T;
 }
 
 async function mutate<T>(
@@ -86,15 +104,14 @@ async function mutate<T>(
   action: string | undefined,
   scope: ReturnType<typeof scopeFor>,
   context: RequestOptions,
+  assertCurrent: () => void,
 ): Promise<T> {
+  assertCurrent();
   if (!id) throw new Error('Connection required');
   const key = documentKey(scope, kind, id);
-  const operation =
-    action === 'verify'
-      ? 'verify'
-      : context.method === 'DELETE'
-        ? 'delete'
-        : 'edit';
+  let operation: ErrorContext['operation'] = 'edit';
+  if (action === 'verify') operation = 'verify';
+  else if (context.method === 'DELETE') operation = 'delete';
   const identity: ErrorContext = {
     savedLocally: false,
     scope,
@@ -107,68 +124,74 @@ async function mutate<T>(
   };
   let response: unknown;
   try {
-    await store.transaction(['documents', 'writes'], async (tx) => {
-      const docs = tx.objectStore('documents');
-      const old = (await store.result(docs.get(key))) as
-        LocalDocument | undefined;
-      if (!old || old.deleted || old.localOnly) {
-        throw new ApiError('Sync required', 422, 'SYNC_REQUIRED');
-      }
-      const updatedAt = Math.max(Date.now(), old.updatedAt + 1);
-      const body = context.body as Record<string, unknown> | undefined;
-      const deleted = context.method === 'DELETE';
-      if (deleted && kind === 'receipt' && old.data.status === 'verified') {
-        throw new ApiError('Deletion unavailable', 422, 'VERIFIED_RECEIPT');
-      }
-      const data: DocumentData = {
-        ...(kind === 'recipe' && context.method === 'PATCH' && body
-          ? optimisticRecipe(old.data, body)
-          : old.data),
-        ...(action ? {} : body),
-        id,
-        ...(action === 'verify'
-          ? { status: kind === 'order' ? 'delivered' : 'verified' }
-          : {}),
-        updatedAt: new Date(updatedAt).toISOString(),
-      };
-      docs.put({
-        ...old,
-        serverVersion: old.serverVersion ?? old.updatedAt,
-        serverData: old.serverData ?? old.data,
-        data,
-        deleted,
-        updatedAt,
-        syncStatus: 'pending-push',
-      } satisfies LocalDocument);
-      const mutationId = crypto.randomUUID();
-      tx.objectStore('writes').put({
-        key: mutationId,
-        scope: scope.key,
-        documentKey: key,
-        id: mutationId,
-        updatedAt,
-        path,
-        method: context.method,
-        operation,
-        body: context.body,
-        baseVersion: old.updatedAt,
-      } satisfies PendingWrite);
-      response = deleted
-        ? { ok: true, mode: 'soft' }
-        : kind === 'receipt' && action === 'verify'
-          ? {
-              receiptId: id,
-              status: 'verified',
-              accepted: ((body?.items as { accepted: boolean }[]) ?? []).filter(
-                (item) => item.accepted,
-              ).length,
-              rejected: ((body?.items as { accepted: boolean }[]) ?? []).filter(
-                (item) => !item.accepted,
-              ).length,
-            }
-          : { [kind]: data };
-    });
+    await store.transaction(
+      ['documents', 'writes'],
+      async (tx) => {
+        const docs = tx.objectStore('documents');
+        const old = (await store.result(docs.get(key))) as
+          LocalDocument | undefined;
+        if (!old || old.deleted || old.localOnly) {
+          throw new ApiError('Sync required', 422, 'SYNC_REQUIRED');
+        }
+        const updatedAt = Math.max(Date.now(), old.updatedAt + 1);
+        const body = context.body as Record<string, unknown> | undefined;
+        const deleted = context.method === 'DELETE';
+        const verifiedStatus = kind === 'order' ? 'delivered' : 'verified';
+        if (deleted && kind === 'receipt' && old.data.status === 'verified') {
+          throw new ApiError('Deletion unavailable', 422, 'VERIFIED_RECEIPT');
+        }
+        const data: DocumentData = {
+          ...(kind === 'recipe' && context.method === 'PATCH' && body
+            ? optimisticRecipe(old.data, body)
+            : old.data),
+          ...(action ? {} : body),
+          id,
+          ...(action === 'verify' ? { status: verifiedStatus } : {}),
+          updatedAt: new Date(updatedAt).toISOString(),
+        };
+        docs.put({
+          ...old,
+          serverVersion: old.serverVersion ?? old.updatedAt,
+          serverData: old.serverData ?? old.data,
+          data,
+          deleted,
+          updatedAt,
+          syncStatus: 'pending-push',
+        } satisfies LocalDocument);
+        const mutationId = crypto.randomUUID();
+        tx.objectStore('writes').put({
+          key: mutationId,
+          scope: scope.key,
+          documentKey: key,
+          id: mutationId,
+          updatedAt,
+          path,
+          method: context.method,
+          operation,
+          body: context.body,
+          baseVersion: old.updatedAt,
+        } satisfies PendingWrite);
+        if (deleted) response = { ok: true, mode: 'soft' };
+        else if (kind === 'receipt' && action === 'verify') {
+          response = {
+            receiptId: id,
+            status: 'verified',
+            accepted: ((body?.items as { accepted: boolean }[]) ?? []).filter(
+              (item) => item.accepted,
+            ).length,
+            rejected: ((body?.items as { accepted: boolean }[]) ?? []).filter(
+              (item) => !item.accepted,
+            ).length,
+          };
+        } else {
+          response = { [kind]: data };
+        }
+      },
+      assertCurrent,
+    );
   } catch (error) {
+    if (isContextAbort(error)) throw error;
+    assertCurrent();
     await recordError(error, identity);
     throw new Error(
       (error instanceof Error || error instanceof DOMException) &&
@@ -177,17 +200,20 @@ async function mutate<T>(
         : 'Save failed',
     );
   }
+  assertCurrent();
   await supersedeLocalErrors({ ...identity, revision: Date.now() });
+  assertCurrent();
   store.changed();
   void syncDocuments(scope, context).catch(() => undefined);
   return response as T;
 }
 
-export async function saveScan(
+async function saveScanCurrent(
   files: readonly File[],
   kind: MediaKind,
   context: RequestOptions,
-  orderId?: string,
+  orderId: string | undefined,
+  assertCurrent: () => void,
 ) {
   const error = validateUploadFiles(files);
   if (error) throw new Error(error);
@@ -228,38 +254,44 @@ export async function saveScan(
     },
   };
   try {
-    await store.transaction(['documents', 'scans', 'blobs'], (tx) => {
-      // Attachments to an existing order do not create another order card.
-      if (kind !== 'order') {
-        tx.objectStore('documents').put({
-          key,
+    await store.transaction(
+      ['documents', 'scans', 'blobs'],
+      (tx) => {
+        // Attachments to an existing order do not create another order card.
+        if (kind !== 'order') {
+          tx.objectStore('documents').put({
+            key,
+            scope: scope.key,
+            kind: documentKind,
+            id,
+            updatedAt: createdAt,
+            data,
+            deleted: false,
+            localOnly: true,
+            syncStatus: 'pending-push',
+          } satisfies LocalDocument);
+        }
+        tx.objectStore('scans').put({
+          key: id,
           scope: scope.key,
-          kind: documentKind,
+          documentKey: key,
           id,
-          updatedAt: createdAt,
-          data,
-          deleted: false,
-          localOnly: true,
-          syncStatus: 'pending-push',
-        } satisfies LocalDocument);
-      }
-      tx.objectStore('scans').put({
-        key: id,
-        scope: scope.key,
-        documentKey: key,
-        id,
-        kind,
-        orderId,
-        filenames: files.map((file) => file.name),
-        createdAt,
-      } satisfies PendingScan);
-      tx.objectStore('blobs').put({
-        key: id,
-        scope: scope.key,
-        files: files.map((file) => file.slice(0, file.size, file.type)),
-      });
-    });
+          kind,
+          orderId,
+          filenames: files.map((file) => file.name),
+          createdAt,
+        } satisfies PendingScan);
+        tx.objectStore('blobs').put({
+          key: id,
+          scope: scope.key,
+          files: files.map((file) => file.slice(0, file.size, file.type)),
+        });
+      },
+      assertCurrent,
+    );
   } catch (error) {
+    if (isContextAbort(error)) throw error;
+    assertCurrent();
     await recordError(error, {
       scope,
       entity: kind,
@@ -277,6 +309,7 @@ export async function saveScan(
         : 'Save failed',
     );
   }
+  assertCurrent();
   await supersedeLocalErrors({
     scope,
     entity: kind,
@@ -286,6 +319,28 @@ export async function saveScan(
     operationId: `local-scan:${kind}:${orderId ?? ''}`,
     revision: createdAt,
   });
+  assertCurrent();
   store.changed();
   void syncDocuments(scope, context).catch(() => undefined);
+}
+
+export async function saveScan(
+  files: readonly File[],
+  kind: MediaKind,
+  context: RequestOptions,
+  orderId?: string,
+) {
+  const lease = beginLocalOperation(context);
+  try {
+    await saveScanCurrent(
+      files,
+      kind,
+      { ...context, signal: lease.signal },
+      orderId,
+      lease.assertCurrent,
+    );
+    lease.assertCurrent();
+  } finally {
+    lease.dispose();
+  }
 }

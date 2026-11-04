@@ -188,13 +188,16 @@ it("keeps an unsaved name, adopts untouched fields and requires explicit conflic
   await user.clear(name);
   await user.type(name, "My unsaved name");
   await act(async () =>
-    editor.queryClient.setQueryData(recipesKeys.recipe("shop-1", "rp-1"), {
-      recipe: {
-        ...editor.recipe,
-        name: "Another device name",
-        yieldQuantity: 9,
+    editor.queryClient.setQueryData(
+      recipesKeys.recipe(authState.identity, "shop-1", "rp-1"),
+      {
+        recipe: {
+          ...editor.recipe,
+          name: "Another device name",
+          yieldQuantity: 9,
+        },
       },
-    }),
+    ),
   );
   expect(name).toHaveValue("My unsaved name");
   expect(

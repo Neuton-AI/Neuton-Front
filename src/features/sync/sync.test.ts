@@ -1,3 +1,6 @@
+import { DOCUMENT_DATABASE } from '@/features/auth/environment';
+import { setApiIdentity } from '@/lib/api-context';
+import { authState } from '@/test/auth';
 import 'fake-indexeddb/auto';
 import { File as NativeFile } from 'node:buffer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -39,6 +42,8 @@ const original: LocalDocument = {
 };
 
 beforeEach(async () => {
+  authState.identity = identity;
+  setApiIdentity(identity);
   // Native structuredClone preserves native Blobs; jsdom's Blob implementation is not cloneable by Node.
   vi.stubGlobal('File', NativeFile);
   api.fetch.mockReset();
@@ -127,6 +132,44 @@ const online = () =>
     value: true,
     configurable: true,
   });
+
+it('rejects a late pull after switching shop and retains the durable download', async () => {
+  let release!: (value: unknown) => void;
+  api.fetch.mockImplementation(async (path: string) => {
+    if (path === '/sync/check') {
+      return { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 200 }] };
+    }
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  });
+  online();
+  const pending = syncDocuments(scope, context);
+  const rejected = expect(pending).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  await vi.waitFor(() => expect(release).toBeDefined());
+  setApiIdentity({ ...identity, generation: 2, shopId: 'other-shop' });
+  release({ recipe: { id, name: 'Late private result' } });
+  await rejected;
+  expect((await store.get<LocalDocument>('documents', key))?.data.name).toBe(
+    'Original',
+  );
+  expect(await store.rows('pulls', scope.key)).toHaveLength(1);
+  expect(await errorsFor(scope.key)).toEqual([]);
+});
+
+it('rejects mismatched owner scopes and a locked local read before exposing records', async () => {
+  online();
+  await expect(
+    syncDocuments(scopeFor(identity, 'different-shop'), context),
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  setApiIdentity(null);
+  await expect(documentFetch(`/recipes/${id}`, context)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  expect(api.fetch).not.toHaveBeenCalled();
+});
 
 it('recipe Save completes offline and persists a pending edit before reconnect', async () => {
   onlineManager.setOnline(false);
@@ -385,6 +428,7 @@ describe('classified queue recovery', () => {
     expect(api.fetch).toHaveBeenCalledTimes(calls);
     expect(await store.writes(scope.key)).toHaveLength(2);
     compareAndPush(() => undefined);
+    setApiIdentity({ ...identity, sessionId: 'session-refreshed' });
     await syncDocuments(scope, {
       ...context,
       identity: { ...identity, sessionId: 'session-refreshed' },
@@ -437,18 +481,24 @@ describe('classified queue recovery', () => {
   it('keeps cancellation, version negotiation and pull tombstones out of user errors', async () => {
     await queueEdit();
     api.fetch.mockImplementation(
-      async (path: string, options?: { method?: string }) =>
-        path === '/sync/check'
-          ? { toPush: [{ kind: 'recipe', id, updatedAt: 100 }], toPull: [] }
-          : options?.method === 'PATCH'
-            ? { syncConflict: true }
-            : { recipe: original.data },
+      async (path: string, options?: { method?: string }) => {
+        if (path === '/sync/check') {
+          return {
+            toPush: [{ kind: 'recipe', id, updatedAt: 100 }],
+            toPull: [],
+          };
+        }
+        if (options?.method === 'PATCH') return { syncConflict: true };
+        return { recipe: original.data };
+      },
     );
     online();
     await syncDocuments(scope, context);
     expect(await errorsFor(scope.key)).toEqual([]);
     api.fetch.mockRejectedValue(new DOMException('cancel', 'AbortError'));
-    await syncDocuments(scope, context);
+    await expect(syncDocuments(scope, context)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
     expect(await errorsFor(scope.key)).toEqual([]);
   });
 });
@@ -489,7 +539,7 @@ describe('local-first persistence and synchronization', () => {
     expect(await store.writes(scope.key)).toHaveLength(1);
     expect(api.fetch).not.toHaveBeenCalled();
     const db = await new Promise<IDBDatabase>((resolve) => {
-      const request = indexedDB.open('neuton-documents-v1');
+      const request = indexedDB.open(DOCUMENT_DATABASE);
       request.onsuccess = () => resolve(request.result);
     });
     const persisted = await store.result(
@@ -619,12 +669,16 @@ describe('local-first persistence and synchronization', () => {
     const version = Date.now() + 10000;
     online();
     api.fetch.mockImplementation(
-      async (path: string, options?: { method?: string }) =>
-        path === '/sync/check'
-          ? { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: version }] }
-          : options?.method === 'PATCH'
-            ? { syncConflict: true }
-            : { recipe: { id, name: 'From device two' } },
+      async (path: string, options?: { method?: string }) => {
+        if (path === '/sync/check') {
+          return {
+            toPush: [],
+            toPull: [{ kind: 'recipe', id, updatedAt: version }],
+          };
+        }
+        if (options?.method === 'PATCH') return { syncConflict: true };
+        return { recipe: { id, name: 'From device two' } };
+      },
     );
     await syncDocuments(scope, context);
     expect((await store.get<LocalDocument>('documents', key))?.data.name).toBe(
@@ -1117,6 +1171,7 @@ describe('upload document continuity', () => {
       toPush: [],
       toPull: [{ kind: 'receipt', id: scan.id, updatedAt: 50, deleted: true }],
     });
+    setApiIdentity(otherToken);
     await syncDocuments(scopeFor(otherToken, 'shop-two'), {
       identity: otherToken,
       shopId: 'shop-two',

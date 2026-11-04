@@ -1,3 +1,4 @@
+import { identityPartition } from "@/features/auth/environment";
 import type React from "react";
 import { Skeleton } from "@/components/feedback";
 import type { DocumentSource } from "@/features/uploads/types";
@@ -15,6 +16,39 @@ const DocumentSourceView: React.FC<IDocumentSourceView> = ({
   shopId,
 }) => {
   const preview = useDocumentSource({ source, identity, shopId });
+  let content: React.ReactNode;
+  if (preview.failed) {
+    content = (
+      <p className="px-6 text-center text-label text-ink-muted">
+        Preview could not be loaded.
+      </p>
+    );
+  } else if (!preview.ready || !preview.url) {
+    content = <Skeleton className="h-full w-full rounded-none" />;
+  } else if (preview.isPdfLink) {
+    content = (
+      <a
+        href={preview.url}
+        target="_blank"
+        rel="noreferrer"
+        className="pressable text-label font-medium text-ink underline"
+      >
+        Open {preview.filename}
+      </a>
+    );
+  } else {
+    content = (
+      <img
+        src={preview.url}
+        alt={preview.filename}
+        width={preview.width}
+        height={preview.height}
+        decoding="async"
+        onError={preview.handleImageError}
+        className="h-full w-full object-contain"
+      />
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
@@ -34,32 +68,7 @@ const DocumentSourceView: React.FC<IDocumentSourceView> = ({
         ) : null}
       </div>
       <div className="flex h-[150px] items-center justify-center overflow-hidden rounded-card bg-surface-cream-strong">
-        {preview.failed ? (
-          <p className="px-6 text-center text-label text-ink-muted">
-            Preview could not be loaded.
-          </p>
-        ) : !preview.ready || !preview.url ? (
-          <Skeleton className="h-full w-full rounded-none" />
-        ) : preview.isPdfLink ? (
-          <a
-            href={preview.url}
-            target="_blank"
-            rel="noreferrer"
-            className="pressable text-label font-medium text-ink underline"
-          >
-            Open {preview.filename}
-          </a>
-        ) : (
-          <img
-            src={preview.url}
-            alt={preview.filename}
-            width={preview.width}
-            height={preview.height}
-            decoding="async"
-            onError={preview.handleImageError}
-            className="h-full w-full object-contain"
-          />
-        )}
+        {content}
       </div>
       {preview.openFailed ? (
         <p role="alert" className="text-label text-ink-muted">
@@ -84,7 +93,7 @@ export const DocumentSources: React.FC<IDocumentSources> = ({
     <div className="flex flex-col gap-3">
       {sources.map((source) => (
         <DocumentSourceView
-          key={`${source.sourceId}:${source.preview?.storagePath ?? source.storagePath}`}
+          key={`${context.identity ? identityPartition(context.identity) : "locked"}:${context.shopId}:${source.sourceId}:${source.preview?.storagePath ?? source.storagePath}`}
           source={source}
           {...context}
         />

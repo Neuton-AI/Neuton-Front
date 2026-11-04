@@ -1,7 +1,7 @@
 import { uploadsKeys } from '@/features/uploads/keys';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
-import { enabled } from '@/lib/queryTypes';
+import { networkEnabled } from '@/lib/queryTypes';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 export function signedDownloadOptions(
@@ -10,7 +10,8 @@ export function signedDownloadOptions(
   storagePath: string,
 ) {
   return {
-    queryKey: uploadsKeys.signedDownloadUrl(shopId, storagePath),
+    networkMode: 'always' as const,
+    queryKey: uploadsKeys.signedDownloadUrl(identity, shopId, storagePath),
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       apiFetch<{ url: string; expiresIn: number }>('/uploads/download-url', {
         method: 'POST',
@@ -32,6 +33,6 @@ export function useSignedDownloadUrl(
 ): UseQueryResult<{ url: string; expiresIn: number }> {
   return useQuery({
     ...signedDownloadOptions(identity, shopId, storagePath),
-    enabled: enabled(identity, shopId) && Boolean(storagePath),
+    enabled: networkEnabled(identity, shopId) && Boolean(storagePath),
   });
 }

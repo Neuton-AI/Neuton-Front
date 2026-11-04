@@ -1,7 +1,14 @@
-import type { StatusFilter } from '@/features/orders/types';
-import type { ShopId } from '@/lib/queryTypes';
+import type { StatusFilter } from './types';
+import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
+import { identityQueryKey } from '@/features/auth/environment';
 export const ordersKeys = {
-  orders: (shopId: ShopId, status: StatusFilter) => ['orders', shopId, status] as const,
-  ordersRoot: ['orders'] as const,
-  order: (shopId: ShopId, id: string) => ['order', shopId, id] as const,
+  orders: (
+    identity: AuthenticatedContext,
+    shopId: ShopId,
+    status: StatusFilter,
+  ) => identityQueryKey(identity, 'orders', shopId, status),
+  ordersRoot: (identity: AuthenticatedContext) =>
+    identityQueryKey(identity, 'orders'),
+  order: (identity: AuthenticatedContext, shopId: ShopId, id: string) =>
+    identityQueryKey(identity, 'order', shopId, id),
 };

@@ -70,10 +70,10 @@ describe("useNewOrderPage", () => {
     complete = true;
     await act(async () => {
       await queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipes("shop-1"),
+        queryKey: recipesKeys.recipes(authState.identity, "shop-1"),
       });
       await queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes("shop-1"),
+        queryKey: recipesKeys.orderableRecipes(authState.identity, "shop-1"),
       });
     });
     await waitFor(() =>

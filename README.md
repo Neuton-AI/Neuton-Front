@@ -33,6 +33,27 @@ removes that account's synced local records. A failed sign-out leaves a locked,
 explicitly unconfirmed state with retry controls. Cross-tab notifications contain
 only a reload hint, never credentials or an authoritative identity.
 
+Offline documents, pending edits, scans, blobs and conflict resolutions use the
+`neuton-owned-v1` identity namespace in `neuton-documents-identity-v2`. Their
+environment/user/shop ownership stays stable when the session is replaced.
+React Query keys use the same identity boundaries, including prices, order quotes
+and signed source URLs. An already-open application can retain its established
+identity and saved work during a connection outage; a cold offline launch remains
+locked. Reconnection must restore a server session and current membership before
+any pending work is transmitted.
+
+Account, shop and session-generation changes abort requests, storage PUTs and
+event streams. Local commits and late responses check that generation before
+acknowledging queued work or updating the view. Cookie/CSRF transport is confined
+to API operations; presigned R2 PUTs omit cookies and carry only their content
+type and signed URL. Background synchronization and stream heartbeats do not
+renew sessions.
+
+The former `neuton-documents-v1` database and old membership/selection preferences
+are quarantined, never relabeled or uploaded into fresh accounts. The previous
+offline-data notice offers an explicit discard confirmation. Discard removes
+only that legacy data; current partitions and their unsent work remain intact.
+
 ## PWA installation and offline shell
 
 `npm run build` generates `manifest.webmanifest`, the Workbox service worker and
@@ -50,9 +71,10 @@ assets from the previous release during deployment to support open tabs.
 The worker precaches HTML, every JS route chunk, CSS, bundled Latin fonts and app
 icons. API responses, scans and private documents are never runtime-cached. Once
 the initial worker installation finishes, the shell loads offline, including
-routes not previously opened. Document reads/writes still require connectivity
-until the local-first implementation in issue #161. A first visit without any
-connection cannot populate the cache. Updates wait until existing app tabs close;
+routes not previously opened. Established users can read saved documents and
+queue supported edits or scans offline in their own partition. Pricing and new
+order creation require connectivity. A first visit without any connection cannot
+populate the cache. Updates wait until existing app tabs close;
 the next launch activates the new shell without interrupting edits or scans.
 
 Dashboard and Profile share the browser install event. Dashboard dismissal lasts

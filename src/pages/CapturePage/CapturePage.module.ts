@@ -1,3 +1,4 @@
+import { beginLocalOperation, isContextAbort } from "@/features/sync/authority";
 import { useAuth, useShopMemberships } from "@/features/auth";
 import { type MediaKind } from "@/features/uploads/types";
 import {
@@ -343,13 +344,10 @@ export function useCapturePage() {
     const sources = previous.sources.filter((source) => source.id !== id);
     const nextCurrent = previous.currentId === id ? null : previous.currentId;
     updateCollection({ sources, currentId: nextCurrent });
-    setReviewIndex((index) =>
-      !sources.length
-        ? null
-        : index === null
-          ? null
-          : Math.min(index, sources.length - 1),
-    );
+    setReviewIndex((index) => {
+      if (!sources.length || index === null) return null;
+      return Math.min(index, sources.length - 1);
+    });
     setError(null);
   };
   const moveSource = (id: string, direction: -1 | 1) => {
@@ -373,12 +371,9 @@ export function useCapturePage() {
       return;
     }
     setSourcePickerOpen(false);
-    const input =
-      source === "gallery"
-        ? galleryInputRef.current
-        : source === "camera"
-          ? nativeCameraInputRef.current
-          : fileInputRef.current;
+    let input = fileInputRef.current;
+    if (source === "gallery") input = galleryInputRef.current;
+    else if (source === "camera") input = nativeCameraInputRef.current;
     if (input) {
       input.value = "";
       input.click();
@@ -399,22 +394,28 @@ export function useCapturePage() {
       setError("Open this capture from an order to attach its document.");
       return;
     }
+    let lease: ReturnType<typeof beginLocalOperation> | undefined;
     busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
+      lease = beginLocalOperation({ identity, shopId: activeShopId });
       await saveScan(
         collectionRef.current.sources.map((source) => source.file),
         kind,
         { identity, shopId: activeShopId },
         orderId,
       );
+      lease.assertCurrent();
+      if (!alive.current) return;
       navigate(kind === "receipt" ? "/catalog?tab=receipts" : "/catalog");
     } catch (cause) {
+      if (isContextAbort(cause) || !alive.current) return;
       setError(
         cause instanceof Error ? cause.message : "Upload failed. Try again.",
       );
     } finally {
+      lease?.dispose();
       busyRef.current = false;
       if (alive.current) setBusy(false);
     }

@@ -76,3 +76,48 @@ it("clears account caches before exposing another account and does not confirm f
   expect(result.current.status).toBe("unavailable");
   expect(result.current.error).toMatch(/not.*confirmed/i);
 });
+
+it("retains only an already established identity during a connection outage and locks on confirmed expiry", async () => {
+  vi.mocked(authClient.session).mockResolvedValueOnce(session());
+  const { result } = fixture();
+  await waitFor(() => expect(result.current.status).toBe("authenticated"));
+  const first = result.current.identity;
+  vi.mocked(authClient.session).mockRejectedValueOnce(
+    new ApiError("Offline", 0),
+  );
+  await act(() => result.current.refresh());
+  expect(result.current.status).toBe("offline");
+  expect(result.current.identity).toMatchObject({
+    userId: first!.userId,
+    offline: true,
+  });
+  vi.mocked(authClient.session).mockRejectedValueOnce(
+    new ApiError("Expired", 401),
+  );
+  await act(() => result.current.refresh());
+  expect(result.current.status).toBe("anonymous");
+  expect(result.current.identity).toBeNull();
+});
+
+it("invalidates old request authority on same-user session replacement without changing persisted identity", async () => {
+  const { beginApiRequest } = await import("@/lib/api-context");
+  const { scopeFor } = await import("@/features/sync/types");
+  vi.mocked(authClient.session).mockResolvedValueOnce(session());
+  const { result, client } = fixture();
+  await waitFor(() => expect(result.current.status).toBe("authenticated"));
+  const old = result.current.identity!;
+  const request = beginApiRequest(old);
+  client.setQueryData(["same-account"], "retained");
+  const replacement = session();
+  replacement.session.id = "replacement";
+  vi.mocked(authClient.session).mockResolvedValueOnce(replacement);
+  await act(() => result.current.refresh());
+  expect(request.signal.aborted).toBe(true);
+  expect(() => request.assertCurrent()).toThrow();
+  expect(result.current.identity?.generation).not.toBe(old.generation);
+  expect(scopeFor(result.current.identity, "shop").key).toBe(
+    scopeFor(old, "shop").key,
+  );
+  expect(client.getQueryData(["same-account"])).toBe("retained");
+  request.dispose();
+});

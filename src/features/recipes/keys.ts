@@ -1,6 +1,10 @@
-import type { ShopId } from '@/lib/queryTypes';
+import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
+import { identityQueryKey } from '@/features/auth/environment';
 export const recipesKeys = {
-  recipes: (shopId: ShopId) => ['recipes', shopId] as const,
-  orderableRecipes: (shopId: ShopId) => ['recipes', 'orderable', shopId] as const,
-  recipe: (shopId: ShopId, id: string) => ['recipe', shopId, id] as const,
+  recipes: (identity: AuthenticatedContext, shopId: ShopId) =>
+    identityQueryKey(identity, 'recipes', shopId),
+  orderableRecipes: (identity: AuthenticatedContext, shopId: ShopId) =>
+    identityQueryKey(identity, 'recipes', shopId, 'orderable'),
+  recipe: (identity: AuthenticatedContext, shopId: ShopId, id: string) =>
+    identityQueryKey(identity, 'recipe', shopId, id),
 };

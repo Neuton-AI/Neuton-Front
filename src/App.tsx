@@ -7,11 +7,13 @@ import { Route, Routes } from "react-router-dom";
 import { RequireAuth, RootRedirect } from "./AppGate";
 import { AuthenticatedRoutes } from "./AppRoutes";
 import { ConfirmEmailPage } from "@/pages/ConfirmEmailPage/ConfirmEmailPage";
+import { LegacyDataNotice } from "@/features/sync/LegacyDataNotice";
 
 export const App: React.FC = () => {
   useAppChrome();
   return (
     <>
+      <LegacyDataNotice />
       <SyncStatus />
       <Routes>
         <Route path="/" element={<RootRedirect />} />

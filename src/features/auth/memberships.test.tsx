@@ -1,3 +1,5 @@
+import { identityPartition } from "./environment";
+const selectedKey = `${identityPartition({ environment: "test", userId: "u1" })}:activeShop`;
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -58,20 +60,20 @@ beforeEach(() => {
   localStorage.clear();
 });
 it("replaces stale selection only with a current membership and clears it after removal", async () => {
-  localStorage.setItem("neuton.activeShop:test:u1", "foreign");
+  localStorage.setItem(selectedKey, "foreign");
   vi.mocked(authClient.session)
     .mockResolvedValueOnce(session(["allowed"]))
     .mockResolvedValueOnce(session([]));
   const { result } = fixture();
   await waitFor(() => expect(result.current.activeShopId).toBe("allowed"));
-  expect(localStorage.getItem("neuton.activeShop:test:u1")).toBe("allowed");
+  expect(localStorage.getItem(selectedKey)).toBe("allowed");
   act(() => result.current.setActiveShopId("foreign"));
   expect(result.current.activeShopId).toBe("allowed");
   await act(() => result.current.refresh());
-  expect(localStorage.getItem("neuton.activeShop:test:u1")).toBeNull();
+  expect(localStorage.getItem(selectedKey)).toBeNull();
 });
 it("retains this environment and user selection without adopting another namespace", async () => {
-  localStorage.setItem("neuton.activeShop:test:u1", "b");
+  localStorage.setItem(selectedKey, "b");
   localStorage.setItem("neuton.activeShop:other:u1", "foreign");
   vi.mocked(authClient.session).mockResolvedValue(session(["a", "b"]));
   const { result } = fixture();

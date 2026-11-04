@@ -2,7 +2,7 @@ import { inventoryKeys } from '@/features/inventory/keys';
 import { type InventoryItem } from '@/features/inventory/types';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
-import { enabled } from '@/lib/queryTypes';
+import { networkEnabled } from '@/lib/queryTypes';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 export function useInventory(
@@ -11,13 +11,14 @@ export function useInventory(
   active = true,
 ): UseQueryResult<{ items: InventoryItem[] }> {
   return useQuery({
-    queryKey: inventoryKeys.inventory(shopId),
+    networkMode: 'always',
+    queryKey: inventoryKeys.inventory(identity, shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ items: InventoryItem[] }>('/inventory', {
         identity,
         shopId,
         signal,
       }),
-    enabled: enabled(identity, shopId) && active,
+    enabled: networkEnabled(identity, shopId) && active,
   });
 }

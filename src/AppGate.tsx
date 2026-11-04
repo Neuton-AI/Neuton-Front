@@ -36,7 +36,7 @@ export function RootRedirect() {
   if (auth.status === "pending-email") {
     return <Navigate to="/auth/confirm" replace />;
   }
-  if (auth.status === "authenticated") {
+  if (auth.status === "authenticated" || auth.status === "offline") {
     return (
       <Navigate
         to={auth.session?.memberships.length ? "/dashboard" : "/profile"}
@@ -53,7 +53,7 @@ export function RequireAuth({ children }: { children: ReactElement }) {
   if (auth.status === "pending-email") {
     return <Navigate to="/auth/confirm" replace />;
   }
-  if (auth.status !== "authenticated") {
+  if (auth.status !== "authenticated" && auth.status !== "offline") {
     return <Navigate to="/signin" replace state={{ from: auth.from }} />;
   }
   if (!auth.session?.memberships.length && auth.from !== "/profile") {

@@ -1,3 +1,4 @@
+import { setApiIdentity } from "@/lib/api-context";
 import { authState, resetAuth } from "@/test/auth";
 import { makeFile, renderHookWithProviders } from "@/test/render";
 import { act, waitFor } from "@testing-library/react";
@@ -290,6 +291,7 @@ describe("capture collection", () => {
       userId: "u1",
       sessionId: "session-1",
     };
+    setApiIdentity(authState.identity);
     rerender();
     boundary.upload.mockRejectedValueOnce(new Error("Source 1 failed"));
     await act(async () => result.current.submit());

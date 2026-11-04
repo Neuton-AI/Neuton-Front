@@ -24,7 +24,8 @@ export function useReceipts(
   active = true,
 ): UseQueryResult<{ receipts: Receipt[] }> {
   return useQuery({
-    queryKey: receiptsKeys.receipts(shopId),
+    networkMode: 'always',
+    queryKey: receiptsKeys.receipts(identity, shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ receipts: Receipt[] }>('/receipts?limit=50', {
         identity,
@@ -41,7 +42,8 @@ export function useReceipt(
   id: string,
 ): UseQueryResult<{ receipt: ReceiptDetail }> {
   return useQuery({
-    queryKey: receiptsKeys.receipt(shopId, id),
+    networkMode: 'always',
+    queryKey: receiptsKeys.receipt(identity, shopId, id),
     queryFn: ({ signal }) =>
       apiFetch<{ receipt: ReceiptDetail }>(`/receipts/${id}`, {
         identity,
@@ -63,6 +65,7 @@ export function useVerifyReceipt(
 > {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id, body }) =>
       apiFetch<VerifyReceiptOutcome>(`/receipts/${id}/verify`, {
         method: 'POST',
@@ -71,19 +74,19 @@ export function useVerifyReceipt(
         body,
       }),
     onSuccess: (data, { id }) => {
-      const key = receiptsKeys.receipt(shopId, id);
+      const key = receiptsKeys.receipt(identity, shopId, id);
       queryClient.setQueryData<{ receipt: ReceiptDetail }>(key, (old) =>
         old ? { receipt: { ...old.receipt, status: data.status } } : old,
       );
       void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({
-        queryKey: receiptsKeys.receipts(shopId),
+        queryKey: receiptsKeys.receipts(identity, shopId),
       });
       void queryClient.invalidateQueries({
-        queryKey: inventoryKeys.inventory(shopId),
+        queryKey: inventoryKeys.inventory(identity, shopId),
       });
       void queryClient.invalidateQueries({
-        queryKey: analyticsKeys.dashboardRoot,
+        queryKey: analyticsKeys.dashboardRoot(identity),
       });
     },
   });
@@ -105,13 +108,13 @@ export function useUpdateReceiptMerchant(
         body: { merchantName },
       }),
     onSuccess: (data, { id }) => {
-      const key = receiptsKeys.receipt(shopId, id);
+      const key = receiptsKeys.receipt(identity, shopId, id);
       queryClient.setQueryData<{ receipt: ReceiptDetail }>(key, (old) =>
         old ? { receipt: { ...old.receipt, ...data.receipt } } : old,
       );
       void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({
-        queryKey: receiptsKeys.receipts(shopId),
+        queryKey: receiptsKeys.receipts(identity, shopId),
       });
     },
   });
@@ -123,6 +126,7 @@ export function useDeleteReceipt(
 ): UseMutationResult<{ ok: true }, Error, { id: string }> {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id }) =>
       apiFetch<{ ok: true }>(`/receipts/${id}`, {
         method: 'DELETE',
@@ -130,12 +134,14 @@ export function useDeleteReceipt(
         shopId,
       }),
     onSuccess: (_data, { id }) => {
-      queryClient.removeQueries({ queryKey: receiptsKeys.receipt(shopId, id) });
-      void queryClient.invalidateQueries({
-        queryKey: receiptsKeys.receipts(shopId),
+      queryClient.removeQueries({
+        queryKey: receiptsKeys.receipt(identity, shopId, id),
       });
       void queryClient.invalidateQueries({
-        queryKey: inventoryKeys.inventory(shopId),
+        queryKey: receiptsKeys.receipts(identity, shopId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: inventoryKeys.inventory(identity, shopId),
       });
     },
   });

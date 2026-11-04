@@ -1,6 +1,10 @@
 import type { LocalDocument, PendingScan, PendingWrite } from './types';
+import {
+  DOCUMENT_DATABASE,
+  identityPartition,
+} from '@/features/auth/environment';
 
-const DATABASE = 'neuton-documents-v1';
+const DATABASE = DOCUMENT_DATABASE;
 const STORES = [
   'documents',
   'writes',
@@ -65,9 +69,24 @@ export function result<T>(request: IDBRequest<T>): Promise<T> {
 export async function transaction<T>(
   names: StoreName[],
   write: (tx: IDBTransaction) => Promise<T> | T,
+  assertCurrent?: () => void,
 ): Promise<T> {
+  assertCurrent?.();
   const db = await database();
+  assertCurrent?.();
   const tx = db.transaction(names, 'readwrite');
+  const abortStale = () => {
+    try {
+      assertCurrent?.();
+    } catch {
+      try {
+        tx.abort();
+      } catch {
+        /* Already committed. */
+      }
+    }
+  };
+  window.addEventListener('neuton-authority-change', abortStale);
   const completed = new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = tx.onabort = () =>
@@ -75,7 +94,9 @@ export async function transaction<T>(
   });
   try {
     const value = await write(tx);
+    assertCurrent?.();
     await completed;
+    assertCurrent?.();
     return value;
   } catch (error) {
     try {
@@ -85,6 +106,8 @@ export async function transaction<T>(
     }
     await completed.catch(() => undefined);
     throw error;
+  } finally {
+    window.removeEventListener('neuton-authority-change', abortStale);
   }
 }
 export async function rows<T>(name: StoreName, scope: string): Promise<T[]> {
@@ -119,9 +142,7 @@ export async function logoutCleanup(
       })[];
       for (const value of values) {
         if (
-          value.scope.startsWith(
-            `${identity.environment}:${identity.userId}:`,
-          ) &&
+          value.scope.startsWith(`${identityPartition(identity)}:`) &&
           (name === 'settings' || value.syncStatus === 'synced')
         ) {
           store.delete(value.key);

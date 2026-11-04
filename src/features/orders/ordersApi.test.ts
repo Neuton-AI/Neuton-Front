@@ -94,11 +94,17 @@ describe('orders API contracts', () => {
   it('posts a new order and invalidates sales and dashboard caches', async () => {
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
-    client.setQueryData(ordersKeys.orders('shop-1', 'all'), {
-      orders: [],
-      total: 0,
-    });
-    client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
+    client.setQueryData(
+      ordersKeys.orders(authState.identity, 'shop-1', 'all'),
+      {
+        orders: [],
+        total: 0,
+      },
+    );
+    client.setQueryData(
+      analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      {},
+    );
     let body: unknown;
     server.use(
       http.post(apiPath('/orders'), async ({ request }) => {
@@ -125,24 +131,33 @@ describe('orders API contracts', () => {
     await act(() => result.current.mutateAsync(payload));
     expect(body).toEqual(payload);
     expect(
-      client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated,
+      client.getQueryState(
+        ordersKeys.orders(authState.identity, 'shop-1', 'all'),
+      )?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
-        ?.isInvalidated,
+      client.getQueryState(
+        analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      )?.isInvalidated,
     ).toBe(true);
   });
   it('removes deleted detail and invalidates sales and money', async () => {
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
-    client.setQueryData(ordersKeys.order('shop-1', 'o1'), {
+    client.setQueryData(ordersKeys.order(authState.identity, 'shop-1', 'o1'), {
       order: buildOrder(),
     });
-    client.setQueryData(ordersKeys.orders('shop-1', 'all'), {
-      orders: [],
-      total: 0,
-    });
-    client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
+    client.setQueryData(
+      ordersKeys.orders(authState.identity, 'shop-1', 'all'),
+      {
+        orders: [],
+        total: 0,
+      },
+    );
+    client.setQueryData(
+      analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      {},
+    );
     server.use(
       http.delete(
         apiPath('/orders/o1'),
@@ -158,14 +173,17 @@ describe('orders API contracts', () => {
     );
     await act(() => result.current.mutateAsync({ id: 'o1' }));
     expect(
-      client.getQueryData(ordersKeys.order('shop-1', 'o1')),
+      client.getQueryData(ordersKeys.order(authState.identity, 'shop-1', 'o1')),
     ).toBeUndefined();
     expect(
-      client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated,
+      client.getQueryState(
+        ordersKeys.orders(authState.identity, 'shop-1', 'all'),
+      )?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
-        ?.isInvalidated,
+      client.getQueryState(
+        analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      )?.isInvalidated,
     ).toBe(true);
   });
   it('marks delivery without discarding cached line items', async () => {
@@ -181,7 +199,7 @@ describe('orders API contracts', () => {
         unitPrice: '5',
       },
     ];
-    client.setQueryData(ordersKeys.order('shop-1', 'o1'), {
+    client.setQueryData(ordersKeys.order(authState.identity, 'shop-1', 'o1'), {
       order: { ...buildOrder(), items },
     });
     server.use(
@@ -199,7 +217,9 @@ describe('orders API contracts', () => {
       },
     );
     await act(() => result.current.mutateAsync({ id: 'o1' }));
-    expect(client.getQueryData(ordersKeys.order('shop-1', 'o1'))).toEqual({
+    expect(
+      client.getQueryData(ordersKeys.order(authState.identity, 'shop-1', 'o1')),
+    ).toEqual({
       order: { ...buildOrder(), status: 'delivered', items },
     });
   });

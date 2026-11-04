@@ -1,5 +1,6 @@
 import type { RequestOptions } from '@/lib/api';
 import type { MediaKind } from '@/features/uploads/types';
+import { identityPartition } from '@/features/auth/environment';
 
 export type Kind = 'receipt' | 'recipe' | 'order';
 export type Scope = {
@@ -75,6 +76,6 @@ export function scopeFor(
     environment,
     userId,
     shopId,
-    key: `${environment}:${userId}:${shopId}`,
+    key: `${identityPartition(identity)}:${shopId}`,
   };
 }

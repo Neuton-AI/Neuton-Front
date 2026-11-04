@@ -1,6 +1,8 @@
 import { setApiIdentity } from '@/lib/api-context';
 import { beforeEach } from 'vitest';
-beforeEach(() => setApiIdentity({ environment: 'test', userId: 'u1' }));
+beforeEach(() =>
+  setApiIdentity({ environment: 'test', userId: 'u1', sessionId: 'session-1' }),
+);
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   connectLiveSync,
@@ -169,5 +171,45 @@ describe('live sync', () => {
     });
     await readSyncEvents(stream, receive);
     expect(receive).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards an old connection and its reconnect timer after a same-user session generation changes', async () => {
+    vi.useFakeTimers();
+    const fetch = vi
+      .fn()
+      .mockRejectedValue(new Error('temporarily disconnected'));
+    vi.stubGlobal('fetch', fetch);
+    const stop = connectLiveSync(
+      {
+        identity: { environment: 'test', userId: 'u1', sessionId: 'session-1' },
+        shopId: 'shop',
+      },
+      vi.fn(),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    setApiIdentity({
+      environment: 'test',
+      userId: 'u1',
+      sessionId: 'session-1',
+      generation: 2,
+    });
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][1].credentials).toBe('include');
+    expect(fetch.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
+    stop();
+  });
+
+  it('cancels a quiet event reader as soon as its authority aborts', async () => {
+    const controller = new AbortController();
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({ cancel });
+    const pending = readSyncEvents(stream, vi.fn(), controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    controller.abort();
+    await rejected;
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 });

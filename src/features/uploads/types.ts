@@ -8,6 +8,7 @@ export type UploadCompleteResponse = {
 };
 
 export type UploadContext = {
+  signal?: AbortSignal;
   identity: import("@/lib/api-context").AuthIdentity | null;
   shopId: string | null;
 };

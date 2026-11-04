@@ -5,7 +5,8 @@ import type { ShopMembershipDto } from "./types";
 export function useShopMemberships(userId: string | undefined) {
   const auth = useAuth();
   const memberships =
-    auth.status === "authenticated" && userId === auth.user?.id
+    (auth.status === "authenticated" || auth.status === "offline") &&
+    userId === auth.user?.id
       ? auth.session!.memberships
       : [];
   const refresh = auth.refresh;

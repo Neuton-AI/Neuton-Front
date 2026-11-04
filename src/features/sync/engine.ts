@@ -1,3 +1,5 @@
+import { beginLocalOperation, isContextAbort } from './authority';
+import { currentApiEpoch } from '@/lib/api-context';
 import { apiFetch, ApiError, type RequestOptions } from '@/lib/api';
 import {
   uploadSources,
@@ -40,31 +42,61 @@ export const syncActivity = new Map<
     completedAt?: number;
   }
 >();
-const authenticatedSessions = new Map<string, string | null | undefined>();
+const authorizedGenerations = new Map<string, number>();
+type SyncContext = RequestOptions & { assertCurrent: () => void };
+function transaction<T>(
+  context: SyncContext,
+  names: Parameters<typeof store.transaction>[0],
+  write: (tx: IDBTransaction) => Promise<T> | T,
+) {
+  return store.transaction(names, write, context.assertCurrent);
+}
+window.addEventListener('neuton-authority-change', () => {
+  running.clear();
+  rerun.clear();
+  syncActivity.clear();
+  authorizedGenerations.clear();
+});
 
 export function syncDocuments(
   scope: Scope,
   context: RequestOptions,
   options: { force?: boolean } = {},
 ): Promise<void> {
-  if (!navigator.onLine) return Promise.resolve();
+  if (!navigator.onLine || context.identity?.offline) return Promise.resolve();
+  let lease: ReturnType<typeof beginLocalOperation>;
+  try {
+    lease = beginLocalOperation(context, scope);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   const previous = running.get(scope.key);
-  if (previous) return previous;
+  if (previous) {
+    lease.dispose();
+    return previous;
+  }
   const reauthenticated =
-    !authenticatedSessions.has(scope.key) ||
-    authenticatedSessions.get(scope.key) !== context.identity?.sessionId;
-  authenticatedSessions.set(scope.key, context.identity?.sessionId);
+    authorizedGenerations.get(scope.key) !== currentApiEpoch();
+  authorizedGenerations.set(scope.key, currentApiEpoch());
   const run = (async () => {
     do {
+      lease.assertCurrent();
       await synchronize(
         scope,
         // A caller may be saving a PATCH; sync downloads must start as GETs.
-        { identity: context.identity, shopId: context.shopId },
+        {
+          identity: context.identity,
+          shopId: context.shopId,
+          signal: lease.signal,
+          assertCurrent: lease.assertCurrent,
+        },
         options.force ?? false,
         reauthenticated,
       );
     } while (rerun.delete(scope.key));
   })().finally(() => {
+    lease.dispose();
+    if (running.get(scope.key) !== run) return;
     running.delete(scope.key);
     const activity = syncActivity.get(scope.key);
     if (activity) syncActivity.set(scope.key, { ...activity, running: false });
@@ -76,21 +108,30 @@ export function syncDocuments(
 
 async function synchronize(
   scope: Scope,
-  context: RequestOptions,
+  context: SyncContext,
   force: boolean,
   reauthenticated: boolean,
 ) {
   if (!navigator.onLine) return;
   // Web Locks serialize tabs as well as in-process runs. Server retry receipts also protect older browsers.
-  const perform = () => transfer(scope, context, force, reauthenticated);
+  const perform = () => {
+    context.assertCurrent();
+    return transfer(scope, context, force, reauthenticated);
+  };
   if (navigator.locks) {
-    await navigator.locks.request(`neuton-sync:${scope.key}`, perform);
-  } else await perform();
+    await navigator.locks.request(
+      `neuton-sync:${scope.key}`,
+      { signal: context.signal },
+      perform,
+    );
+  } else {
+    await perform();
+  }
 }
 
 async function transfer(
   scope: Scope,
-  context: RequestOptions,
+  context: SyncContext,
   force: boolean,
   reauthenticated: boolean,
 ) {
@@ -121,6 +162,7 @@ async function transfer(
     work: () => Promise<void>,
     notify = true,
   ) => {
+    context.assertCurrent();
     if (authenticationFailed) return false;
     const blocked = (await errorsFor(scope.key)).filter(
       (row) =>
@@ -138,6 +180,7 @@ async function transfer(
     ) {
       return false;
     }
+    context.assertCurrent();
     syncActivity.set(scope.key, {
       running: true,
       entity: identity.entity,
@@ -147,7 +190,9 @@ async function transfer(
     store.changed();
     try {
       await work();
+      context.assertCurrent();
       await resolveErrors(identity);
+      context.assertCurrent();
       if (notify) {
         syncActivity.set(
           scope.key,
@@ -169,9 +214,20 @@ async function transfer(
         (error instanceof Error || error instanceof DOMException) &&
         error.name === 'AbortError'
       ) {
-        return false;
+        throw error;
       }
       const upload = error instanceof UploadSourcesError ? error : null;
+      try {
+        context.assertCurrent();
+      } catch (cancelled) {
+        // A denial itself may initiate provider revalidation. Retain that denial
+        // in its original partition so it is not retried as unattempted work.
+        const cause = upload?.cause ?? error;
+        if (cause instanceof ApiError && [401, 403].includes(cause.status)) {
+          await recordError(cause, identity);
+        }
+        throw cancelled;
+      }
       if (upload?.failures.length) {
         for (const failure of upload.failures)
           await recordError(failure.error, {
@@ -180,7 +236,9 @@ async function transfer(
             sourceIndex: failure.sourceIndex,
             sourceId: failure.sourceId,
           });
-      } else await recordError(upload?.cause ?? error, identity);
+      } else {
+        await recordError(upload?.cause ?? error, identity);
+      }
       if (
         (error instanceof ApiError &&
           (error.status === 401 || error.code === 'ACCOUNT_CHANGED')) ||
@@ -240,6 +298,7 @@ async function transfer(
             ),
           },
         });
+        context.assertCurrent();
         for (const meta of result.toPush)
           toPush.set(`${meta.kind}:${meta.id}`, meta);
         for (const meta of result.toPull) {
@@ -319,7 +378,8 @@ async function transfer(
       const saved = await attempt(
         { ...identity, phase: 'local-persistence' },
         async () => {
-          await store.transaction(
+          await transaction(
+            context,
             ['writes', 'documents', 'pulls'],
             async (tx) => {
               const current = (await store.result(
@@ -370,7 +430,7 @@ async function transfer(
       if (failures.length) throw failures[0];
       return;
     }
-    await store.transaction(['pulls', 'documents'], async (tx) => {
+    await transaction(context, ['pulls', 'documents'], async (tx) => {
       for (const meta of final.toPull) {
         const key = documentKey(scope, meta.kind, meta.id);
         tx.objectStore('pulls').put({
@@ -404,37 +464,47 @@ async function transfer(
         false,
       );
     }
-    await store.transaction(['documents', 'settings', 'writes'], async (tx) => {
-      const docs = tx.objectStore('documents');
-      const all = (await store.result(
-        docs.index('scope').getAll(scope.key),
-      )) as LocalDocument[];
-      const remaining = (await store.result(
-        tx.objectStore('writes').index('scope').getAll(scope.key),
-      )) as { documentKey: string }[];
-      for (const row of all) {
-        // Equal revisions require no full transfer. Pending edits racing this run keep their state.
-        if (
-          !row.localOnly &&
-          !remaining.some((write) => write.documentKey === row.key) &&
-          !final.toPush.some(
-            (meta) => meta.id === row.id && meta.kind === row.kind,
-          ) &&
-          row.syncStatus === 'pending-push'
-        ) {
-          docs.put({ ...row, syncStatus: 'synced', lastSyncedAt: Date.now() });
+    await transaction(
+      context,
+      ['documents', 'settings', 'writes'],
+      async (tx) => {
+        const docs = tx.objectStore('documents');
+        const all = (await store.result(
+          docs.index('scope').getAll(scope.key),
+        )) as LocalDocument[];
+        const remaining = (await store.result(
+          tx.objectStore('writes').index('scope').getAll(scope.key),
+        )) as { documentKey: string }[];
+        for (const row of all) {
+          // Equal revisions require no full transfer. Pending edits racing this run keep their state.
+          if (
+            !row.localOnly &&
+            !remaining.some((write) => write.documentKey === row.key) &&
+            !final.toPush.some(
+              (meta) => meta.id === row.id && meta.kind === row.kind,
+            ) &&
+            row.syncStatus === 'pending-push'
+          ) {
+            docs.put({
+              ...row,
+              syncStatus: 'synced',
+              lastSyncedAt: Date.now(),
+            });
+          }
         }
-      }
-      tx.objectStore('settings').put({
-        key: scope.key,
-        scope: scope.key,
-        initialized: true,
-      });
-    });
+        tx.objectStore('settings').put({
+          key: scope.key,
+          scope: scope.key,
+          initialized: true,
+        });
+      },
+    );
     if (lastSuccess) syncActivity.set(scope.key, lastSuccess);
     if (acknowledged) store.changed();
     await pruneErrors(scope.key);
   } catch (error) {
+    if (isContextAbort(error)) throw error;
+    context.assertCurrent();
     if (!failures.includes(error)) {
       await recordError(error, { ...metadata, phase: 'local-persistence' });
     }
@@ -443,7 +513,7 @@ async function transfer(
   if (failures.length) throw failures[0];
 }
 
-async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
+async function pull(scope: Scope, context: SyncContext, meta: Meta) {
   const key = documentKey(scope, meta.kind, meta.id);
   const before = await store.get<LocalDocument>('documents', key);
   let data = before?.data ?? { id: meta.id };
@@ -459,11 +529,14 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
       }
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) deleted = true;
-      else throw error;
+      else {
+        throw error;
+      }
     }
   }
   let updated = false;
-  await store.transaction(
+  await transaction(
+    context,
     ['documents', 'writes', 'pulls', 'syncErrors'],
     async (tx) => {
       const docs = tx.objectStore('documents');
@@ -613,11 +686,7 @@ async function pull(scope: Scope, context: RequestOptions, meta: Meta) {
   }
 }
 
-async function pushScan(
-  scope: Scope,
-  context: RequestOptions,
-  scan: PendingScan,
-) {
+async function pushScan(scope: Scope, context: SyncContext, scan: PendingScan) {
   const binary = await store.get<{ files: Blob[] }>('blobs', scan.key);
   if (!binary) {
     throw new DOMException('Saved scan files unavailable', 'NotFoundError');
@@ -646,6 +715,7 @@ async function pushScan(
   }
   if (!completed) {
     const session: UploadSession = {
+      owner: scope.key,
       clientRequestId: scan.id,
       kind: scan.kind,
       orderId: scan.orderId,
@@ -671,11 +741,15 @@ async function pushScan(
       })),
     };
     await uploadSources(files, scan.kind, {
-      context: { identity: context.identity ?? null, shopId: scope.shopId },
+      context: {
+        identity: context.identity ?? null,
+        shopId: scope.shopId,
+        signal: context.signal,
+      },
       session,
       orderId: scan.orderId,
       persistProgress: async (progress) => {
-        await store.transaction(['scans'], (tx) => {
+        await transaction(context, ['scans'], (tx) => {
           tx.objectStore('scans').put({
             ...scan,
             upload: {
@@ -692,7 +766,7 @@ async function pushScan(
       },
     });
   }
-  await store.transaction(['scans', 'blobs'], (tx) => {
+  await transaction(context, ['scans', 'blobs'], (tx) => {
     tx.objectStore('scans').delete(scan.key);
     tx.objectStore('blobs').delete(scan.key);
   });

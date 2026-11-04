@@ -36,4 +36,9 @@ export interface SessionDto {
   memberships: ShopMembershipDto[];
 }
 export type AuthStatus =
-  "loading" | "anonymous" | "pending-email" | "authenticated" | "unavailable";
+  | "loading"
+  | "anonymous"
+  | "pending-email"
+  | "authenticated"
+  | "offline"
+  | "unavailable";

@@ -1,9 +1,22 @@
+import { isContextAbort } from './authority';
 import { useEffect, useState } from 'react';
 import { useAuth, useShopMemberships } from '@/features/auth';
 import * as store from './store';
 import { scopeFor, type LocalDocument } from './types';
 import { resolveDocumentConflict } from './conflicts';
 import { syncDocuments } from './engine';
+
+function fieldLabel(field: string) {
+  if (field === '$deleted') {
+    return 'Deleted elsewhere. Export pending work before accepting if you need a copy.';
+  }
+  if (field.startsWith('$')) return 'Document changes';
+  return field;
+}
+function choiceLabel(choice: 'local' | 'server', deleted?: boolean) {
+  if (choice === 'local') return 'Keep my change';
+  return deleted ? 'Accept deletion' : 'Use server change';
+}
 
 export function SyncConflicts() {
   const { identity, user } = useAuth();
@@ -55,11 +68,7 @@ export function SyncConflicts() {
           >
             <span>
               {String(row.data.name ?? row.data.merchantName ?? row.kind)}:{' '}
-              {field === '$deleted'
-                ? 'Deleted elsewhere. Export pending work before accepting if you need a copy.'
-                : field.startsWith('$')
-                  ? 'Document changes'
-                  : field}
+              {fieldLabel(field)}
             </span>
             {(['local', 'server'] as const).map((choice) => (
               <button
@@ -70,25 +79,25 @@ export function SyncConflicts() {
                 onClick={() => {
                   if (!identity || !activeShopId) return;
                   setError('');
-                  void resolveDocumentConflict(row.key, field, choice)
+                  void resolveDocumentConflict(row.key, field, choice, {
+                    identity,
+                    shopId: activeShopId,
+                  })
                     .then(() =>
                       syncDocuments(scopeFor(identity, activeShopId), {
                         identity,
                         shopId: activeShopId,
                       }),
                     )
-                    .catch(() =>
+                    .catch((cause) => {
+                      if (isContextAbort(cause)) return;
                       setError(
                         'Could not resolve or sync this change. Your saved work is retained.',
-                      ),
-                    );
+                      );
+                    });
                 }}
               >
-                {choice === 'local'
-                  ? 'Keep my change'
-                  : row.remoteDeleted
-                    ? 'Accept deletion'
-                    : 'Use server change'}
+                {choiceLabel(choice, row.remoteDeleted)}
               </button>
             ))}
           </div>

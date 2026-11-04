@@ -1,5 +1,9 @@
-import type { ShopId } from '@/lib/queryTypes';
+import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
+import { identityQueryKey } from '@/features/auth/environment';
 export const uploadsKeys = {
-  signedDownloadUrl: (shopId: ShopId, storagePath: string) =>
-    ['signed-download-url', shopId, storagePath] as const,
+  signedDownloadUrl: (
+    identity: AuthenticatedContext,
+    shopId: ShopId,
+    path: string,
+  ) => identityQueryKey(identity, 'signed-download-url', shopId, path),
 };

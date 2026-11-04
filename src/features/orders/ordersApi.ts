@@ -1,3 +1,7 @@
+import {
+  sameQueryPartition,
+  identityQueryKey,
+} from '@/features/auth/environment';
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
 import type { StatusFilter } from '@/features/orders/types';
@@ -8,9 +12,8 @@ import {
 } from '@/features/orders/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
-import { enabled } from '@/lib/queryTypes';
+import { enabled, networkEnabled } from '@/lib/queryTypes';
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -24,7 +27,8 @@ export function useOrders(
   statusFilter: StatusFilter,
 ): UseQueryResult<{ orders: Order[]; total: number }> {
   return useQuery({
-    queryKey: ordersKeys.orders(shopId, statusFilter),
+    networkMode: 'always',
+    queryKey: ordersKeys.orders(identity, shopId, statusFilter),
     queryFn: ({ signal }) =>
       apiFetch<{ orders: Order[]; total: number }>(
         statusFilter === 'all'
@@ -42,7 +46,8 @@ export function useOrder(
   id: string,
 ): UseQueryResult<{ order: OrderDetail }> {
   return useQuery({
-    queryKey: ordersKeys.order(shopId, id),
+    networkMode: 'always',
+    queryKey: ordersKeys.order(identity, shopId, id),
     queryFn: ({ signal }) =>
       apiFetch<{ order: OrderDetail }>(`/orders/${id}`, {
         identity,
@@ -63,12 +68,14 @@ export function useOrderQuote(
   },
 ): UseQueryResult<OrderQuote> {
   return useQuery({
-    queryKey: [
+    networkMode: 'always',
+    queryKey: identityQueryKey(
+      identity,
       'order-quote',
       shopId,
       JSON.stringify(inputs.items),
       inputs.distanceKm,
-    ],
+    ),
     queryFn: ({ signal }) =>
       apiFetch<OrderQuote>('/orders/quote', {
         method: 'POST',
@@ -78,8 +85,13 @@ export function useOrderQuote(
         body: { deliveryDistanceKm: inputs.distanceKm, items: inputs.items },
       }),
     enabled:
-      enabled(identity, shopId) && inputs.enabled && inputs.items.length > 0,
-    placeholderData: keepPreviousData,
+      networkEnabled(identity, shopId) &&
+      inputs.enabled &&
+      inputs.items.length > 0,
+    placeholderData: (previous, query) =>
+      sameQueryPartition(query?.queryKey, identity, shopId)
+        ? previous
+        : undefined,
   });
 }
 
@@ -93,6 +105,7 @@ export function useCreateOrder(
 > {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: (body: CreateOrderBody) =>
       apiFetch<{ order: Order; totals: { netProfit: number } }>('/orders', {
         method: 'POST',
@@ -101,9 +114,11 @@ export function useCreateOrder(
         body,
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
       void queryClient.invalidateQueries({
-        queryKey: analyticsKeys.dashboardRoot,
+        queryKey: ordersKeys.ordersRoot(identity),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: analyticsKeys.dashboardRoot(identity),
       });
     },
   });
@@ -123,6 +138,7 @@ export function useMarkOrderDelivered(
 ): UseMutationResult<{ order: OrderDetail }, Error, { id: string }> {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id }) =>
       apiFetch<{ order: OrderDetail }>(`/orders/${id}/verify`, {
         method: 'POST',
@@ -130,14 +146,16 @@ export function useMarkOrderDelivered(
         shopId,
       }),
     onSuccess: (data, { id }) => {
-      const key = ordersKeys.order(shopId, id);
+      const key = ordersKeys.order(identity, shopId, id);
       // The transition response carries the order row without its items, so
       // only the status is taken; the refetch brings back the full detail.
       queryClient.setQueryData<{ order: OrderDetail }>(key, (old) =>
         old ? { order: { ...old.order, status: data.order.status } } : old,
       );
       void queryClient.invalidateQueries({ queryKey: key });
-      void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
+      void queryClient.invalidateQueries({
+        queryKey: ordersKeys.ordersRoot(identity),
+      });
     },
   });
 }
@@ -148,6 +166,7 @@ export function useDeleteOrder(
 ): UseMutationResult<undefined, Error, { id: string }> {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id }) =>
       apiFetch<undefined>(`/orders/${id}`, {
         method: 'DELETE',
@@ -155,10 +174,14 @@ export function useDeleteOrder(
         shopId,
       }),
     onSuccess: (_data, { id }) => {
-      queryClient.removeQueries({ queryKey: ordersKeys.order(shopId, id) });
-      void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
+      queryClient.removeQueries({
+        queryKey: ordersKeys.order(identity, shopId, id),
+      });
       void queryClient.invalidateQueries({
-        queryKey: analyticsKeys.dashboardRoot,
+        queryKey: ordersKeys.ordersRoot(identity),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: analyticsKeys.dashboardRoot(identity),
       });
     },
   });

@@ -49,7 +49,7 @@ describe('receipts API contracts', () => {
     expect(calls).toBe(1);
     await act(() =>
       queryClient.invalidateQueries({
-        queryKey: receiptsKeys.receipt('shop-1', 'rc-1'),
+        queryKey: receiptsKeys.receipt(authState.identity, 'shop-1', 'rc-1'),
       }),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
@@ -69,12 +69,24 @@ describe('receipts API contracts', () => {
     );
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
-    client.setQueryData(receiptsKeys.receipt('shop-1', 'rc-1'), {
-      receipt: buildReceiptDetail(),
-    });
-    client.setQueryData(receiptsKeys.receipts('shop-1'), {});
-    client.setQueryData(inventoryKeys.inventory('shop-1'), {});
-    client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
+    client.setQueryData(
+      receiptsKeys.receipt(authState.identity, 'shop-1', 'rc-1'),
+      {
+        receipt: buildReceiptDetail(),
+      },
+    );
+    client.setQueryData(
+      receiptsKeys.receipts(authState.identity, 'shop-1'),
+      {},
+    );
+    client.setQueryData(
+      inventoryKeys.inventory(authState.identity, 'shop-1'),
+      {},
+    );
+    client.setQueryData(
+      analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      {},
+    );
     const { result } = renderHookWithProviders(
       () => useVerifyReceipt(authState.identity, 'shop-1'),
       {
@@ -84,20 +96,26 @@ describe('receipts API contracts', () => {
     const payload = { items: [{ id: 'li-1', accepted: true }] };
     await act(() => result.current.mutateAsync({ id: 'rc-1', body: payload }));
     expect(body).toEqual(payload);
-    expect(client.getQueryData(receiptsKeys.receipt('shop-1', 'rc-1'))).toEqual(
-      {
-        receipt: { ...buildReceiptDetail(), status: 'verified' },
-      },
-    );
     expect(
-      client.getQueryState(receiptsKeys.receipts('shop-1'))?.isInvalidated,
-    ).toBe(true);
+      client.getQueryData(
+        receiptsKeys.receipt(authState.identity, 'shop-1', 'rc-1'),
+      ),
+    ).toEqual({
+      receipt: { ...buildReceiptDetail(), status: 'verified' },
+    });
     expect(
-      client.getQueryState(inventoryKeys.inventory('shop-1'))?.isInvalidated,
-    ).toBe(true);
-    expect(
-      client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))
+      client.getQueryState(receiptsKeys.receipts(authState.identity, 'shop-1'))
         ?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(
+        inventoryKeys.inventory(authState.identity, 'shop-1'),
+      )?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(
+        analyticsKeys.dashboard(authState.identity, 'shop-1', '30d'),
+      )?.isInvalidated,
     ).toBe(true);
     client.clear();
   });
@@ -111,11 +129,20 @@ describe('receipts API contracts', () => {
     );
     const client = createTestQueryClient();
     client.setDefaultOptions({ queries: { gcTime: Infinity, retry: false } });
-    client.setQueryData(receiptsKeys.receipt('shop-1', 'rc-1'), {
-      receipt: buildReceiptDetail(),
-    });
-    client.setQueryData(receiptsKeys.receipts('shop-1'), {});
-    client.setQueryData(inventoryKeys.inventory('shop-1'), {});
+    client.setQueryData(
+      receiptsKeys.receipt(authState.identity, 'shop-1', 'rc-1'),
+      {
+        receipt: buildReceiptDetail(),
+      },
+    );
+    client.setQueryData(
+      receiptsKeys.receipts(authState.identity, 'shop-1'),
+      {},
+    );
+    client.setQueryData(
+      inventoryKeys.inventory(authState.identity, 'shop-1'),
+      {},
+    );
     const { result } = renderHookWithProviders(
       () => useDeleteReceipt(authState.identity, 'shop-1'),
       {
@@ -124,13 +151,18 @@ describe('receipts API contracts', () => {
     );
     await act(() => result.current.mutateAsync({ id: 'rc-1' }));
     expect(
-      client.getQueryData(receiptsKeys.receipt('shop-1', 'rc-1')),
+      client.getQueryData(
+        receiptsKeys.receipt(authState.identity, 'shop-1', 'rc-1'),
+      ),
     ).toBeUndefined();
     expect(
-      client.getQueryState(receiptsKeys.receipts('shop-1'))?.isInvalidated,
+      client.getQueryState(receiptsKeys.receipts(authState.identity, 'shop-1'))
+        ?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(inventoryKeys.inventory('shop-1'))?.isInvalidated,
+      client.getQueryState(
+        inventoryKeys.inventory(authState.identity, 'shop-1'),
+      )?.isInvalidated,
     ).toBe(true);
     client.clear();
   });

@@ -14,7 +14,7 @@ import {
 } from '@/features/recipes/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, AuthenticatedContext } from '@/lib/queryTypes';
-import { enabled } from '@/lib/queryTypes';
+import { enabled, networkEnabled } from '@/lib/queryTypes';
 import {
   useMutation,
   useQuery,
@@ -29,7 +29,8 @@ export function useRecipes(
   active = true,
 ): UseQueryResult<{ recipes: Recipe[] }> {
   return useQuery({
-    queryKey: recipesKeys.recipes(shopId),
+    networkMode: 'always',
+    queryKey: recipesKeys.recipes(identity, shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ recipes: Recipe[] }>('/recipes?includeUnverified=true', {
         identity,
@@ -46,7 +47,8 @@ export function useRecipe(
   id: string,
 ): UseQueryResult<{ recipe: Recipe }> {
   return useQuery({
-    queryKey: recipesKeys.recipe(shopId, id),
+    networkMode: 'always',
+    queryKey: recipesKeys.recipe(identity, shopId, id),
     queryFn: ({ signal }) =>
       apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, {
         identity,
@@ -62,14 +64,15 @@ export function useOrderableRecipes(
   shopId: ShopId,
 ): UseQueryResult<{ recipes: OrderableRecipe[] }> {
   return useQuery({
-    queryKey: recipesKeys.orderableRecipes(shopId),
+    networkMode: 'always',
+    queryKey: recipesKeys.orderableRecipes(identity, shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ recipes: OrderableRecipe[] }>('/recipes/orderable', {
         identity,
         shopId,
         signal,
       }),
-    enabled: enabled(identity, shopId),
+    enabled: networkEnabled(identity, shopId),
   });
 }
 
@@ -79,6 +82,7 @@ export function useVerifyRecipe(
 ): UseMutationResult<{ recipe: Recipe }, Error, { id: string }> {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id }) =>
       apiFetch<{ recipe: Recipe }>(`/recipes/${id}/verify`, {
         method: 'POST',
@@ -89,7 +93,7 @@ export function useVerifyRecipe(
         body: {},
       }),
     onSuccess: (data, { id }) => {
-      const key = recipesKeys.recipe(shopId, id);
+      const key = recipesKeys.recipe(identity, shopId, id);
       queryClient.setQueryData<{ recipe: Recipe }>(key, (old) =>
         old
           ? {
@@ -102,10 +106,10 @@ export function useVerifyRecipe(
       );
       void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipes(shopId),
+        queryKey: recipesKeys.recipes(identity, shopId),
       });
       void queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes(shopId),
+        queryKey: recipesKeys.orderableRecipes(identity, shopId),
       });
     },
   });
@@ -121,6 +125,7 @@ export function useDeleteRecipe(
 > {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id }) =>
       apiFetch<{ ok: true; mode: 'hard' | 'soft' }>(`/recipes/${id}`, {
         method: 'DELETE',
@@ -128,15 +133,17 @@ export function useDeleteRecipe(
         shopId,
       }),
     onSuccess: (_data, { id }) => {
-      queryClient.removeQueries({ queryKey: recipesKeys.recipe(shopId, id) });
-      void queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipes(shopId),
+      queryClient.removeQueries({
+        queryKey: recipesKeys.recipe(identity, shopId, id),
       });
       void queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes(shopId),
+        queryKey: recipesKeys.recipes(identity, shopId),
       });
       void queryClient.invalidateQueries({
-        queryKey: analyticsKeys.dashboardRoot,
+        queryKey: recipesKeys.orderableRecipes(identity, shopId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: analyticsKeys.dashboardRoot(identity),
       });
     },
   });
@@ -148,8 +155,8 @@ export function useUpdateRecipe(
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    // documentFetch saves to IndexedDB first; its sync engine owns network retries.
     networkMode: 'always',
+    // documentFetch saves to IndexedDB first; its sync engine owns network retries.
     mutationFn: ({ id, body }: { id: string; body: RecipeUpdate }) =>
       apiFetch<{ recipe: Omit<Recipe, 'costing'> }>(`/recipes/${id}`, {
         method: 'PATCH',
@@ -159,16 +166,16 @@ export function useUpdateRecipe(
       }),
     onSuccess: (_data, { id }) => {
       void queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipe(shopId, id),
+        queryKey: recipesKeys.recipe(identity, shopId, id),
       });
       void queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipes(shopId),
+        queryKey: recipesKeys.recipes(identity, shopId),
       });
       void queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes(shopId),
+        queryKey: recipesKeys.orderableRecipes(identity, shopId),
       });
       void queryClient.invalidateQueries({
-        queryKey: analyticsKeys.dashboardRoot,
+        queryKey: analyticsKeys.dashboardRoot(identity),
       });
     },
   });
@@ -179,6 +186,7 @@ export function useBarcodePrice(
   shopId: ShopId,
 ) {
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id, body }: { id: string; body: BarcodePriceInput }) =>
       apiFetch<{ price: BarcodePrice }>(`/recipes/${id}/barcode-price`, {
         method: 'POST',
@@ -194,6 +202,7 @@ export function useManualProduct(
   shopId: ShopId,
 ) {
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ id, body }: { id: string; body: ManualProductInput }) =>
       apiFetch<{ product: ManualProduct; usage: ManualProductUsage }>(
         `/recipes/${id}/manual-product`,
