@@ -10,6 +10,20 @@ on the backend equal to the browser origin. Hosted installations must route
 `/api` to the API under the same HTTPS origin. Browser auth needs no Supabase,
 Google client-secret, SMTP, or database variables in the frontend bundle.
 
+Use Node 22+ and `npm ci`, then `npm run dev` locally. Production builds use
+`npm run build`; deploy all of `dist/` with the response headers below. Supply
+`VITE_APP_VERSION` and optional `VITE_FARO_COLLECTOR_URL`/`VITE_FARO_TOKEN` only
+when using browser telemetry; Vite values are public bundle configuration.
+Supabase URL/key settings are unused. Keep development and production origins,
+telemetry destinations and backend credentials separate. Register each Google
+client's callback at its exact application origin plus
+`/api/v1/auth/google/callback`; Google initiation always comes through the API.
+Route `/api/*` before SPA fallback, preserve cookies and no-store headers, and
+disable buffering/caching for event streams. Static hosting alone needs a proxy
+or Worker for those routes. See the backend's `docs/auth-setup.md` for the full
+role/migration/mail setup. No existing account or business data is imported;
+users register afresh, and quarantined local data is never adopted automatically.
+
 The provider restores authority from `GET /api/v1/session`, distinguishes
 anonymous, pending confirmation, active and unavailable states, and locks a cold
 offline launch. Pending accounts reach `/auth/confirm`; active accounts without
@@ -113,7 +127,8 @@ assets from the previous release during deployment to support open tabs.
 The worker precaches HTML, every JS route chunk, CSS, bundled Latin fonts and app
 icons. API responses, scans and private documents are never runtime-cached. Once
 the initial worker installation finishes, the shell loads offline, including
-routes not previously opened. Established users can read saved documents and
+business routes not previously opened. Auth/action, session and profile routes
+require the network and never use a cached navigation shell. Established users can read saved documents and
 queue supported edits or scans offline in their own partition. Pricing and new
 order creation require connectivity. A first visit without any connection cannot
 populate the cache. Updates wait until existing app tabs close;
