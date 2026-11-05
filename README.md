@@ -7,14 +7,14 @@ The application uses Neuton's HttpOnly cookie session through a single root
 credentials. Local development opens `http://localhost:5173`; Vite proxies `/api`
 to `http://localhost:4000`, matching the backend's default port. Keep `APP_ORIGIN`
 on the backend equal to the browser origin. Hosted installations must route
-`/api` to the API under the same HTTPS origin. Browser auth needs no Supabase,
-Google client-secret, SMTP, or database variables in the frontend bundle.
+`/api` to the API under the same HTTPS origin. Browser auth needs no provider
+client-secret, SMTP, or database variables in the frontend bundle.
 
 Use Node 22+ and `npm ci`, then `npm run dev` locally. Production builds use
 `npm run build`; deploy all of `dist/` with the response headers below. Supply
 `VITE_APP_VERSION` and optional `VITE_FARO_COLLECTOR_URL`/`VITE_FARO_TOKEN` only
 when using browser telemetry; Vite values are public bundle configuration.
-Supabase URL/key settings are unused. Keep development and production origins,
+Keep development and production origins,
 telemetry destinations and backend credentials separate. Register each Google
 client's callback at its exact application origin plus
 `/api/v1/auth/google/callback`; Google initiation always comes through the API.
