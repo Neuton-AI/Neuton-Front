@@ -83,6 +83,21 @@ only that legacy data; current partitions and their unsent work remain intact.
 
 ## PWA installation and offline shell
 
+`public/_headers` supplies the hosted CSP, `no-referrer`, MIME protection and
+cache policy. Hosts that do not support this file must apply equivalent response
+headers, including on SPA rewrites. Auth/action, session, API and profile routes
+must use `no-store` and reach the network; they are excluded from worker navigation
+fallback. Test these routes directly after deployment. The CSP permits bundled
+scripts/fonts, inline component styles, HTTPS product images, R2 storage and
+Grafana collectors. Supply an exact collector/storage origin in the deployed CSP
+when using another host; do not broaden script permissions for Google navigation.
+
+Startup captures action fragments before dynamically importing the app or
+telemetry. Reload requires reopening the original link. Telemetry ignores
+credential endpoints and signed URLs, disables console capture, and drops
+sensitive route or credential-bearing signals before transport. Never add
+request headers/bodies or authentication material to custom telemetry.
+
 `npm run build` generates `manifest.webmanifest`, the Workbox service worker and
 its precache manifest through `vite-plugin-pwa`. `npm run preview -- --host
 127.0.0.1` serves the production build locally for verification. Development mode

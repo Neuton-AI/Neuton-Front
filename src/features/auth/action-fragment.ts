@@ -19,8 +19,11 @@ if (
     const google = window.location.pathname === "/auth/google/complete";
     const candidate = parameters.get(google ? "ticket" : "token");
     if (candidate && /^[A-Za-z0-9_-]{43}$/.test(candidate)) {
-      if (google) googleTicket = candidate;
-      else actionSecret = candidate;
+      if (google) {
+        googleTicket = candidate;
+      } else {
+        actionSecret = candidate;
+      }
     }
     if (google) {
       const error = parameters.get("error");
@@ -31,8 +34,9 @@ if (
           "GOOGLE_EMAIL_COLLISION",
           "GOOGLE_ALREADY_LINKED",
         ].includes(error)
-      )
+      ) {
         googleError = error;
+      }
     }
   }
 }

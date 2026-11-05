@@ -1,4 +1,17 @@
 import { expect, it, vi } from "vitest";
+it.each(['confirm', 'reset-password', 'email-change'])(
+  'keeps %s secrets only in memory and requires reopening the link after reload',
+  async (route) => {
+    vi.resetModules();
+    history.replaceState(null, '', `/auth/${route}#token=${'A'.repeat(43)}`);
+    const action = await import('./action-fragment');
+    expect(location.hash).toBe('');
+    expect(action.readActionSecret()).toBe('A'.repeat(43));
+    vi.resetModules();
+    const reloaded = await import('./action-fragment');
+    expect(reloaded.readActionSecret()).toBeNull();
+  },
+);
 it("removes a confirmation fragment during module evaluation without storage or automatic consumption", async () => {
   vi.resetModules();
   const secret = "A".repeat(43);

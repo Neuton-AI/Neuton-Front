@@ -34,7 +34,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff,woff2}'],
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/auth(?:\/|$)/],
+        navigateFallbackDenylist: [
+          /^\/api(?:[/?]|$)/,
+          /^\/(?:auth|session|profile|forgot-password)(?:[/?]|$)/,
+        ],
         // Activate updates only after existing tabs close, keeping their chunks intact.
         skipWaiting: false,
         clientsClaim: false,
