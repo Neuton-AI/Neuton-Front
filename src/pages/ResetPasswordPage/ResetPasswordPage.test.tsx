@@ -7,9 +7,11 @@ import { ResetPasswordPage } from "./ResetPasswordPage";
 import { authClient } from "@/features/auth/client";
 import { clearActionSecret } from "@/features/auth/action-fragment";
 
-vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ refresh: vi.fn().mockResolvedValue(null) }),
+const auth = vi.hoisted(() => ({
+  loading: false,
+  refresh: vi.fn().mockResolvedValue(null),
 }));
+vi.mock("@/features/auth", () => ({ useAuth: () => auth }));
 vi.mock("@/features/auth/client", () => ({
   authClient: { recover: vi.fn(), resetPassword: vi.fn() },
 }));
@@ -17,6 +19,43 @@ vi.mock("@/features/auth/action-fragment", () => ({
   readActionSecret: () => "a".repeat(43),
   clearActionSecret: vi.fn(),
 }));
+it("preserves only the completion message when session revocation remounts the page", () => {
+  render(
+    <MemoryRouter
+      initialEntries={[
+        {
+          pathname: "/auth/reset-password",
+          state: { passwordResetCompleted: true },
+        },
+      ]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <ResetPasswordPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Sign in with your new password",
+  );
+  expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+});
+it("waits for initial session restoration before taking ownership of the action fragment", () => {
+  auth.loading = true;
+  vi.mocked(clearActionSecret).mockClear();
+  const view = render(
+    <MemoryRouter>
+      <ResetPasswordPage />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+  expect(clearActionSecret).not.toHaveBeenCalled();
+  auth.loading = false;
+  view.rerender(
+    <MemoryRouter>
+      <ResetPasswordPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByLabelText("New password")).toBeInTheDocument();
+});
 it("shows the same accepted recovery message and waits for deliberate reset submission", async () => {
   const user = userEvent.setup();
   vi.mocked(authClient.recover).mockResolvedValue();

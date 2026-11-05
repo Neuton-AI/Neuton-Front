@@ -1,8 +1,18 @@
 import { Link } from "react-router-dom";
 import { Button, Input } from "@/components/ui";
-import { useResetPasswordPage } from "./ResetPasswordPage.module";
+import { FullPageLoader } from "@/components/feedback";
+import {
+  useResetPasswordPage,
+  useResetPasswordReady,
+} from "./ResetPasswordPage.module";
 
 export function ResetPasswordPage() {
+  const ready = useResetPasswordReady();
+  if (!ready) return <FullPageLoader />;
+  return <ResetPasswordForm />;
+}
+
+function ResetPasswordForm() {
   const model = useResetPasswordPage();
   return (
     <main className="shell p-6" aria-labelledby="reset-title">

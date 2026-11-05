@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { authClient } from "@/features/auth/client";
 import {
@@ -7,13 +8,24 @@ import {
   readActionSecret,
 } from "@/features/auth/action-fragment";
 
+export function useResetPasswordReady() {
+  return !useAuth().loading;
+}
+
 export function useResetPasswordPage() {
   const auth = useAuth();
-  const [secret, setSecret] = useState(readActionSecret);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const completed =
+    (location.state as { passwordResetCompleted?: boolean } | null)
+      ?.passwordResetCompleted === true;
+  const [secret, setSecret] = useState(() =>
+    completed ? null : readActionSecret(),
+  );
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(completed);
   const [error, setError] = useState("");
   useEffect(() => () => clearActionSecret(), []);
   async function submit(event: FormEvent) {
@@ -32,6 +44,12 @@ export function useResetPasswordPage() {
     try {
       await authClient.resetPassword(secret, password);
       setDone(true);
+      setSecret(null);
+      clearActionSecret();
+      navigate("/auth/reset-password", {
+        replace: true,
+        state: { passwordResetCompleted: true },
+      });
       await auth.refresh().catch(() => undefined);
     } catch (cause) {
       setError(
