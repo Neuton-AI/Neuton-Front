@@ -68,16 +68,19 @@ export function useConfirmEmailChange() {
         setSecret(null);
         clearActionSecret();
         let message =
-          "Confirmation was not confirmed. Reopen the email link or request a new change from your profile.";
-        if (cause instanceof ApiError && cause.code === "INVALID_ACTION")
+          "The email change was not confirmed. Reopen the email link or request a new change from your profile.";
+        if (cause instanceof ApiError && cause.code === "INVALID_ACTION") {
           message =
             "This link is invalid or expired. Request a new email change from your profile.";
-        if (cause instanceof ApiError && cause.code === "EMAIL_UNAVAILABLE")
+        }
+        if (cause instanceof ApiError && cause.code === "EMAIL_UNAVAILABLE") {
           message =
             "This contact email is unavailable. Request a change to a different address.";
-        if (cause instanceof ApiError && cause.code === "ACCOUNT_CHANGED")
+        }
+        if (cause instanceof ApiError && cause.code === "ACCOUNT_CHANGED") {
           message =
             "Sign in to the account that requested the change, then reopen the email link.";
+        }
         setError(message);
       }
     } finally {

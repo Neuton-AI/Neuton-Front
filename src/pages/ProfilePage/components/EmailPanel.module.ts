@@ -21,10 +21,11 @@ export function useEmailPanel() {
         if (!controller.signal.aborted) setMethods(result);
       })
       .catch(() => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
           setError(
             "Unable to load verification methods. Reconnect and try again.",
           );
+        }
       });
     return () => controller.abort();
   }, [verifying, auth.identity]);
@@ -48,8 +49,9 @@ export function useEmailPanel() {
       if (
         cause instanceof ApiError &&
         cause.code === "REAUTHENTICATION_REQUIRED"
-      )
+      ) {
         setVerifying(true);
+      }
       setError(
         cause instanceof Error
           ? cause.message
