@@ -3,6 +3,39 @@ import { resetCsrf } from "./csrf";
 import type { AuthIdentity, DeviceSession, SessionDto } from "./types";
 
 export const authClient = {
+  async startGoogle(
+    purpose: "login" | "link" | "reauthenticate",
+    returnPath = "/",
+    identity?: AuthIdentity,
+  ): Promise<string> {
+    const result = await apiFetch<{ authorizationUrl: string }>(
+      "/auth/google/start",
+      { method: "POST", body: { purpose, returnPath }, identity },
+    );
+    const url = new URL(result.authorizationUrl);
+    if (
+      url.origin !== "https://accounts.google.com" ||
+      url.pathname !== "/o/oauth2/v2/auth" ||
+      url.username ||
+      url.password
+    ) {
+      throw new Error("Google sign-in could not start. Please try again.");
+    }
+    return url.href;
+  },
+  async completeGoogle(
+    ticket: string,
+  ): Promise<{
+    returnPath: string;
+    purpose: "login" | "link" | "reauthenticate";
+  }> {
+    const result = await apiFetch<{
+      returnPath: string;
+      purpose: "login" | "link" | "reauthenticate";
+    }>("/auth/google/complete", { method: "POST", body: { ticket } });
+    resetCsrf();
+    return result;
+  },
   async session(signal?: AbortSignal): Promise<SessionDto> {
     const session = await apiFetch<SessionDto>("/session", { signal });
     if (
