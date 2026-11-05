@@ -6,10 +6,14 @@ export function ReauthenticateDialog({
   intent,
   onVerified,
   onCancel,
+  passwordAvailable = true,
+  googleAvailable = false,
 }: {
   intent: string;
   onVerified: () => void;
   onCancel: () => void;
+  passwordAvailable?: boolean;
+  googleAvailable?: boolean;
 }) {
   const model = useReauthenticateDialog(onVerified);
   return (
@@ -27,7 +31,7 @@ export function ReauthenticateDialog({
         Verify your identity
       </h2>
       <p id="reauth-intent" className="my-3">
-        Verify your password to {intent}. You will review and submit the action
+        Verify your identity to {intent}. You will review and submit the action
         afterward.
       </p>
       {model.error && (
@@ -35,28 +39,45 @@ export function ReauthenticateDialog({
           {model.error} <Link to="/signin">Sign in again</Link>
         </p>
       )}
-      <form
-        onSubmit={(event) => void model.submit(event)}
-        className="flex flex-col gap-3"
+      {passwordAvailable && (
+        <form
+          onSubmit={(event) => void model.submit(event)}
+          className="flex flex-col gap-3"
+        >
+          <label htmlFor="reauth-password">Password</label>
+          <Input
+            id="reauth-password"
+            type="password"
+            autoComplete="current-password"
+            required
+            maxLength={256}
+            disabled={model.busy}
+            value={model.password}
+            onChange={(event) => model.setPassword(event.target.value)}
+          />
+          <Button type="submit" loading={model.busy}>
+            Verify password
+          </Button>
+        </form>
+      )}
+      {googleAvailable && (
+        <Button
+          className="mt-3"
+          variant="outline"
+          loading={model.busy}
+          onClick={() => void model.google()}
+        >
+          Verify with Google
+        </Button>
+      )}
+      <Button
+        className="mt-3"
+        variant="outline"
+        disabled={model.busy}
+        onClick={onCancel}
       >
-        <label htmlFor="reauth-password">Password</label>
-        <Input
-          id="reauth-password"
-          type="password"
-          autoComplete="current-password"
-          required
-          maxLength={256}
-          disabled={model.busy}
-          value={model.password}
-          onChange={(event) => model.setPassword(event.target.value)}
-        />
-        <Button type="submit" loading={model.busy}>
-          Verify password
-        </Button>
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </form>
+        Cancel
+      </Button>
     </dialog>
   );
 }

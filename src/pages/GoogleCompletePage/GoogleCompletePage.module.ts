@@ -42,9 +42,15 @@ export function useGoogleCompletePage() {
     if (auth.session.user.status === "pending_email") {
       navigate("/auth/confirm", { replace: true });
     } else if (!auth.session.memberships.length) {
-      navigate("/profile", { replace: true });
+      navigate("/profile", {
+        replace: true,
+        state: { googleVerified: completed.purpose === "reauthenticate" },
+      });
     } else {
-      navigate(safeReturnPath(completed.returnPath), { replace: true });
+      navigate(safeReturnPath(completed.returnPath), {
+        replace: true,
+        state: { googleVerified: completed.purpose === "reauthenticate" },
+      });
     }
   }, [completed, auth.loading, auth.session, navigate]);
   const failedRestore = completed && !auth.loading && !auth.session;

@@ -11,7 +11,9 @@ const auth = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 vi.mock("./useAuth", () => ({ useAuth: () => auth }));
-vi.mock("./client", () => ({ authClient: { reauthenticate: vi.fn() } }));
+vi.mock("./client", () => ({
+  authClient: { reauthenticate: vi.fn(), startGoogle: vi.fn() },
+}));
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () {
     this.setAttribute("open", "");
@@ -36,6 +38,36 @@ function mount() {
   );
   return { verified, cancel };
 }
+it("offers linked Google proof without a password form for Google-only accounts", async () => {
+  vi.mocked(authClient.startGoogle).mockRejectedValueOnce(
+    new Error("Google verification unavailable"),
+  );
+  render(
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <ReauthenticateDialog
+        intent="add your first password"
+        passwordAvailable={false}
+        googleAvailable
+        onVerified={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Verify with Google" }));
+  expect(authClient.startGoogle).toHaveBeenCalledWith(
+    "reauthenticate",
+    "/profile",
+    auth.identity,
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Google verification unavailable",
+  );
+});
 it("keeps the intended action and waits for an authoritative replacement without retaining the password", async () => {
   auth.refresh.mockResolvedValue({
     user: { id: "user-a" },

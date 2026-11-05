@@ -1,8 +1,30 @@
 import { apiFetch, ApiError } from "@/lib/api";
 import { resetCsrf } from "./csrf";
-import type { AuthIdentity, DeviceSession, SessionDto } from "./types";
+import type {
+  AuthIdentity,
+  DeviceSession,
+  SessionDto,
+  LoginMethods,
+} from "./types";
 
 export const authClient = {
+  methods(identity: AuthIdentity, signal?: AbortSignal): Promise<LoginMethods> {
+    return apiFetch("/auth/methods", { identity, signal });
+  },
+  addPassword(identity: AuthIdentity, newPassword: string): Promise<void> {
+    return apiFetch("/auth/password/add", {
+      method: "POST",
+      body: { newPassword },
+      identity,
+    });
+  },
+  unlinkGoogle(identity: AuthIdentity): Promise<void> {
+    return apiFetch("/auth/methods/google", {
+      method: "DELETE",
+      body: {},
+      identity,
+    });
+  },
   async startGoogle(
     purpose: "login" | "link" | "reauthenticate",
     returnPath = "/",
@@ -23,9 +45,7 @@ export const authClient = {
     }
     return url.href;
   },
-  async completeGoogle(
-    ticket: string,
-  ): Promise<{
+  async completeGoogle(ticket: string): Promise<{
     returnPath: string;
     purpose: "login" | "link" | "reauthenticate";
   }> {

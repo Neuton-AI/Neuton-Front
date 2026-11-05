@@ -44,5 +44,29 @@ export function useReauthenticateDialog(onVerified: () => void) {
       if (mounted.current) setBusy(false);
     }
   }
-  return { dialogRef, password, setPassword, busy, error, submit };
+  async function google() {
+    if (busy || !auth.identity) return;
+    setPassword("");
+    setBusy(true);
+    setError("");
+    try {
+      window.location.assign(
+        await authClient.startGoogle(
+          "reauthenticate",
+          "/profile",
+          auth.identity,
+        ),
+      );
+    } catch (cause) {
+      if (mounted.current) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Google verification could not start.",
+        );
+        setBusy(false);
+      }
+    }
+  }
+  return { dialogRef, password, setPassword, busy, error, submit, google };
 }

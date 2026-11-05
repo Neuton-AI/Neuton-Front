@@ -44,6 +44,16 @@ export interface DeviceSession {
   device: string | null;
   current: boolean;
 }
+export interface LoginMethods {
+  passwordAvailable: boolean;
+  googleLinked: boolean;
+  capabilities: {
+    linkGoogle: boolean;
+    unlinkGoogle: boolean;
+    addPassword: boolean;
+    reauthenticateGoogle: boolean;
+  };
+}
 export type AuthStatus =
   | "loading"
   | "anonymous"

@@ -22,8 +22,21 @@ state is cleared. Profile provides password changes and a reusable password
 verification dialog. Both reload the authoritative session and discard CSRF
 state after replacement; verification preserves the intended action for a
 deliberate submission. Failed or lost replacement responses recheck authority
-and offer normal sign-in without replaying the operation. Google sign-in belongs
-to its subsequent migration phase.
+and offer normal sign-in without replaying the operation.
+
+Google sign-in starts with a CSRF-protected POST and top-level navigation to
+Google. `/auth/google/complete` removes its fragment before telemetry starts,
+shares one completion POST across remounts, then restores `/session` before
+choosing confirmation, onboarding or the approved destination. Cancellation,
+expired browser context and email collisions offer an explicit restart or
+sign-in-and-link path. Provider tokens never enter browser application state.
+
+Profile shows the server's password/Google descriptors and method capabilities.
+Explicit linking preserves the local contact address. Google-only accounts must
+verify their linked Google identity before adding a first password; removing
+Google requires a remaining password and recent authentication. Verification
+returns to account controls for deliberate submission. Method changes reset
+CSRF, reload authority and notify other tabs before background work reconnects.
 
 CSRF secrets stay in module memory, with one shared acquisition request and no
 mutation replay after failures. Action-link fragments are captured and removed
