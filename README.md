@@ -18,7 +18,12 @@ email notice, confirmation requires a deliberate POST, and users sign in normall
 after confirming. `/forgot-password` requests recovery with a generic accepted
 message; `/auth/reset-password` submits its transient fragment token only on
 user action and returns to normal sign-in. Submitted password and action-secret
-state is cleared. Google sign-in belongs to its subsequent migration phase.
+state is cleared. Profile provides password changes and a reusable password
+verification dialog. Both reload the authoritative session and discard CSRF
+state after replacement; verification preserves the intended action for a
+deliberate submission. Failed or lost replacement responses recheck authority
+and offer normal sign-in without replaying the operation. Google sign-in belongs
+to its subsequent migration phase.
 
 CSRF secrets stay in module memory, with one shared acquisition request and no
 mutation replay after failures. Action-link fragments are captured and removed

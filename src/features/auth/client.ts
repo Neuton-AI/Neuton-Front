@@ -55,6 +55,27 @@ export const authClient = {
       identity,
     });
   },
+  changePassword(
+    identity: AuthIdentity,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    return apiFetch("/profile/password", {
+      method: "POST",
+      body: { currentPassword, newPassword },
+      identity,
+    });
+  },
+  reauthenticate(
+    identity: AuthIdentity,
+    currentPassword: string,
+  ): Promise<void> {
+    return apiFetch("/auth/reauthenticate/password", {
+      method: "POST",
+      body: { currentPassword },
+      identity,
+    });
+  },
   devices(
     identity: AuthIdentity,
     signal?: AbortSignal,
