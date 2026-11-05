@@ -8,6 +8,8 @@ import { RequireAuth, RootRedirect } from "./AppGate";
 import { AuthenticatedRoutes } from "./AppRoutes";
 import { ConfirmEmailPage } from "@/pages/ConfirmEmailPage/ConfirmEmailPage";
 import { LegacyDataNotice } from "@/features/sync/LegacyDataNotice";
+import { RecoveryPage } from "@/pages/RecoveryPage/RecoveryPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage/ResetPasswordPage";
 
 export const App: React.FC = () => {
   useAppChrome();
@@ -21,6 +23,8 @@ export const App: React.FC = () => {
         <Route path="/signin" element={<AuthPage mode="signin" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="/auth/confirm" element={<ConfirmEmailPage />} />
+        <Route path="/forgot-password" element={<RecoveryPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/*"
           element={

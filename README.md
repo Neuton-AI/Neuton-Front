@@ -15,8 +15,10 @@ anonymous, pending confirmation, active and unavailable states, and locks a cold
 offline launch. Pending accounts reach `/auth/confirm`; active accounts without
 memberships reach `/profile` to create their first shop. Signup gives a generic
 email notice, confirmation requires a deliberate POST, and users sign in normally
-after confirming. Recovery, account-security screens and Google sign-in belong
-to the subsequent migration phases.
+after confirming. `/forgot-password` requests recovery with a generic accepted
+message; `/auth/reset-password` submits its transient fragment token only on
+user action and returns to normal sign-in. Submitted password and action-secret
+state is cleared. Google sign-in belongs to its subsequent migration phase.
 
 CSRF secrets stay in module memory, with one shared acquisition request and no
 mutation replay after failures. Action-link fragments are captured and removed

@@ -35,6 +35,19 @@ export const authClient = {
   resend(email: string): Promise<void> {
     return apiFetch("/auth/email/resend", { method: "POST", body: { email } });
   },
+  recover(email: string): Promise<void> {
+    return apiFetch("/auth/password/recovery", {
+      method: "POST",
+      body: { email },
+    });
+  },
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await apiFetch("/auth/password/reset", {
+      method: "POST",
+      body: { token, newPassword },
+    });
+    resetCsrf();
+  },
   renew(identity: AuthIdentity): Promise<void> {
     return apiFetch("/auth/session/renew", {
       method: "POST",
