@@ -10,6 +10,7 @@ import { useProfilePage } from "./ProfilePage.module";
 import { ShopTab } from "./components/ShopTab/ShopTab";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { MethodsPanel } from "./components/MethodsPanel";
+import { EmailPanel } from "./components/EmailPanel";
 
 export const ProfilePage: React.FC = () => {
   const {
@@ -92,6 +93,7 @@ export const ProfilePage: React.FC = () => {
 
           {tab === "me" && identity && <SessionsPanel />}
           {tab === "me" && identity && <MethodsPanel />}
+          {tab === "me" && identity && <EmailPanel />}
           {notice ? <InlineNotice tone="success">{notice}</InlineNotice> : null}
 
           <button

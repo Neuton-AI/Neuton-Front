@@ -25,13 +25,20 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [segment, setSegment] = useState<Mode>(mode);
+  const emailChanged =
+    (location.state as { emailChanged?: boolean } | null)?.emailChanged ===
+    true;
 
   useEffect(() => {
     setError(null);
-    setNotice(null);
+    setNotice(
+      emailChanged
+        ? "Contact email changed. All devices were signed out. Sign in again."
+        : null,
+    );
     setPassword("");
     setSegment(mode);
-  }, [mode]);
+  }, [mode, emailChanged]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();

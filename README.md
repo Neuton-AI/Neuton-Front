@@ -159,3 +159,5 @@ the PR; desktop emulation is insufficient. Check:
 References: [manifest display behavior](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/display),
 [theme hints](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/How_to/Customize_your_app_colors),
 [Chrome manifest updates](https://web.dev/articles/manifest-updates).
+
+Contact email changes are started in Profile and confirmed deliberately at /auth/email-change. The early fragment capture keeps the action secret in memory only. The requesting account and recent proof are required; password verification retains the live flow. After Google verification or sign-in, reopen the email link. Completion signs out all sessions and returns to normal sign-in. No secret is stored in history or browser storage.

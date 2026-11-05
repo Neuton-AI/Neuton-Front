@@ -11,6 +11,7 @@ import { LegacyDataNotice } from "@/features/sync/LegacyDataNotice";
 import { RecoveryPage } from "@/pages/RecoveryPage/RecoveryPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage/ResetPasswordPage";
 import { GoogleCompletePage } from "@/pages/GoogleCompletePage/GoogleCompletePage";
+import { ConfirmEmailChangePage } from "@/pages/ConfirmEmailChangePage/ConfirmEmailChangePage";
 
 export const App: React.FC = () => {
   useAppChrome();
@@ -27,6 +28,7 @@ export const App: React.FC = () => {
         <Route path="/forgot-password" element={<RecoveryPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/auth/google/complete" element={<GoogleCompletePage />} />
+        <Route path="/auth/email-change" element={<ConfirmEmailChangePage />} />
         <Route
           path="/*"
           element={

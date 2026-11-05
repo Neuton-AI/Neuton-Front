@@ -8,6 +8,24 @@ import type {
 } from "./types";
 
 export const authClient = {
+  changeEmail(identity: AuthIdentity, email: string): Promise<void> {
+    return apiFetch("/auth/email/change", {
+      method: "POST",
+      body: { email },
+      identity,
+    });
+  },
+  async confirmEmailChange(
+    identity: AuthIdentity,
+    token: string,
+  ): Promise<void> {
+    await apiFetch("/auth/email/change/confirm", {
+      method: "POST",
+      body: { token },
+      identity,
+    });
+    resetCsrf();
+  },
   methods(identity: AuthIdentity, signal?: AbortSignal): Promise<LoginMethods> {
     return apiFetch("/auth/methods", { identity, signal });
   },
