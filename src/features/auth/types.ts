@@ -35,6 +35,15 @@ export interface SessionDto {
   };
   memberships: ShopMembershipDto[];
 }
+export interface DeviceSession {
+  id: string;
+  createdAt: string;
+  lastActivityAt: string;
+  idleExpiresAt: string;
+  absoluteExpiresAt: string;
+  device: string | null;
+  current: boolean;
+}
 export type AuthStatus =
   | "loading"
   | "anonymous"

@@ -33,6 +33,13 @@ removes that account's synced local records. A failed sign-out leaves a locked,
 explicitly unconfirmed state with retry controls. Cross-tab notifications contain
 only a reload hint, never credentials or an authoritative identity.
 
+Profile lists current and other devices, with individual and all-device sign-out.
+Revocation failures remain explicitly unconfirmed. Renewal starts only from a
+due foreground interaction; Web Locks coordinate available tabs and the server
+enforces its write interval. Expiry locks local authority without transmitting
+or discarding unsent work. Tabs accept only account-changed, logged-out,
+session-replaced and membership-refresh hints and reload the server session.
+
 Offline documents, pending edits, scans, blobs and conflict resolutions use the
 `neuton-owned-v1` identity namespace in `neuton-documents-identity-v2`. Their
 environment/user/shop ownership stays stable when the session is replaced.

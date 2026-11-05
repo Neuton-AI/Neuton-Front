@@ -14,6 +14,7 @@ vi.mock("./client", () => ({
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
+    logoutAll: vi.fn(),
     renew: vi.fn(),
   },
 }));
@@ -36,6 +37,40 @@ const session = (userId = "user-a"): SessionDto => ({
     renewAfter: "2099-01-01T00:00:00Z",
   },
 });
+
+it("renews only due foreground activity and coalesces concurrent interactions", async () => {
+  const due = session();
+  due.session.renewAfter = "2020-01-01T00:00:00Z";
+  vi.mocked(authClient.session).mockResolvedValue(due);
+  let finish!: () => void;
+  vi.mocked(authClient.renew).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { result } = fixture();
+  await waitFor(() => expect(result.current.status).toBe("authenticated"));
+  expect(authClient.renew).not.toHaveBeenCalled();
+  act(() => {
+    window.dispatchEvent(new Event("pointerdown"));
+    window.dispatchEvent(new Event("keydown"));
+  });
+  await waitFor(() => expect(authClient.renew).toHaveBeenCalledOnce());
+  await act(async () => finish());
+});
+
+it("locks an expired session while retaining the last user for unsent-work recovery", async () => {
+  const expires = session();
+  expires.session.absoluteExpiresAt = new Date(Date.now() + 150).toISOString();
+  vi.mocked(authClient.session).mockResolvedValue(expires);
+  const { result } = fixture();
+  await waitFor(() => expect(result.current.status).toBe("authenticated"));
+  await waitFor(() => expect(result.current.status).toBe("anonymous"));
+  expect(result.current.identity).toBeNull();
+  expect(result.current.lastUserId).toBe("user-a");
+  expect(authClient.renew).not.toHaveBeenCalled();
+});
 beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
@@ -56,6 +91,29 @@ it("keeps an authentication outage separate from an anonymous response", async (
   const { result } = fixture();
   await waitFor(() => expect(result.current.status).toBe("unavailable"));
   expect(result.current.user).toBeNull();
+});
+
+it("accepts only non-secret tab hints and reloads authoritative server identity", async () => {
+  let receive!: (event: { data: unknown }) => void;
+  vi.stubGlobal(
+    "BroadcastChannel",
+    class {
+      set onmessage(handler: (event: { data: unknown }) => void) {
+        receive = handler;
+      }
+      postMessage() {}
+      close() {}
+    },
+  );
+  vi.mocked(authClient.session)
+    .mockResolvedValueOnce(session())
+    .mockResolvedValueOnce(session("user-b"));
+  const { result } = fixture();
+  await waitFor(() => expect(result.current.user?.id).toBe("user-a"));
+  act(() => receive({ data: { userId: "forged", role: "owner" } }));
+  expect(authClient.session).toHaveBeenCalledOnce();
+  await act(async () => receive({ data: "account-changed" }));
+  await waitFor(() => expect(result.current.user?.id).toBe("user-b"));
 });
 it("clears account caches before exposing another account and does not confirm failed logout", async () => {
   vi.mocked(authClient.session)

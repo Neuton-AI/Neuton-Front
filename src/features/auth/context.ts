@@ -13,6 +13,7 @@ export interface AuthContextValue {
   login(email: string, password: string): Promise<SessionDto | null>;
   register(email: string, password: string, fullName?: string): Promise<void>;
   logout(): Promise<void>;
+  logoutAll(): Promise<void>;
   setActiveShopId(shopId: string): void;
 }
 export const AuthContext = createContext<AuthContextValue | undefined>(

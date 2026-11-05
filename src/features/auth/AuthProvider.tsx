@@ -16,6 +16,7 @@ import { AuthContext } from "./context";
 import { resetCsrf } from "./csrf";
 import type { AuthStatus, SessionDto } from "./types";
 import { identityPartition } from "./environment";
+import { isAuthTabEvent } from "./tab-events";
 
 type AuthState = {
   status: AuthStatus;
@@ -233,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await authClient.login(email, password);
         const session = await refresh();
-        channel.current?.postMessage("reload");
+        channel.current?.postMessage("account-changed");
         return session;
       } catch (error) {
         try {
@@ -249,32 +250,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [begin, refresh],
   );
 
-  const logout = useCallback(async () => {
-    const previousSession = current.current.session;
-    const knownUserId = previousSession?.user.id ?? lastUserId.current;
-    const expectedUserId = knownUserId ?? undefined;
-    begin();
-    try {
-      await authClient.logout(expectedUserId);
-      if (previousSession) {
-        await logoutCleanup({
-          environment: previousSession.environment,
-          userId: previousSession.user.id,
-        }).catch(() => undefined);
+  const logout = useCallback(
+    async (all = false) => {
+      const previousSession = current.current.session;
+      const knownUserId = previousSession?.user.id ?? lastUserId.current;
+      const expectedUserId = knownUserId ?? undefined;
+      begin();
+      try {
+        if (all) await authClient.logoutAll(expectedUserId);
+        else await authClient.logout(expectedUserId);
+        if (previousSession) {
+          await logoutCleanup({
+            environment: previousSession.environment,
+            userId: previousSession.user.id,
+          }).catch(() => undefined);
+        }
+        await apply(null, "anonymous");
+        channel.current?.postMessage("logged-out");
+      } catch (error) {
+        await apply(
+          null,
+          "unavailable",
+          "Sign-out was not confirmed. Reconnect and try again.",
+        );
+        throw error;
+      } finally {
+        operation.current = false;
       }
-      await apply(null, "anonymous");
-      channel.current?.postMessage("reload");
-    } catch (error) {
-      await apply(
-        null,
-        "unavailable",
-        "Sign-out was not confirmed. Reconnect and try again.",
-      );
-      throw error;
-    } finally {
-      operation.current = false;
-    }
-  }, [apply, begin]);
+    },
+    [apply, begin],
+  );
 
   const setActiveShopId = useCallback(
     (shopId: string) => {
@@ -315,7 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof BroadcastChannel !== "undefined") {
       channel.current = new BroadcastChannel("neuton-auth");
       channel.current.onmessage = (event) => {
-        if (event.data === "reload" && !operation.current) {
+        if (isAuthTabEvent(event.data) && !operation.current) {
           resetCsrf();
           void refresh().catch(() => undefined);
         }
@@ -363,14 +368,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const expected = generation.current;
       renewing = true;
       lastAttempt = now;
-      void authClient
-        .renew(
+      const renew = async () => {
+        if (
+          expected !== generation.current ||
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+        const authoritative = await authClient.session();
+        if (expected !== generation.current) return;
+        if (
+          authoritative.user.id !== snapshot.session!.user.id ||
+          authoritative.session.id !== snapshot.session!.session.id
+        ) {
+          await refresh();
+          return;
+        }
+        if (Date.parse(authoritative.session.renewAfter) > Date.now()) return;
+        await authClient.renew(
           sessionIdentity(
-            snapshot.session,
+            snapshot.session!,
             snapshot.generation,
             snapshot.activeShopId,
           ),
-        )
+        );
+      };
+      let renewal: Promise<unknown>;
+      if (navigator.locks) {
+        renewal = navigator.locks.request(
+          "neuton-session-renewal",
+          { ifAvailable: true },
+          (lock) => {
+            if (lock) return renew();
+          },
+        );
+      } else renewal = renew();
+      void renewal
         .then(() => {
           if (expected === generation.current) return refresh();
         })
@@ -390,6 +423,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("keydown", foregroundActivity);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    if (!state.session || !["authenticated", "offline"].includes(state.status)) {
+      return;
+    }
+    const expiresAt = Math.min(
+      Date.parse(state.session.session.idleExpiresAt),
+      Date.parse(state.session.session.absoluteExpiresAt),
+    );
+    const expected = generation.current;
+    let timer: ReturnType<typeof setTimeout>;
+    const checkExpiry = () => {
+      if (expected !== generation.current) return;
+      const remaining = expiresAt - Date.now();
+      if (remaining > 0) {
+        timer = setTimeout(checkExpiry, Math.min(remaining, 2_147_483_647));
+        return;
+      }
+      generation.current += 1;
+      setApiIdentity(null);
+      resetCsrf();
+      void apply(
+        null,
+        "anonymous",
+        "Session expired. Sign in again to resume your saved work.",
+      );
+    };
+    checkExpiry();
+    return () => clearTimeout(timer);
+  }, [state.session, state.status, state.generation, apply]);
 
   const identity = useMemo(
     () =>
@@ -414,6 +477,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       login,
       logout,
+      logoutAll: () => logout(true),
       register: authClient.register,
       setActiveShopId,
     }),

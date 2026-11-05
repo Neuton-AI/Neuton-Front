@@ -1,6 +1,6 @@
 import { apiFetch, ApiError } from "@/lib/api";
 import { resetCsrf } from "./csrf";
-import type { AuthIdentity, SessionDto } from "./types";
+import type { AuthIdentity, DeviceSession, SessionDto } from "./types";
 
 export const authClient = {
   async session(signal?: AbortSignal): Promise<SessionDto> {
@@ -41,6 +41,27 @@ export const authClient = {
       body: {},
       identity,
     });
+  },
+  devices(
+    identity: AuthIdentity,
+    signal?: AbortSignal,
+  ): Promise<{ sessions: DeviceSession[] }> {
+    return apiFetch("/auth/sessions", { identity, signal });
+  },
+  revokeDevice(id: string, identity: AuthIdentity): Promise<void> {
+    return apiFetch(`/auth/sessions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      body: {},
+      identity,
+    });
+  },
+  async logoutAll(expectedUserId?: string): Promise<void> {
+    await apiFetch("/auth/logout-all", {
+      method: "POST",
+      body: {},
+      expectedUserId,
+    });
+    resetCsrf();
   },
   async logout(expectedUserId?: string): Promise<void> {
     await apiFetch("/auth/logout", {
