@@ -9,9 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * stub every page, so the suite covers routing and auth without any network,
  * and a failure points at a route rather than at somebody's data layer.
  *
- * Nothing here asserts on Supabase configuration state: the pages' behaviour
- * differs depending on whether a developer's local `.env` is present, so the
- * assertions deliberately stay on the URL and on page identity.
+ * Provider responses are controlled here; assertions cover the URL and page
+ * identity independently of runtime service configuration.
  */
 
 const authState = vi.hoisted(() => ({
@@ -30,8 +29,7 @@ const passwordFlows = vi.hoisted(() => ({
 
 vi.mock("@/features/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/auth")>()),
-  // A fake client so AuthPage renders its real form regardless of whether the
-  // developer's machine happens to have a .env with Supabase keys.
+  // The shared provider boundary lets AuthPage render its real form offline.
   useAuth: () => ({
     session: authState.session
       ? { ...authState.session, memberships: [{ shopId: "shop-1" }] }

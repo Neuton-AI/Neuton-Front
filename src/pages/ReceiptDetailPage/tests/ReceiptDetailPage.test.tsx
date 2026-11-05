@@ -29,8 +29,6 @@ vi.mock("@/features/auth", async () => {
   const { buildShop } = await import("@/test/factories/shops.factory");
   const shop = buildShop();
   return {
-    supabase: null,
-    isSupabaseConfigured: false,
     useAuth: () => ({
       session: null,
       loading: false,

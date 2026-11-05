@@ -53,10 +53,7 @@ beforeEach(() => {
   auth.signInWithPassword.mockReset();
   auth.signUp.mockReset();
   auth.signInWithPassword.mockResolvedValue({ error: null });
-  auth.signUp.mockResolvedValue({
-    data: { session: { access_token: "t" } },
-    error: null,
-  });
+  auth.signUp.mockResolvedValue(undefined);
 });
 
 describe("AuthPage sign in", () => {
