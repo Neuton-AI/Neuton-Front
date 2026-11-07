@@ -3,7 +3,7 @@ import {
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import {
   useDeleteRecipe,
   useRecipe,

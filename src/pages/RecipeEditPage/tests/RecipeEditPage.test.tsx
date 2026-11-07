@@ -12,7 +12,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RecipeEditPage } from "../RecipeEditPage";
 
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 vi.mock("@/components/BarcodeScanner/BarcodeScanner", () => ({

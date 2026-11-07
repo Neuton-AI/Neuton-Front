@@ -7,7 +7,7 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useReceiptDetailPage } from "../ReceiptDetailPage.module";
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 vi.mock("react-router-dom", async (original) => ({

@@ -4,7 +4,7 @@ import { act, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useDashboardPage } from "../DashboardPage.module";
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 beforeEach(resetAuth);

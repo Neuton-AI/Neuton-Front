@@ -1,7 +1,7 @@
 /**
- * Typed API client for the Neuton Fastify backend.
+ * Typed API client for the Neuton backend.
  *
- * Auth is a Supabase JWT; the active shop travels in `x-shop-id` because the
+ * Auth uses a Neuton JWT; the active shop travels in `x-shop-id` because the
  * API resolves shop membership server-side from that header.
  *
  * The Faro trace id travels as `x-trace-id` so a browser session, the API log

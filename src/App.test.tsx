@@ -8,10 +8,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * App is the routing table plus two guards. These tests mount it for real but
  * stub every page, so the suite covers routing and auth without any network,
  * and a failure points at a route rather than at somebody's data layer.
- *
- * Nothing here asserts on Supabase configuration state: the pages' behaviour
- * differs depending on whether a developer's local `.env` is present, so the
- * assertions deliberately stay on the URL and on page identity.
  */
 
 const authState = vi.hoisted(() => ({
@@ -19,17 +15,14 @@ const authState = vi.hoisted(() => ({
   loading: false,
 }));
 
-const supabaseAuth = vi.hoisted(() => ({
-  signInWithPassword: vi.fn(async () => ({ error: null })),
-  signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
+const authActions = vi.hoisted(() => ({
+  signIn: vi.fn(async () => {}),
+  signUp: vi.fn(async () => {}),
 }));
 
-vi.mock("@/features/auth/supabase", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/features/auth/supabase")>()),
-  // A fake client so AuthPage renders its real form regardless of whether the
-  // developer's machine happens to have a .env with Supabase keys.
-  supabase: { auth: supabaseAuth },
-  isSupabaseConfigured: true,
+vi.mock("@/features/auth/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/auth/auth")>()),
+  ...authActions,
   useAuth: () => ({
     session: authState.session,
     loading: authState.loading,
@@ -234,7 +227,7 @@ describe("routing", () => {
 describe("deep-link round trip", () => {
   beforeEach(() => {
     authState.session = null;
-    supabaseAuth.signInWithPassword.mockClear();
+    authActions.signIn.mockClear();
   });
 
   it("brings the user back to the deep link they originally asked for", async () => {
@@ -243,11 +236,8 @@ describe("deep-link round trip", () => {
     // after they sign in.
     const user = userEvent.setup();
 
-    // Stand in for supabase's onAuthStateChange, which is what makes the guard
-    // let them through in the real app.
-    supabaseAuth.signInWithPassword.mockImplementationOnce(async () => {
+    authActions.signIn.mockImplementationOnce(async () => {
       authState.session = { user: { id: "u1" } };
-      return { error: null };
     });
 
     renderApp("/orders/o-123");

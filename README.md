@@ -1,5 +1,12 @@
 # Neuton-Front
 
+## Sign-in
+
+Set `VITE_API_BASE_URL` to the Neuton API origin. Signup with email and password
+signs the user in immediately. The browser holds the one-hour token in memory.
+Closing or reloading the page requires signing in again. Shop membership is
+loaded from the API, and cached shop data is scoped to the signed-in account.
+
 ## PWA installation and offline shell
 
 `npm run build` generates `manifest.webmanifest`, the Workbox service worker and

@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SHOP_ID = "shop-1";
 
-vi.mock("@/features/auth/supabase", () => ({
+vi.mock("@/features/auth/auth", () => ({
   useAuth: () => ({ user: { id: "u1" }, token: "test-token", loading: false }),
   useShopMemberships: () => ({
     memberships: [

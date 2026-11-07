@@ -1,14 +1,11 @@
 import type React from "react";
 import { FormFields } from "@/components/FormFields/FormFields";
 import { Button } from "@/components/ui";
-import { Link } from "react-router-dom";
-import { AuthConfiguration } from "./components/AuthConfiguration/AuthConfiguration";
 import {
   AuthHeading,
   AuthModeTabs,
 } from "./components/AuthHeading/AuthHeading";
 import { useAuthPage } from "./AuthPage.module";
-import { AuthSocial } from "./components/AuthSocial/AuthSocial";
 
 type Mode = "signin" | "signup";
 
@@ -18,7 +15,7 @@ interface IAuthPage {
 
 export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
   const model = useAuthPage({ mode });
-  if (!model.isConfigured) return <AuthConfiguration />;
+  const submitLabel = model.isSignIn ? "Sign in" : "Create account";
   return (
     <div className="shell">
       <div className="flex flex-1 flex-col justify-center px-6 pb-10">
@@ -38,14 +35,6 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
               {model.error}
             </p>
           ) : null}
-          {model.notice ? (
-            <p
-              role="status"
-              className="rounded-card bg-surface-cream-strong p-3 text-label font-medium text-ink"
-            >
-              {model.notice}
-            </p>
-          ) : null}
           <Button
             type="submit"
             variant="primary"
@@ -55,24 +44,9 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
             loading={model.busy}
             className="h-12"
           >
-            {model.busy
-              ? "Working…"
-              : model.isSignIn
-                ? "Sign in"
-                : "Create account"}
+            {model.busy ? "Working…" : submitLabel}
           </Button>
         </form>
-        {model.isSignIn && (
-          <p className="mt-3 text-right">
-            <Link
-              to="/forgot-password"
-              className="text-label font-medium text-brand-primary-active underline underline-offset-2 hover:text-brand-primary"
-            >
-              Forgot password?
-            </Link>
-          </p>
-        )}
-        <AuthSocial />
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { useCapturePage } from "../CapturePage.module";
 
 const boundary = vi.hoisted(() => ({ upload: vi.fn(), navigate: vi.fn() }));
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 vi.mock("@/features/sync/documentsApi", () => ({ saveScan: boundary.upload }));

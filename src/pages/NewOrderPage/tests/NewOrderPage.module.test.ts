@@ -16,7 +16,7 @@ import { recipesKeys } from "@/features/recipes/keys";
 
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 vi.mock("@/features/sync/documentsApi", async () => ({

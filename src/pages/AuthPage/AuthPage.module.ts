@@ -1,6 +1,6 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { supabase } from "@/features/auth/supabase";
+import { signIn, signUp } from "@/features/auth/auth";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 type Mode = "signin" | "signup";
@@ -8,8 +8,6 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
 
   const location = useLocation();
-
-  const client = supabase;
 
   const [email, setEmail] = useState("");
 
@@ -21,19 +19,16 @@ export function useAuthPage({ mode }: { mode: Mode }) {
 
   const [error, setError] = useState<string | null>(null);
 
-  const [notice, setNotice] = useState<string | null>(null);
-
   const [segment, setSegment] = useState<Mode>(mode);
 
   useEffect(() => {
     setError(null);
-    setNotice(null);
     setSegment(mode);
   }, [mode]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!client || busy) return;
+    if (busy) return;
     const validationError = Object.values(
       validateFields(fields, formValues),
     )[0];
@@ -43,26 +38,11 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     }
     setBusy(true);
     setError(null);
-    setNotice(null);
-
     try {
       if (segment === "signin") {
-        const { error: signInError } = await client.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) throw signInError;
+        await signIn({ email, password });
       } else {
-        const { data, error: signUpError } = await client.auth.signUp({
-          email,
-          password,
-          options: { data: { fullName } },
-        });
-        if (signUpError) throw signUpError;
-        if (!data.session) {
-          setNotice("Check your inbox to confirm your email, then sign in.");
-          return;
-        }
+        await signUp({ email, password, fullName });
       }
 
       const from = (location.state as { from?: string } | null)?.from;
@@ -90,6 +70,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       type: "text",
       autoComplete: "name",
       required: true,
+      maxLength: 120,
       placeholder: "Your name",
       visible: () => !isSignIn,
     },
@@ -101,6 +82,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       type: "email",
       autoComplete: "email",
       required: true,
+      maxLength: 254,
     },
     {
       kind: "input",
@@ -110,7 +92,8 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       type: "password",
       autoComplete: isSignIn ? "current-password" : "new-password",
       required: true,
-      minLength: 8,
+      minLength: isSignIn ? undefined : 15,
+      maxLength: 128,
     },
   ];
   const handleFieldChange = (name: keyof typeof formValues, value: string) => {
@@ -122,10 +105,8 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     fields,
     formValues,
     handleFieldChange,
-    isConfigured: Boolean(client),
     busy,
     error,
-    notice,
     setSegment,
     submit,
     isSignIn,

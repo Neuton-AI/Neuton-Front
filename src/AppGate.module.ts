@@ -1,4 +1,4 @@
-import { useAuth } from "@/features/auth/supabase";
+import { useAuth } from "@/features/auth/auth";
 import { useLocation } from "react-router-dom";
 
 export function useRootRedirect() {

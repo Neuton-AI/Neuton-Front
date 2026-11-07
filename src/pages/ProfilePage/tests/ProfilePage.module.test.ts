@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useProfilePage } from "../ProfilePage.module";
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 vi.mock("react-router-dom", async (original) => ({
@@ -64,15 +64,8 @@ describe("useProfilePage", () => {
   });
   it("signs out and returns to authentication", async () => {
     const { result } = renderHookWithProviders(() => useProfilePage());
-    await act(() => result.current.signOut());
+    act(() => result.current.signOut());
     expect(signOut).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith("/signin", { replace: true });
-  });
-  it("surfaces rejected sign-out without navigating", async () => {
-    signOut.mockRejectedValue(new Error("Sign-out failed"));
-    const { result } = renderHookWithProviders(() => useProfilePage());
-    await act(() => result.current.signOut());
-    expect(result.current.notice).toBe("Sign-out failed");
-    expect(navigate).not.toHaveBeenCalled();
   });
 });

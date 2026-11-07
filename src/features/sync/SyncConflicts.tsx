@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAuth, useShopMemberships } from '@/features/auth/supabase';
+import { useAuth, useShopMemberships } from '@/features/auth/auth';
 import * as store from './store';
 import { scopeFor, type LocalDocument } from './types';
 import { resolveDocumentConflict } from './conflicts';

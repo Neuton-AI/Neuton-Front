@@ -3,7 +3,7 @@ import {
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import { useInventory } from "@/features/inventory/inventoryApi";
 import { useReceipts } from "@/features/receipts/receiptsApi";
 import { useRecipes } from "@/features/recipes/recipesApi";

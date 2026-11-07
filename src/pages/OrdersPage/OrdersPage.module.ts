@@ -3,7 +3,7 @@ import {
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import { useOrders } from "@/features/orders/ordersApi";
 import type { Order, OrderStatus } from "@/features/orders/types";
 import { useMemo, useState } from "react";

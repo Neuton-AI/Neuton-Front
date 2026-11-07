@@ -3,7 +3,7 @@ import {
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import { useReceipt, useVerifyReceipt } from "@/features/receipts/receiptsApi";
 import type { VerifyReceiptBody } from "@/features/receipts/types";
 import { useState } from "react";

@@ -1,9 +1,9 @@
 import {
-  supabase,
+  signOut as clearSession,
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import { useCreateShop } from "@/features/shops/shopsApi";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,14 +21,9 @@ export function useProfilePage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const signOut = async () => {
-    try {
-      const result = await supabase?.auth.signOut();
-      if (result?.error) throw result.error;
-      navigate("/signin", { replace: true });
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Could not sign out.");
-    }
+  const signOut = () => {
+    clearSession();
+    navigate("/signin", { replace: true });
   };
 
   const createShopMutation = useCreateShop(token);
@@ -39,8 +34,7 @@ export function useProfilePage() {
     setNotice(null);
     try {
       const { shop } = await createShopMutation.mutateAsync(name.trim());
-      // Memberships are an external hook, not a query we invalidate, so the
-      // new membership has to be pulled in by hand before switching to it.
+      // Refresh the membership list before selecting the new shop.
       await reload();
       setActiveShopId(shop.id);
       setNotice(`${shop.name} is ready.`);

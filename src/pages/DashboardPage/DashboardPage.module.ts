@@ -6,7 +6,7 @@ import {
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 export const DASHBOARD_PERIODS: { key: DashboardPeriod; label: string }[] = [

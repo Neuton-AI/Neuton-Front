@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  supabase,
+  signOut,
   useAuth,
   useShopMemberships,
-} from '@/features/auth/supabase';
+} from '@/features/auth/auth';
 import { syncDocuments, syncActivity } from './engine';
 import { errorsFor, type SyncError } from './errors';
 import * as store from './store';
@@ -240,8 +240,6 @@ export function useSyncStatus() {
     setOpened,
     retry,
     exportPending,
-    onSignIn: () => {
-      void supabase?.auth.signOut();
-    },
+    onSignIn: signOut,
   };
 }

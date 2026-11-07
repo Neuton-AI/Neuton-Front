@@ -10,7 +10,7 @@ import { Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { NewOrderPage } from "../NewOrderPage";
 vi.mock(
-  "@/features/auth/supabase",
+  "@/features/auth/auth",
   async () => (await import("@/test/auth")).authMock,
 );
 beforeEach(resetAuth);

@@ -4,7 +4,7 @@ import {
   useAuth,
   useCurrentShop,
   useShopMemberships,
-} from "@/features/auth/supabase";
+} from "@/features/auth/auth";
 import { useCreateOrder, useOrderQuote } from "@/features/orders/ordersApi";
 import type { OrderableRecipe } from "@/features/orders/types";
 import { useOrderableRecipes, useRecipes } from "@/features/recipes/recipesApi";

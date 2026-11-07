@@ -1,4 +1,4 @@
-import { useAuth, useShopMemberships } from "@/features/auth/supabase";
+import { useAuth, useShopMemberships } from "@/features/auth/auth";
 import { type MediaKind } from "@/features/uploads/types";
 import {
   MAX_UPLOAD_SOURCES,

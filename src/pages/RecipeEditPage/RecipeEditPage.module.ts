@@ -1,4 +1,4 @@
-import { useAuth, useShopMemberships } from "@/features/auth/supabase";
+import { useAuth, useShopMemberships } from "@/features/auth/auth";
 import {
   useBarcodePrice,
   useManualProduct,

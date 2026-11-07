@@ -54,7 +54,7 @@ export default tseslint.config(
           { name: '@tanstack/react-query', message: 'Consume server state through the companion module.' },
           { name: '@/lib/api', message: 'Call transport from a domain feature, then compose it in the companion module.' },
         ],
-        patterns: [{ group: ['@/features/**/*Api', '@/features/auth/supabase', '@/features/uploads/upload'], allowTypeImports: true, message: 'Views receive behavior from their companion modules.' }],
+        patterns: [{ group: ['@/features/**/*Api', '@/features/auth/auth', '@/features/uploads/upload'], allowTypeImports: true, message: 'Views receive behavior from their companion modules.' }],
       }],
     },
   },

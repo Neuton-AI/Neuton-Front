@@ -11,10 +11,9 @@ export const authState = {
 };
 export const selectShop = vi.fn();
 export const reloadMemberships = vi.fn(async () => {});
-export const signOut = vi.fn(async () => ({ error: null }));
+export const signOut = vi.fn();
 export const authMock = {
-  supabase: { auth: { signOut } },
-  isSupabaseConfigured: true,
+  signOut,
   useAuth: () => ({
     user: { id: 'u1', email: 'testtest@gmail.com' },
     token: authState.token,
@@ -43,5 +42,5 @@ export function resetAuth() {
   });
   selectShop.mockReset();
   reloadMemberships.mockClear();
-  signOut.mockReset().mockResolvedValue({ error: null });
+  signOut.mockReset();
 }

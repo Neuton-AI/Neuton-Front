@@ -26,8 +26,7 @@ jobs:
       - name: Install
         run: npm ci
 
-      # No secrets are needed: the suite stubs `fetch` and the Supabase client,
-      # so every test is hermetic and no .env is required.
+      # The suite stubs the API and requires no secrets or .env file.
       - name: Lint
         run: npm run lint
 
