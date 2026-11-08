@@ -13,7 +13,7 @@ import {
   type RecipeUpdate,
 } from '@/features/recipes/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
-import type { ShopId, Token } from '@/lib/queryTypes';
+import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {
   useMutation,
@@ -24,7 +24,7 @@ import {
 } from '@tanstack/react-query';
 
 export function useRecipes(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   active = true,
 ): UseQueryResult<{ recipes: Recipe[] }> {
@@ -32,45 +32,45 @@ export function useRecipes(
     queryKey: recipesKeys.recipes(shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ recipes: Recipe[] }>('/recipes?includeUnverified=true', {
-        token,
+        userId,
         shopId,
         signal,
       }),
-    enabled: enabled(token, shopId) && active,
+    enabled: enabled(userId, shopId) && active,
   });
 }
 
 export function useRecipe(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   id: string,
 ): UseQueryResult<{ recipe: Recipe }> {
   return useQuery({
     queryKey: recipesKeys.recipe(shopId, id),
     queryFn: ({ signal }) =>
-      apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, { token, shopId, signal }),
-    enabled: enabled(token, shopId) && Boolean(id),
+      apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, { userId, shopId, signal }),
+    enabled: enabled(userId, shopId) && Boolean(id),
   });
 }
 
 export function useOrderableRecipes(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseQueryResult<{ recipes: OrderableRecipe[] }> {
   return useQuery({
     queryKey: recipesKeys.orderableRecipes(shopId),
     queryFn: ({ signal }) =>
       apiFetch<{ recipes: OrderableRecipe[] }>('/recipes/orderable', {
-        token,
+        userId,
         shopId,
         signal,
       }),
-    enabled: enabled(token, shopId),
+    enabled: enabled(userId, shopId),
   });
 }
 
 export function useVerifyRecipe(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<{ recipe: Recipe }, Error, { id: string }> {
   const queryClient = useQueryClient();
@@ -78,7 +78,7 @@ export function useVerifyRecipe(
     mutationFn: ({ id }) =>
       apiFetch<{ recipe: Recipe }>(`/recipes/${id}/verify`, {
         method: 'POST',
-        token,
+        userId,
         shopId,
         // Every field of the body is optional, but the endpoint still parses an
         // object — a bodyless POST comes back as a 400.
@@ -108,7 +108,7 @@ export function useVerifyRecipe(
 }
 
 export function useDeleteRecipe(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<{ ok: true; mode: 'hard' | 'soft' }, Error, { id: string }> {
   const queryClient = useQueryClient();
@@ -116,7 +116,7 @@ export function useDeleteRecipe(
     mutationFn: ({ id }) =>
       apiFetch<{ ok: true; mode: 'hard' | 'soft' }>(`/recipes/${id}`, {
         method: 'DELETE',
-        token,
+        userId,
         shopId,
       }),
     onSuccess: (_data, { id }) => {
@@ -134,7 +134,7 @@ export function useDeleteRecipe(
   });
 }
 
-export function useUpdateRecipe(token: Token, shopId: ShopId) {
+export function useUpdateRecipe(userId: UserId, shopId: ShopId) {
   const queryClient = useQueryClient();
   return useMutation({
     // documentFetch saves to IndexedDB first; its sync engine owns network retries.
@@ -142,7 +142,7 @@ export function useUpdateRecipe(token: Token, shopId: ShopId) {
     mutationFn: ({ id, body }: { id: string; body: RecipeUpdate }) =>
       apiFetch<{ recipe: Omit<Recipe, 'costing'> }>(`/recipes/${id}`, {
         method: 'PATCH',
-        token,
+        userId,
         shopId,
         body,
       }),
@@ -163,26 +163,26 @@ export function useUpdateRecipe(token: Token, shopId: ShopId) {
   });
 }
 
-export function useBarcodePrice(token: Token, shopId: ShopId) {
+export function useBarcodePrice(userId: UserId, shopId: ShopId) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BarcodePriceInput }) =>
       apiFetch<{ price: BarcodePrice }>(`/recipes/${id}/barcode-price`, {
         method: 'POST',
-        token,
+        userId,
         shopId,
         body,
       }),
   });
 }
 
-export function useManualProduct(token: Token, shopId: ShopId) {
+export function useManualProduct(userId: UserId, shopId: ShopId) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ManualProductInput }) =>
       apiFetch<{ product: ManualProduct; usage: ManualProductUsage }>(
         `/recipes/${id}/manual-product`,
         {
           method: 'POST',
-          token,
+          userId,
           shopId,
           body,
         },

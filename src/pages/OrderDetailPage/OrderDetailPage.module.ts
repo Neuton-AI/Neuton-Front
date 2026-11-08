@@ -20,13 +20,13 @@ export function useOrderDetailPage() {
 
   const navigate = useNavigate();
 
-  const { user, token } = useAuth();
+  const { user, userId } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const orderQuery = useOrder(token, activeShopId, id);
+  const orderQuery = useOrder(userId, activeShopId, id);
 
   const sourceOrder = orderQuery.data?.order;
   const order = sourceOrder
@@ -39,9 +39,9 @@ export function useOrderDetailPage() {
       }
     : null;
 
-  const markOrder = useMarkOrderDelivered(token, activeShopId);
+  const markOrder = useMarkOrderDelivered(userId, activeShopId);
 
-  const deleteOrder = useDeleteOrder(token, activeShopId);
+  const deleteOrder = useDeleteOrder(userId, activeShopId);
 
   /** A failed delete belongs in the load-error slot whose retry refetches. */
   const [actionError, setActionError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function useOrderDetailPage() {
     (location.state as { fresh?: boolean } | null)?.fresh === true;
 
   const remove = async () => {
-    if (!token || !activeShopId || !id || deleteOrder.isPending) return;
+    if (!userId || !activeShopId || !id || deleteOrder.isPending) return;
     setConfirmingDelete(false);
 
     setActionError(null);
@@ -97,7 +97,7 @@ export function useOrderDetailPage() {
    * twice while the refetch is still in flight.
    */
   const markDelivered = async () => {
-    if (!token || !activeShopId || !id || markOrder.isPending || !order) return;
+    if (!userId || !activeShopId || !id || markOrder.isPending || !order) return;
 
     setMarkError(null);
     try {
@@ -122,7 +122,7 @@ export function useOrderDetailPage() {
   const distanceFee =
     toNumber(order?.deliveryDistanceKm) * toNumber(shop?.deliveryRatePerKm);
   return {
-    token,
+    userId,
     activeShopId,
     distanceFee,
     shop,

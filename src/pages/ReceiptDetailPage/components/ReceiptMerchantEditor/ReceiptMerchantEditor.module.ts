@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useUpdateReceiptMerchant } from "@/features/receipts/receiptsApi";
 import type { Receipt } from "@/features/receipts/types";
-import type { ShopId, Token } from "@/lib/queryTypes";
+import type { ShopId, UserId } from "@/lib/queryTypes";
 
 export type MerchantEditorProps = {
   receipt: Receipt;
-  token: Token;
+  userId: UserId;
   shopId: ShopId;
 };
 export function useReceiptMerchantEditor({
   receipt,
-  token,
+  userId,
   shopId,
 }: MerchantEditorProps) {
   const [name, setName] = useState(receipt.merchantName?.trim() ?? "");
@@ -30,7 +30,7 @@ export function useReceiptMerchantEditor({
     base.current = { id: receipt.id, name: incoming };
   }, [receipt.id, receipt.merchantName, name]);
   const [error, setError] = useState<string | null>(null);
-  const update = useUpdateReceiptMerchant(token, shopId);
+  const update = useUpdateReceiptMerchant(userId, shopId);
   const trimmed = name.trim();
   const valid = trimmed.length > 0 && trimmed.length <= 200;
   async function save(event: FormEvent) {

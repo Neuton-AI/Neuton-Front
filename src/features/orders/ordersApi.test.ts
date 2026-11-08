@@ -20,10 +20,10 @@ beforeEach(() => server.resetHandlers());
 describe('orders API contracts', () => {
   it.each([
     [null, 'shop-1'],
-    ['token-1', null],
+    ['userId-1', null],
     [null, null],
-  ])('does not request without token %s and shop %s', async (token, shop) => {
-    const { result } = renderHookWithProviders(() => useOrders(token, shop, 'all'));
+  ])('does not request without userId %s and shop %s', async (userId, shop) => {
+    const { result } = renderHookWithProviders(() => useOrders(userId, shop, 'all'));
     expect(result.current.fetchStatus).toBe('idle');
     expect(result.current.data).toBeUndefined();
   });
@@ -35,15 +35,15 @@ describe('orders API contracts', () => {
         return requireContext(request) ?? HttpResponse.json({ orders: [buildOrder()], total: 1 });
       }),
     );
-    const { result } = renderHookWithProviders(() => useOrders('token-1', 'shop-1', 'delivered'));
+    const { result } = renderHookWithProviders(() => useOrders('userId-1', 'shop-1', 'delivered'));
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(new URL(url).searchParams.get('status')).toBe('delivered');
     expect(new URL(url).searchParams.get('limit')).toBe('100');
   });
   it('keeps detail disabled without an ID and quote disabled without items', () => {
-    const detail = renderHookWithProviders(() => useOrder('token-1', 'shop-1', ''));
+    const detail = renderHookWithProviders(() => useOrder('userId-1', 'shop-1', ''));
     const quote = renderHookWithProviders(() =>
-      useOrderQuote('token-1', 'shop-1', { items: [], distanceKm: 0, enabled: true }),
+      useOrderQuote('userId-1', 'shop-1', { items: [], distanceKm: 0, enabled: true }),
     );
     expect(detail.result.current.fetchStatus).toBe('idle');
     expect(quote.result.current.fetchStatus).toBe('idle');
@@ -57,7 +57,7 @@ describe('orders API contracts', () => {
       }),
     );
     const { result } = renderHookWithProviders(() =>
-      useOrderQuote('token-1', 'shop-1', {
+      useOrderQuote('userId-1', 'shop-1', {
         items: [{ recipeId: 'rp-1', quantity: 2 }],
         distanceKm: 5,
         enabled: true,
@@ -78,7 +78,7 @@ describe('orders API contracts', () => {
         return HttpResponse.json({ order: buildOrder(), totals: { netProfit: 1 } });
       }),
     );
-    const { result } = renderHookWithProviders(() => useCreateOrder('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useCreateOrder('userId-1', 'shop-1'), {
       queryClient: client,
     });
     const payload = {
@@ -107,7 +107,7 @@ describe('orders API contracts', () => {
         ({ request }) => requireContext(request) ?? new HttpResponse(null, { status: 204 }),
       ),
     );
-    const { result } = renderHookWithProviders(() => useDeleteOrder('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useDeleteOrder('userId-1', 'shop-1'), {
       queryClient: client,
     });
     await act(() => result.current.mutateAsync({ id: 'o1' }));
@@ -131,7 +131,7 @@ describe('orders API contracts', () => {
           requireContext(request) ?? HttpResponse.json({ order: { status: 'delivered' } }),
       ),
     );
-    const { result } = renderHookWithProviders(() => useMarkOrderDelivered('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useMarkOrderDelivered('userId-1', 'shop-1'), {
       queryClient: client,
     });
     await act(() => result.current.mutateAsync({ id: 'o1' }));

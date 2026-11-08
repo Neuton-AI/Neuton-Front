@@ -5,7 +5,7 @@ import { Button } from "@/components/ui";
 import { useShopTab } from "./ShopTab.module";
 
 interface IShopTab {
-  token: string | null;
+  userId: string | null;
   shopId: string | null;
   role: "owner" | "admin" | "member" | undefined;
   fallbackName: string | undefined;
@@ -14,7 +14,7 @@ interface IShopTab {
 }
 
 export const ShopTab: React.FC<IShopTab> = ({
-  token,
+  userId,
   shopId,
   role,
   fallbackName,
@@ -33,7 +33,7 @@ export const ShopTab: React.FC<IShopTab> = ({
     shopQueryError,
     handleRetry,
     shopQueryIsLoading,
-  } = useShopTab({ token, shopId, role, fallbackName, onSaved, onNotice });
+  } = useShopTab({ userId, shopId, role, fallbackName, onSaved, onNotice });
   if (!shopId) {
     return (
       <p className="text-body text-ink-muted">

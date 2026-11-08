@@ -35,7 +35,7 @@ describe('recipes API contracts', () => {
       ingredients: [{ rawName: 'Original tomatoes', rawMaterialName: 'Tomato', quantity: 2, rawSrcUnit: 'kg', inventoryItemId: null, generalPriceId: 'price-1' }],
     };
     const { result } = renderHookWithProviders(
-      () => useUpdateRecipe('token-1', 'shop-1'),
+      () => useUpdateRecipe('userId-1', 'shop-1'),
       { queryClient: client },
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1', body }));
@@ -71,7 +71,7 @@ describe('recipes API contracts', () => {
       }),
     );
     const { result } = renderHookWithProviders(
-      () => useBarcodePrice('token-1', 'shop-1'),
+      () => useBarcodePrice('userId-1', 'shop-1'),
       { queryClient: client },
     );
     await act(() => result.current.mutateAsync({ id: 'rp-1', body }));
@@ -80,8 +80,8 @@ describe('recipes API contracts', () => {
   });
 
   it('enables only active lists with credentials and a shop', () => {
-    const list = renderHookWithProviders(() => useRecipes('token-1', 'shop-1', false));
-    const detail = renderHookWithProviders(() => useRecipe('token-1', null, 'rp-1'));
+    const list = renderHookWithProviders(() => useRecipes('userId-1', 'shop-1', false));
+    const detail = renderHookWithProviders(() => useRecipe('userId-1', null, 'rp-1'));
     expect(list.result.current.fetchStatus).toBe('idle');
     expect(detail.result.current.fetchStatus).toBe('idle');
   });
@@ -97,7 +97,7 @@ describe('recipes API contracts', () => {
       }),
     );
     const { result, queryClient } = renderHookWithProviders(() =>
-      useRecipe('token-1', 'shop-1', 'rp-1'),
+      useRecipe('userId-1', 'shop-1', 'rp-1'),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.recipe.status).toBe('processing');
@@ -125,7 +125,7 @@ describe('recipes API contracts', () => {
       }),
     );
     const { result, queryClient } = renderHookWithProviders(() =>
-      useRecipes('token-1', 'shop-1'),
+      useRecipes('userId-1', 'shop-1'),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.recipes[0]?.status).toBe('pending');
@@ -161,7 +161,7 @@ describe('recipes API contracts', () => {
     client.setQueryData(recipesKeys.orderableRecipes('shop-1'), {
       recipes: [],
     });
-    const { result } = renderHookWithProviders(() => useVerifyRecipe('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useVerifyRecipe('userId-1', 'shop-1'), {
       queryClient: client,
     });
     await act(() => result.current.mutateAsync({ id: 'rp-1' }));
@@ -190,7 +190,7 @@ describe('recipes API contracts', () => {
     client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), { recipe: buildRecipe() });
     client.setQueryData(recipesKeys.recipes('shop-1'), {});
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
-    const { result } = renderHookWithProviders(() => useDeleteRecipe('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useDeleteRecipe('userId-1', 'shop-1'), {
       queryClient: client,
     });
     await act(() => result.current.mutateAsync({ id: 'rp-1' }));
@@ -207,7 +207,7 @@ describe('recipes API contracts', () => {
         HttpResponse.json({ error: { message: 'Forbidden' } }, { status: 403 }),
       ),
     );
-    const { result } = renderHookWithProviders(() => useRecipe('token-1', 'shop-1', 'rp-1'));
+    const { result } = renderHookWithProviders(() => useRecipe('userId-1', 'shop-1', 'rp-1'));
     await waitFor(() =>
       expect(result.current.error).toMatchObject({ status: 403, message: 'Forbidden' }),
     );

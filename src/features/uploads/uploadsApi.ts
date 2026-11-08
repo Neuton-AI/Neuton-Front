@@ -1,16 +1,16 @@
 import { uploadsKeys } from '@/features/uploads/keys';
 import { apiFetch } from '@/lib/api';
-import type { ShopId, Token } from '@/lib/queryTypes';
+import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-export function signedDownloadOptions(token: Token, shopId: ShopId, storagePath: string) {
+export function signedDownloadOptions(userId: UserId, shopId: ShopId, storagePath: string) {
   return {
     queryKey: uploadsKeys.signedDownloadUrl(shopId, storagePath),
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       apiFetch<{ url: string; expiresIn: number }>('/uploads/download-url', {
         method: 'POST',
-        token,
+        userId,
         shopId,
         signal,
         body: { path: storagePath },
@@ -22,12 +22,12 @@ export function signedDownloadOptions(token: Token, shopId: ShopId, storagePath:
 }
 
 export function useSignedDownloadUrl(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   storagePath: string,
 ): UseQueryResult<{ url: string; expiresIn: number }> {
   return useQuery({
-    ...signedDownloadOptions(token, shopId, storagePath),
-    enabled: enabled(token, shopId) && Boolean(storagePath),
+    ...signedDownloadOptions(userId, shopId, storagePath),
+    enabled: enabled(userId, shopId) && Boolean(storagePath),
   });
 }

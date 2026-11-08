@@ -34,7 +34,7 @@ it("loads only the WebP preview, and signs the original only after a click", asy
   const target = { opener: {}, location: { href: "" }, close: vi.fn() };
   vi.spyOn(window, "open").mockReturnValue(target as unknown as Window);
   renderWithRouter(
-    <DocumentSources token="token" shopId="shop" sources={[source]} />,
+    <DocumentSources userId="userId" shopId="shop" sources={[source]} />,
   );
   expect(await screen.findByAltText("invoice.pdf")).toHaveAttribute(
     "src",
@@ -57,7 +57,7 @@ it("loads only the WebP preview, and signs the original only after a click", asy
 it("automatically uses the original image for legacy sources", async () => {
   renderWithRouter(
     <DocumentSources
-      token="token"
+      userId="userId"
       shopId="shop"
       sources={[{ ...source, preview: undefined, contentType: "image/png" }]}
     />,
@@ -71,7 +71,7 @@ it("automatically uses the original image for legacy sources", async () => {
 it("retains the existing Open PDF link for legacy PDF sources", async () => {
   renderWithRouter(
     <DocumentSources
-      token="token"
+      userId="userId"
       shopId="shop"
       sources={[{ ...source, preview: undefined }]}
     />,
@@ -84,7 +84,7 @@ it("retains the existing Open PDF link for legacy PDF sources", async () => {
 
 it("keeps original access when a preview fails without automatically requesting it", async () => {
   renderWithRouter(
-    <DocumentSources token="token" shopId="shop" sources={[source]} />,
+    <DocumentSources userId="userId" shopId="shop" sources={[source]} />,
   );
   fireEvent.error(await screen.findByAltText("invoice.pdf"));
   expect(screen.getByText("Preview could not be loaded.")).toBeInTheDocument();
@@ -97,7 +97,7 @@ it("keeps original access when a preview fails without automatically requesting 
 it("renders multiple sources in their original order", async () => {
   renderWithRouter(
     <DocumentSources
-      token="token"
+      userId="userId"
       shopId="shop"
       sources={[
         source,

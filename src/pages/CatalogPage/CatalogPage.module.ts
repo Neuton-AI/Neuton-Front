@@ -24,7 +24,7 @@ const TAB_TO_KIND: Record<Tab, MediaKind> = {
 };
 export function useCatalogPage() {
   const location = useLocation();
-  const { user, token } = useAuth();
+  const { user, userId } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
@@ -44,11 +44,11 @@ export function useCatalogPage() {
   // Each tab is its own query, enabled only while visible: `/recipes` costs
   // every recipe against live inventory, so fetching all three on mount is both
   // wasteful and the reason one 404 could discard a successful receipts response.
-  const recipesQuery = useRecipes(token, activeShopId, tab === "recipes");
+  const recipesQuery = useRecipes(userId, activeShopId, tab === "recipes");
 
-  const inventoryQuery = useInventory(token, activeShopId, tab === "inventory");
+  const inventoryQuery = useInventory(userId, activeShopId, tab === "inventory");
 
-  const receiptsQuery = useReceipts(token, activeShopId, tab === "receipts");
+  const receiptsQuery = useReceipts(userId, activeShopId, tab === "receipts");
 
   const recipes = (recipesQuery.data?.recipes ?? []).map((recipe) => ({
     ...recipe,

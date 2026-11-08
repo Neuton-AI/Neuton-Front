@@ -5,7 +5,7 @@ import {
   type UploadSession,
 } from './uploadSources';
 
-const context = { token: 'jwt', shopId: 'shop-1' };
+const context = { userId: 'user-1', shopId: 'shop-1' };
 const first = new File(['page one'], 'first.jpg', { type: 'image/jpeg' });
 const second = new File(['page two'], 'second.pdf', {
   type: 'application/pdf',
@@ -35,10 +35,14 @@ const complete = {
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
+function installFetch(fetchMock: ReturnType<typeof vi.fn>) {
+  vi.stubGlobal('fetch', (path: string, options?: RequestInit) =>
+    path === '/api/v1/auth/csrf' ? Promise.resolve(json({ token: 'proof' })) : fetchMock(path, options));
+}
 function stub(...responses: Response[]) {
   const fetchMock = vi.fn();
   for (const response of responses) fetchMock.mockResolvedValueOnce(response);
-  vi.stubGlobal('fetch', fetchMock);
+  installFetch(fetchMock);
   return fetchMock;
 }
 function body(fetchMock: ReturnType<typeof vi.fn>, index: number) {
@@ -124,7 +128,7 @@ describe('uploadSources', () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('Network disconnected'));
-    vi.stubGlobal('fetch', fetchMock);
+    installFetch(fetchMock);
     let session: UploadSession | undefined;
     await expect(
       uploadSources([first], 'receipt', {

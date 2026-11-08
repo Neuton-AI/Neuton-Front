@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
+  envDir: process.env.NEUTON_SKIP_ENV_FILES === '1' ? false : undefined,
   plugins: [
     react(),
     VitePWA({
@@ -52,7 +53,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
+    proxy: { '/api': process.env.NEUTON_API_UPSTREAM ?? 'http://127.0.0.1:4000' },
   },
+  preview: { proxy: { '/api': process.env.NEUTON_API_UPSTREAM ?? 'http://127.0.0.1:4000' } },
   build: {
     rollupOptions: {
       output: {

@@ -71,7 +71,7 @@ export function useRecipeEditPage() {
   const { id = "" } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, userId, loading: authLoading } = useAuth();
   const {
     memberships,
     activeShopId,
@@ -79,12 +79,12 @@ export function useRecipeEditPage() {
   } = useShopMemberships(user?.id);
   const role = memberships.find((row) => row.shopId === activeShopId)?.role;
   const canManage = role === "owner" || role === "admin";
-  const query = useRecipe(token, activeShopId, id);
+  const query = useRecipe(userId, activeShopId, id);
   const recipe = query.data?.recipe;
-  const update = useUpdateRecipe(token, activeShopId);
-  const deletion = useDeleteRecipe(token, activeShopId);
-  const barcode = useBarcodePrice(token, activeShopId);
-  const manual = useManualProduct(token, activeShopId);
+  const update = useUpdateRecipe(userId, activeShopId);
+  const deletion = useDeleteRecipe(userId, activeShopId);
+  const barcode = useBarcodePrice(userId, activeShopId);
+  const manual = useManualProduct(userId, activeShopId);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -274,7 +274,7 @@ export function useRecipeEditPage() {
     const row = draft?.ingredients.find(
       (ingredient) => ingredient.key === scanKey,
     );
-    if (!row || !canManage || barcode.isPending || !token || !activeShopId)
+    if (!row || !canManage || barcode.isPending || !userId || !activeShopId)
       return;
     const request = ++scanRequest.current;
     setScanError(null);
@@ -328,7 +328,7 @@ export function useRecipeEditPage() {
     const row = draft?.ingredients.find(
       (ingredient) => ingredient.key === scanKey,
     );
-    if (!row || !canManage || manual.isPending || !token || !activeShopId)
+    if (!row || !canManage || manual.isPending || !userId || !activeShopId)
       return;
     const request = ++scanRequest.current;
     setScanError(null);
@@ -373,7 +373,7 @@ export function useRecipeEditPage() {
   }
 
   async function save() {
-    if (!draft || !canManage || !token || !activeShopId || busy) return;
+    if (!draft || !canManage || !userId || !activeShopId || busy) return;
     if (conflicts.length) {
       setError("Resolve the competing changes before saving.");
       return;
@@ -431,7 +431,7 @@ export function useRecipeEditPage() {
   }
 
   async function remove() {
-    if (!canManage || busy || !token || !activeShopId) return;
+    if (!canManage || busy || !userId || !activeShopId) return;
     if (
       !window.confirm(
         "Delete this recipe? If it has sales history it will be deactivated instead of permanently removed.",

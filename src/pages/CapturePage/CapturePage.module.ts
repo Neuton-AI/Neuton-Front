@@ -30,7 +30,7 @@ export type CaptureSource = {
 type Collection = { sources: CaptureSource[]; currentId: string | null };
 
 export function useCapturePage() {
-  const { user, token } = useAuth();
+  const { user, userId } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const [params] = useSearchParams();
   const orderId = params.get("orderId") ?? undefined;
@@ -372,7 +372,7 @@ export function useCapturePage() {
   const submit = async () => {
     if (
       !collectionRef.current.sources.length ||
-      !token ||
+      !userId ||
       !activeShopId ||
       busyRef.current ||
       addingRef.current ||
@@ -390,7 +390,7 @@ export function useCapturePage() {
       await saveScan(
         collectionRef.current.sources.map((source) => source.file),
         kind,
-        { token, shopId: activeShopId },
+        { userId, shopId: activeShopId },
         orderId,
       );
       navigate(kind === "receipt" ? "/catalog?tab=receipts" : "/catalog");

@@ -6,12 +6,12 @@ import { resolveDocumentConflict } from './conflicts';
 import { syncDocuments } from './engine';
 
 export function SyncConflicts() {
-  const { token, user } = useAuth();
+  const { userId, user } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const [documents, setDocuments] = useState<LocalDocument[]>([]);
   const [error, setError] = useState('');
   const scope =
-    token && activeShopId ? scopeFor(token, activeShopId).key : null;
+    userId && activeShopId ? scopeFor(userId, activeShopId).key : null;
   useEffect(() => {
     let active = true;
     const refresh = () => {
@@ -68,12 +68,12 @@ export function SyncConflicts() {
                 className="underline"
                 disabled={choice === 'local' && row.remoteDeleted}
                 onClick={() => {
-                  if (!token || !activeShopId) return;
+                  if (!userId || !activeShopId) return;
                   setError('');
                   void resolveDocumentConflict(row.key, field, choice)
                     .then(() =>
-                      syncDocuments(scopeFor(token, activeShopId), {
-                        token,
+                      syncDocuments(scopeFor(userId, activeShopId), {
+                        userId,
                         shopId: activeShopId,
                       }),
                     )

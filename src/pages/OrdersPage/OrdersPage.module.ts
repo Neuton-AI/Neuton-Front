@@ -16,7 +16,7 @@ function formatOrderHeader(order: Order): string {
 
 type StatusFilter = "all" | OrderStatus;
 export function useOrdersPage() {
-  const { user, token } = useAuth();
+  const { user, userId } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
@@ -27,7 +27,7 @@ export function useOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const { data, isLoading, error, refetch } = useOrders(
-    token,
+    userId,
     activeShopId,
     statusFilter,
   );

@@ -17,8 +17,8 @@ import {
 
 describe('receipts API contracts', () => {
   it('does not request an inactive list or an unidentified detail', () => {
-    const list = renderHookWithProviders(() => useReceipts('token-1', 'shop-1', false));
-    const detail = renderHookWithProviders(() => useReceipt('token-1', 'shop-1', ''));
+    const list = renderHookWithProviders(() => useReceipts('userId-1', 'shop-1', false));
+    const detail = renderHookWithProviders(() => useReceipt('userId-1', 'shop-1', ''));
     expect(list.result.current.fetchStatus).toBe('idle');
     expect(detail.result.current.fetchStatus).toBe('idle');
   });
@@ -34,7 +34,7 @@ describe('receipts API contracts', () => {
       }),
     );
     const { result, queryClient } = renderHookWithProviders(() =>
-      useReceipt('token-1', 'shop-1', 'rc-1'),
+      useReceipt('userId-1', 'shop-1', 'rc-1'),
     );
     await act(() => vi.advanceTimersByTimeAsync(20));
     expect(result.current.data?.receipt.status).toBe('processing');
@@ -68,7 +68,7 @@ describe('receipts API contracts', () => {
     client.setQueryData(receiptsKeys.receipts('shop-1'), {});
     client.setQueryData(inventoryKeys.inventory('shop-1'), {});
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
-    const { result } = renderHookWithProviders(() => useVerifyReceipt('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useVerifyReceipt('userId-1', 'shop-1'), {
       queryClient: client,
     });
     const payload = { items: [{ id: 'li-1', accepted: true }] };
@@ -101,7 +101,7 @@ describe('receipts API contracts', () => {
     client.setQueryData(receiptsKeys.receipt('shop-1', 'rc-1'), { receipt: buildReceiptDetail() });
     client.setQueryData(receiptsKeys.receipts('shop-1'), {});
     client.setQueryData(inventoryKeys.inventory('shop-1'), {});
-    const { result } = renderHookWithProviders(() => useDeleteReceipt('token-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useDeleteReceipt('userId-1', 'shop-1'), {
       queryClient: client,
     });
     await act(() => result.current.mutateAsync({ id: 'rc-1' }));

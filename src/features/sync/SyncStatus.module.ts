@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  signOut,
+  restoreSession,
   useAuth,
   useShopMemberships,
 } from '@/features/auth/auth';
@@ -25,7 +25,7 @@ type Snapshot = {
 };
 
 export function useSyncStatus() {
-  const { token, user } = useAuth();
+  const { userId, user, sessionId } = useAuth();
   const { activeShopId } = useShopMemberships(user?.id);
   const client = useQueryClient();
   const [snapshot, setSnapshot] = useState<Snapshot>();
@@ -34,7 +34,7 @@ export function useSyncStatus() {
   const [localMessage, setLocalMessage] = useState('');
   const popup = useRef<HTMLElement>(null);
   const scopeKey =
-    token && activeShopId ? scopeFor(token, activeShopId).key : null;
+    userId && activeShopId ? scopeFor(userId, activeShopId).key : null;
   useEffect(() => {
     setOpened(false);
     setLocalMessage('');
@@ -63,8 +63,9 @@ export function useSyncStatus() {
     return () => window.removeEventListener('neuton-account-change', clear);
   }, [client]);
   useEffect(() => {
-    if (!token || !activeShopId) return;
-    const scope = scopeFor(token, activeShopId);
+    if (!userId || !activeShopId) return;
+    const scope = scopeFor(userId, activeShopId);
+    const transfer = new AbortController();
     let active = true;
     let refreshing = false;
     let documentVersion: string | undefined;
@@ -122,7 +123,7 @@ export function useSyncStatus() {
     const scheduler = createSyncScheduler(async () => {
       if (!active) return;
       setOnline(navigator.onLine);
-      await syncDocuments(scope, { token, shopId: activeShopId });
+      await syncDocuments(scope, { userId, shopId: activeShopId, signal: transfer.signal }, { sessionId });
       if (active) await refresh();
       if (
         active &&
@@ -134,7 +135,7 @@ export function useSyncStatus() {
         throw new Error('Synchronization is waiting for its retry backoff');
     });
     const sync = () => scheduler.request();
-    const disconnect = connectLiveSync({ token, shopId: activeShopId }, sync);
+    const disconnect = connectLiveSync({ shopId: activeShopId, sessionId, onInvalid: () => void restoreSession() }, sync);
     const unsubscribe = store.subscribe(() => {
       void refresh();
     });
@@ -148,6 +149,7 @@ export function useSyncStatus() {
     window.addEventListener('focus', sync);
     return () => {
       active = false;
+      transfer.abort();
       scheduler.stop();
       disconnect();
       unsubscribe();
@@ -156,8 +158,8 @@ export function useSyncStatus() {
       window.removeEventListener('offline', sync);
       window.removeEventListener('focus', sync);
     };
-  }, [token, activeShopId, client]);
-  if (!token || !activeShopId) return null;
+  }, [userId, activeShopId, client, sessionId]);
+  if (!userId || !activeShopId) return null;
   const current = snapshot?.scope === scopeKey ? snapshot : undefined;
   const errors = current?.errors ?? [];
   const succeeded =
@@ -182,13 +184,13 @@ export function useSyncStatus() {
   const retry = () => {
     setLocalMessage('');
     void syncDocuments(
-      scopeFor(token, activeShopId),
-      { token, shopId: activeShopId },
+      scopeFor(userId, activeShopId),
+      { userId, shopId: activeShopId },
       { force: true },
     ).catch(() => undefined);
   };
   const exportPending = async () => {
-    const scope = scopeFor(token, activeShopId);
+    const scope = scopeFor(userId, activeShopId);
     try {
       const [documents, writes, scans, blobs] = await Promise.all([
         store.documents(scope.key),
@@ -240,6 +242,6 @@ export function useSyncStatus() {
     setOpened,
     retry,
     exportPending,
-    onSignIn: signOut,
+    onSignIn: () => void restoreSession(),
   };
 }

@@ -18,9 +18,9 @@ vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
   apiFetch: api.fetch,
 }));
-const token = `header.${btoa(JSON.stringify({ sub: 'user-one' }))}.signature`;
-const context = { token, shopId: 'shop-one' };
-const scope = scopeFor(token, context.shopId);
+const userId = 'user-one';
+const context = { userId, shopId: 'shop-one' };
+const scope = scopeFor(userId, context.shopId);
 const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const key = documentKey(scope, 'recipe', id);
 const original: LocalDocument = {
@@ -127,7 +127,7 @@ const online = () =>
 it('recipe Save completes offline and persists a pending edit before reconnect', async () => {
   onlineManager.setOnline(false);
   const { result, queryClient } = renderHookWithProviders(() =>
-    useUpdateRecipe(context.token, context.shopId),
+    useUpdateRecipe(context.userId, context.shopId),
   );
   const body = {
     name: 'Saved offline', imageUrl: null, prepTimeMinutes: 5,
@@ -334,7 +334,7 @@ describe('classified queue recovery', () => {
     expect(api.fetch).toHaveBeenCalledTimes(calls);
     expect(await store.writes(scope.key)).toHaveLength(2);
     compareAndPush(() => undefined);
-    await syncDocuments(scope, { ...context, token: token + '-refreshed' });
+    await syncDocuments(scope, { ...context, userId: userId + '-refreshed' });
     expect(await store.writes(scope.key)).toEqual([]);
   });
   it('backs off transient failures without accumulating duplicates', async () => {
@@ -408,10 +408,10 @@ describe('local-first persistence and synchronization', () => {
     expect(await documentFetch(`/recipes/${id}`, context)).toEqual({
       recipe: original.data,
     });
-    expect(await store.documents(scopeFor(token, 'another-shop').key)).toEqual(
+    expect(await store.documents(scopeFor(userId, 'another-shop').key)).toEqual(
       [],
     );
-    const another = `header.${btoa(JSON.stringify({ sub: 'another-user' }))}.signature`;
+    const another = 'another-user';
     expect(
       await store.documents(scopeFor(another, context.shopId).key),
     ).toEqual([]);
@@ -1016,14 +1016,14 @@ describe('upload document continuity', () => {
 
   it('does not let another account sync remove this shop card', async () => {
     const scan = await queueScan('receipt');
-    const otherToken = `header.${btoa(JSON.stringify({ sub: 'user-two' }))}.signature`;
+    const otherToken = 'user-two';
     online();
     api.fetch.mockResolvedValue({
       toPush: [],
       toPull: [{ kind: 'receipt', id: scan.id, updatedAt: 50, deleted: true }],
     });
     await syncDocuments(scopeFor(otherToken, 'shop-two'), {
-      token: otherToken,
+      userId: otherToken,
       shopId: 'shop-two',
     });
     expect(

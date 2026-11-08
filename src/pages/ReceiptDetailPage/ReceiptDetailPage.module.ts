@@ -12,17 +12,17 @@ import { useParams } from "react-router-dom";
 export function useReceiptDetailPage() {
   const { id = "" } = useParams();
 
-  const { user, token } = useAuth();
+  const { user, userId } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
 
-  const receiptQuery = useReceipt(token, activeShopId, id);
+  const receiptQuery = useReceipt(userId, activeShopId, id);
 
   const receipt = receiptQuery.data?.receipt ?? null;
 
-  const verifyMutation = useVerifyReceipt(token, activeShopId);
+  const verifyMutation = useVerifyReceipt(userId, activeShopId);
 
   /** Kept apart from `error`: a failed verify belongs next to its button, not
    *  in the load-error slot whose retry only refetches the receipt. */
@@ -58,7 +58,7 @@ export function useReceiptDetailPage() {
    */
   const verify = async () => {
     if (
-      !token ||
+      !userId ||
       !activeShopId ||
       !id ||
       !canVerify ||
@@ -96,7 +96,7 @@ export function useReceiptDetailPage() {
   };
   const verifyPending = verifyMutation.isPending;
   return {
-    token,
+    userId,
     activeShopId,
     receipt,
     verifyError,

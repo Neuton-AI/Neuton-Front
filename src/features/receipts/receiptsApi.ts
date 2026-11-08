@@ -8,7 +8,7 @@ import {
   type VerifyReceiptOutcome,
 } from '@/features/receipts/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
-import type { ShopId, Token } from '@/lib/queryTypes';
+import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {
   useMutation,
@@ -19,20 +19,20 @@ import {
 } from '@tanstack/react-query';
 
 export function useReceipts(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   active = true,
 ): UseQueryResult<{ receipts: Receipt[] }> {
   return useQuery({
     queryKey: receiptsKeys.receipts(shopId),
     queryFn: ({ signal }) =>
-      apiFetch<{ receipts: Receipt[] }>('/receipts?limit=50', { token, shopId, signal }),
-    enabled: enabled(token, shopId) && active,
+      apiFetch<{ receipts: Receipt[] }>('/receipts?limit=50', { userId, shopId, signal }),
+    enabled: enabled(userId, shopId) && active,
   });
 }
 
 export function useReceipt(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   id: string,
 ): UseQueryResult<{ receipt: ReceiptDetail }> {
@@ -40,17 +40,17 @@ export function useReceipt(
     queryKey: receiptsKeys.receipt(shopId, id),
     queryFn: ({ signal }) =>
       apiFetch<{ receipt: ReceiptDetail }>(`/receipts/${id}`, {
-        token,
+        userId,
         shopId,
         signal,
       }),
-    enabled: enabled(token, shopId) && Boolean(id),
+    enabled: enabled(userId, shopId) && Boolean(id),
     // The shop event stream refreshes processing and review states alike.
   });
 }
 
 export function useVerifyReceipt(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<
   VerifyReceiptOutcome,
@@ -62,7 +62,7 @@ export function useVerifyReceipt(
     mutationFn: ({ id, body }) =>
       apiFetch<VerifyReceiptOutcome>(`/receipts/${id}/verify`, {
         method: 'POST',
-        token,
+        userId,
         shopId,
         body,
       }),
@@ -80,14 +80,14 @@ export function useVerifyReceipt(
 }
 
 /** Saves locally first; the existing sync mutation protocol persists the correction. */
-export function useUpdateReceiptMerchant(token: Token, shopId: ShopId) {
+export function useUpdateReceiptMerchant(userId: UserId, shopId: ShopId) {
   const queryClient = useQueryClient();
   return useMutation({
     networkMode: 'always',
     mutationFn: ({ id, merchantName }: { id: string; merchantName: string }) =>
       apiFetch<{ receipt: Receipt }>(`/receipts/${id}`, {
         method: 'PATCH',
-        token,
+        userId,
         shopId,
         body: { merchantName },
       }),
@@ -105,7 +105,7 @@ export function useUpdateReceiptMerchant(token: Token, shopId: ShopId) {
 }
 
 export function useDeleteReceipt(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<{ ok: true }, Error, { id: string }> {
   const queryClient = useQueryClient();
@@ -113,7 +113,7 @@ export function useDeleteReceipt(
     mutationFn: ({ id }) =>
       apiFetch<{ ok: true }>(`/receipts/${id}`, {
         method: 'DELETE',
-        token,
+        userId,
         shopId,
       }),
     onSuccess: (_data, { id }) => {

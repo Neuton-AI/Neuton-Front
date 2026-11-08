@@ -8,6 +8,7 @@ import { InstallAppButton } from "@/features/pwa/InstallApp";
 import { MeTab } from "./components/MeTab/MeTab";
 import { useProfilePage } from "./ProfilePage.module";
 import { ShopTab } from "./components/ShopTab/ShopTab";
+import { SessionDevices } from './components/SessionDevices';
 
 export const ProfilePage: React.FC = () => {
   const {
@@ -15,13 +16,14 @@ export const ProfilePage: React.FC = () => {
     handleSelectShop,
     handleSaved,
     user,
-    token,
+    userId,
     memberships,
     activeShopId,
     activeShop,
     tab,
     setTab,
     notice,
+    sessionNotice,
     setNotice,
     signOut,
     createShop,
@@ -78,7 +80,7 @@ export const ProfilePage: React.FC = () => {
               />
             ) : (
               <ShopTab
-                token={token}
+                userId={userId}
                 shopId={activeShopId}
                 role={role}
                 fallbackName={activeShop?.name}
@@ -89,6 +91,8 @@ export const ProfilePage: React.FC = () => {
           </div>
 
           {notice ? <InlineNotice tone="success">{notice}</InlineNotice> : null}
+          {sessionNotice && <InlineNotice tone="error">{sessionNotice}</InlineNotice>}
+          {tab === 'me' && <SessionDevices signOutEverywhere={() => signOut(true)} />}
 
           <button
             type="button"

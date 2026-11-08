@@ -1,4 +1,4 @@
-import { apiFetch, ApiError, type RequestOptions } from '@/lib/api';
+import { apiFetch, ApiError, requestScopeSignal, type RequestOptions } from '@/lib/api';
 import {
   uploadSources,
   UploadSourcesError,
@@ -40,26 +40,26 @@ export const syncActivity = new Map<
     completedAt?: number;
   }
 >();
-const authenticatedTokens = new Map<string, string | null | undefined>();
+const authenticatedSessions = new Map<string, string | null | undefined>();
 
 export function syncDocuments(
   scope: Scope,
   context: RequestOptions,
-  options: { force?: boolean } = {},
+  options: { force?: boolean; sessionId?: string | null } = {},
 ): Promise<void> {
   if (!navigator.onLine) return Promise.resolve();
   const previous = running.get(scope.key);
   if (previous) return previous;
-  const reauthenticated =
-    !authenticatedTokens.has(scope.key) ||
-    authenticatedTokens.get(scope.key) !== context.token;
-  authenticatedTokens.set(scope.key, context.token);
+  const signal = requestScopeSignal(context.userId, context.shopId, context.signal);
+  const sessionId = options.sessionId ?? context.userId;
+  const reauthenticated = !authenticatedSessions.has(scope.key) || authenticatedSessions.get(scope.key) !== sessionId;
+  authenticatedSessions.set(scope.key, sessionId);
   const run = (async () => {
     do {
       await synchronize(
         scope,
         // A caller may be saving a PATCH; sync downloads must start as GETs.
-        { token: context.token, shopId: context.shopId },
+        { userId: context.userId, shopId: context.shopId, signal },
         options.force ?? false,
         reauthenticated,
       );
@@ -94,6 +94,7 @@ async function transfer(
   force: boolean,
   reauthenticated: boolean,
 ) {
+  context.signal?.throwIfAborted();
   const failures: unknown[] = [];
   let lastSuccess: ReturnType<typeof syncActivity.get>;
   let authenticationFailed = false;
@@ -647,7 +648,8 @@ async function pushScan(
       })),
     };
     await uploadSources(files, scan.kind, {
-      context: { token: context.token ?? null, shopId: scope.shopId },
+      context: { userId: context.userId ?? null, shopId: scope.shopId },
+      signal: context.signal,
       session,
       orderId: scan.orderId,
       persistProgress: async (progress) => {
@@ -668,6 +670,7 @@ async function pushScan(
       },
     });
   }
+  context.signal?.throwIfAborted();
   await store.transaction(['scans', 'blobs'], (tx) => {
     tx.objectStore('scans').delete(scan.key);
     tx.objectStore('blobs').delete(scan.key);

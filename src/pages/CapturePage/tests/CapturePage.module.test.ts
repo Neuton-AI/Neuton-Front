@@ -267,21 +267,21 @@ describe("capture collection", () => {
       expect(boundary.upload).toHaveBeenCalledWith(
         files,
         kind,
-        { token: "token-1", shopId: "shop-1" },
+        { userId: "userId-1", shopId: "shop-1" },
         "00000000-0000-4000-8000-000000000001",
       );
       expect(boundary.navigate).toHaveBeenCalled();
     },
   );
   it("retains failed upload state for retry and refuses unauthenticated submissions", async () => {
-    authState.token = null;
+    authState.userId = null;
     const { result, rerender } = renderHookWithProviders(() =>
       useCapturePage(),
     );
     act(() => result.current.onPick([photo()]));
     await act(async () => result.current.submit());
     expect(boundary.upload).not.toHaveBeenCalled();
-    authState.token = "token-1";
+    authState.userId = "userId-1";
     rerender();
     boundary.upload.mockRejectedValueOnce(new Error("Source 1 failed"));
     await act(async () => result.current.submit());
