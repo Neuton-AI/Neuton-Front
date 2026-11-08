@@ -42,7 +42,7 @@ export async function documentFetch<T>(
     action === 'manual-product'
   )
     return apiFetch<T>(path, context);
-  const scope = scopeFor(context.token, context.shopId);
+  const scope = scopeFor(context.userId, context.shopId);
   if (context.method && context.method !== 'GET')
     return mutate<T>(path, kind, id, action, scope, context);
   const local = await store.documents(scope.key);
@@ -187,7 +187,7 @@ export async function saveScan(
 ) {
   const error = validateUploadFiles(files);
   if (error) throw new Error(error);
-  const scope = scopeFor(context.token, context.shopId);
+  const scope = scopeFor(context.userId, context.shopId);
   const id = crypto.randomUUID();
   const documentKind: Kind = kind === 'product' ? 'recipe' : kind;
   const key = documentKey(scope, documentKind, id);

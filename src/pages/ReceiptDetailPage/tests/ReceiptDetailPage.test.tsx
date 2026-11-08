@@ -33,7 +33,7 @@ vi.mock("@/features/auth/auth", async () => {
       session: null,
       loading: false,
       user: { id: "u1" },
-      token: "token-1",
+      userId: "userId-1",
     }),
     useShopMemberships: () => ({
       memberships: [{ shopId: "shop-1", role: state.role, shops: shop }],

@@ -16,7 +16,7 @@ export const DASHBOARD_PERIODS: { key: DashboardPeriod; label: string }[] = [
   { key: "12m", label: "1Y" },
 ];
 export function useDashboardPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, userId, loading: authLoading } = useAuth();
 
   const {
     memberships,
@@ -39,7 +39,7 @@ export function useDashboardPage() {
   );
 
   const { data, isLoading, error, refetch } = useDashboardSummary(
-    token,
+    userId,
     activeShopId,
     period,
   );

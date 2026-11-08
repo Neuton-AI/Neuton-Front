@@ -33,7 +33,7 @@ describe("useProfilePage", () => {
     server.use(
       http.post(apiPath("/shops"), async ({ request }) => {
         body = await request.json();
-        expect(request.headers.get("authorization")).toBe("Bearer token-1");
+        expect(request.credentials).toBe("same-origin");
         return HttpResponse.json({
           shop: buildShop({ id: "new-shop", name: "Bakery" }),
         });
@@ -64,7 +64,7 @@ describe("useProfilePage", () => {
   });
   it("signs out and returns to authentication", async () => {
     const { result } = renderHookWithProviders(() => useProfilePage());
-    act(() => result.current.signOut());
+    await act(() => result.current.signOut());
     expect(signOut).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith("/signin", { replace: true });
   });

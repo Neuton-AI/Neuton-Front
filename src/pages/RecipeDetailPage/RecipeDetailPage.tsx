@@ -73,7 +73,7 @@ export const RecipeDetailView: React.FC<IRecipeDetailView> = ({ model }) => {
             {recipe.sources?.length ? (
               <SheetSection title="Original scans">
                 <DocumentSources
-                  token={model.token}
+                  userId={model.userId}
                   shopId={model.activeShopId}
                   sources={recipe.sources}
                 />

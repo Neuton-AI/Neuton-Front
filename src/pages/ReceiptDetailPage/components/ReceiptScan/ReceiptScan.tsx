@@ -9,13 +9,13 @@ type Receipt = NonNullable<ReceiptDetailPageModel["receipt"]>;
 
 interface IReceiptScan {
   receipt: Receipt;
-  token: string | null;
+  userId: string | null;
   shopId: string | null;
 }
 
 export const ReceiptScan: React.FC<IReceiptScan> = ({
   receipt,
-  token,
+  userId,
   shopId,
 }) => {
   const sources: DocumentSource[] = receipt.sources?.length
@@ -34,7 +34,7 @@ export const ReceiptScan: React.FC<IReceiptScan> = ({
     <div className="shrink-0">
       <SheetSection title="Original scan">
         {sources.length ? (
-          <DocumentSources token={token} shopId={shopId} sources={sources} />
+          <DocumentSources userId={userId} shopId={shopId} sources={sources} />
         ) : (
           <div className="flex flex-col items-center gap-2 px-6 text-center">
             <IconReceipt className="h-7 w-7 text-ink-muted-soft" />

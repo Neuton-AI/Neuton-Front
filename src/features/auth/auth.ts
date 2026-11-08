@@ -1,23 +1,39 @@
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { ShopMembership } from '@/features/shops/types';
 import { logoutCleanup } from '@/features/sync/store';
-import { ApiError, apiFetch } from '@/lib/api';
+import { ApiError, apiFetch, resetCsrf, setRequestSession, setRequestShop } from '@/lib/api';
 
 type Credentials = { email: string; password: string };
-type Session = {
-  token: string;
-  user: { id: string; email: string; fullName: string | null; avatarUrl: string | null };
+export type SessionMetadata = {
+  id: string;
+  lastActivityAt: string;
+  idleExpiresAt: string;
+  absoluteExpiresAt: string;
+  nextRenewalAt: string;
 };
-type SessionMembership = { shop: ShopMembership['shops']; role: ShopMembership['role'] };
+export type DeviceSession = SessionMetadata & { deviceLabel: string | null; createdAt: string; current: boolean };
+type Session = {
+  user: { id: string; email: string; fullName: string | null; avatarUrl: string | null };
+  memberships: { shop: ShopMembership['shops']; role: ShopMembership['role'] }[];
+  session: SessionMetadata;
+};
+type AuthSnapshot = {
+  status: 'loading' | 'authenticated' | 'anonymous' | 'unavailable';
+  session: Session | null;
+  message?: string;
+};
 
 const activeShopKey = 'neuton.activeShopId';
-const membershipsKey = (userId: string) => `neuton.memberships:${userId}`;
-const emptyMemberships: ShopMembership[] = [];
-
-let session: Session | null = null;
-let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<() => void>();
+const emptyMemberships: ShopMembership[] = [];
+const unavailableMessage = 'Session unavailable. Check your connection and try again.';
+const channel = typeof window.BroadcastChannel === 'function' ? new BroadcastChannel('neuton-session') : null;
+let snapshot: AuthSnapshot = { status: 'loading', session: null };
+let revision = 0;
+let restoring: { revision: number; result: Promise<void> } | undefined;
+let renewal: Promise<void> | undefined;
+let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+let logoutUnconfirmed: string | undefined;
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
@@ -28,131 +44,185 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
-function changeSession(next: Session | null) {
-  const previous = session;
-  session = next;
-  if (previous && previous.user.id !== next?.user.id) {
-    try {
-      localStorage.removeItem(membershipsKey(previous.user.id));
-    } catch { /* The optional cache cannot prevent sign-out. */ }
-    window.dispatchEvent(new Event('neuton-account-change'));
-    void logoutCleanup(previous.user.id).catch(() => undefined);
+function readActiveShopId() {
+  try { return localStorage.getItem(activeShopKey); } catch { return null; }
+}
+
+function storeActiveShopId(id: string | null) {
+  setRequestShop(id);
+  if (id === readActiveShopId()) return;
+  try {
+    if (id) localStorage.setItem(activeShopKey, id);
+    else localStorage.removeItem(activeShopKey);
+  } catch { /* The API scope still changes when storage is unavailable. */ }
+  notify();
+}
+
+function sessionFailure(status: number) {
+  if (status === 401) update({ status: 'anonymous', session: null });
+  else update({ status: 'unavailable', session: null, message: unavailableMessage });
+}
+
+function update(next: AuthSnapshot) {
+  const previous = snapshot.session;
+  const changed = previous?.session.id !== next.session?.session.id;
+  snapshot = next;
+  if (changed) {
+    revision++;
+    setRequestSession(next.session?.user.id ?? null, next.session?.session.id ?? null, sessionFailure);
+    setRequestShop(null);
+    if (previous) window.dispatchEvent(new Event('neuton-account-change'));
+  }
+  if (next.session) {
+    const selected = readActiveShopId();
+    const memberships = next.session.memberships;
+    storeActiveShopId(memberships.some(({ shop }) => shop.id === selected) ? selected : (memberships[0]?.shop.id ?? null));
+  }
+  clearTimeout(expiryTimer);
+  if (next.session) {
+    const expires = Math.min(Date.parse(next.session.session.idleExpiresAt), Date.parse(next.session.session.absoluteExpiresAt));
+    expiryTimer = setTimeout(() => {
+      update({ status: 'loading', session: null });
+      void restoreSession();
+    }, Math.max(0, expires - Date.now()));
   }
   notify();
 }
 
-export function signOut() {
-  clearTimeout(expiryTimer);
-  changeSession(null);
+export function restoreSession() {
+  const started = revision;
+  if (restoring?.revision === started) return restoring.result;
+  const result = (async () => {
+    try {
+      const session = await apiFetch<Session>('/session');
+      if (!session?.user?.id || !session.session?.id || !Array.isArray(session.memberships) ||
+        !Number.isFinite(Date.parse(session.session.idleExpiresAt)) || !Number.isFinite(Date.parse(session.session.absoluteExpiresAt))) {
+        throw new Error('Invalid session response');
+      }
+      if (started === revision) update({ status: 'authenticated', session, message: logoutUnconfirmed });
+    } catch (error) {
+      if (started !== revision) return;
+      if (error instanceof ApiError && error.status === 401) {
+        if (logoutUnconfirmed) {
+          update({ status: 'unavailable', session: null, message: `This browser is signed out. ${logoutUnconfirmed}` });
+        } else {
+          update({ status: 'anonymous', session: null });
+        }
+      } else {
+        update({ status: 'unavailable', session: null, message: logoutUnconfirmed ?? unavailableMessage });
+      }
+    }
+  })();
+  restoring = { revision: started, result };
+  void result.finally(() => { if (restoring?.result === result) restoring = undefined; });
+  return result;
 }
 
 async function authenticate(path: string, body: Credentials & { fullName?: string }) {
-  const next = await apiFetch<Session>(path, { method: 'POST', body });
-  // The browser uses the expiry only to end its local session. The API verifies the JWT.
-  const payload = next.token.split('.')[1];
-  const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
-  if (typeof claims.exp !== 'number' || !Number.isFinite(claims.exp)) {
-    throw new Error('The server returned an invalid session.');
+  const started = ++revision;
+  await apiFetch(path, { method: 'POST', body });
+  if (started !== revision) return;
+  logoutUnconfirmed = undefined;
+  resetCsrf();
+  await restoreSession();
+  if (!snapshot.session) throw new Error(unavailableMessage);
+  channel?.postMessage('changed');
+}
+
+export const signIn = (credentials: Credentials) => authenticate('/auth/signin', credentials);
+export const signUp = (credentials: Credentials & { fullName: string }) => authenticate('/auth/signup', credentials);
+
+export async function signOut(everywhere = false) {
+  const started = ++revision;
+  const current = snapshot.session;
+  try {
+    await apiFetch(everywhere ? '/auth/logout-all' : '/auth/logout', { method: 'POST', sessionId: current?.session.id });
+    if (started !== revision) return;
+    logoutUnconfirmed = undefined;
+    update({ status: 'anonymous', session: null });
+    if (current) void logoutCleanup(current.user.id).catch(() => undefined);
+    channel?.postMessage('changed');
+  } catch (error) {
+    if (started !== revision) return;
+    logoutUnconfirmed = everywhere ? 'Sign-out everywhere could not be confirmed.' : 'Sign-out could not be confirmed.';
+    update({ status: 'unavailable', session: null, message: logoutUnconfirmed });
+    throw error;
   }
-  const remainingMs = claims.exp * 1000 - Date.now();
-  if (remainingMs <= 0) throw new Error('Session expired. Sign in again.');
-  clearTimeout(expiryTimer);
-  changeSession(next);
-  expiryTimer = setTimeout(signOut, remainingMs);
 }
 
-export function signIn(credentials: Credentials) {
-  return authenticate('/auth/signin', credentials);
+export async function listSessions(signal?: AbortSignal) {
+  return (await apiFetch<{ sessions: DeviceSession[] }>('/auth/sessions', { userId: snapshot.session?.user.id, signal })).sessions;
 }
 
-export function signUp(credentials: Credentials & { fullName: string }) {
-  return authenticate('/auth/signup', credentials);
+export async function endSession(id: string) {
+  const current = snapshot.session;
+  if (!current) return;
+  await apiFetch('/auth/sessions/' + encodeURIComponent(id), { method: 'DELETE', userId: current.user.id });
+  if (snapshot.session?.session.id !== current.session.id) return;
+  if (id === current.session.id) {
+    update({ status: 'anonymous', session: null });
+    void logoutCleanup(current.user.id).catch(() => undefined);
+  }
+  channel?.postMessage('changed');
 }
+
+export function renewOnInteraction() {
+  const current = snapshot.session;
+  if (!current || renewal || document.visibilityState !== 'visible' ||
+    Date.now() < Date.parse(current.session.nextRenewalAt)) return;
+  renewal = apiFetch<SessionMetadata>('/auth/session/renew', { method: 'POST', userId: current.user.id })
+    .then((session) => {
+      if (snapshot.session?.session.id === current.session.id && session.id === current.session.id) {
+        update({ status: 'authenticated', session: { ...snapshot.session, session } });
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => { renewal = undefined; });
+}
+
+channel?.addEventListener('message', () => {
+  revision++;
+  resetCsrf();
+  update({ status: 'loading', session: null });
+  void restoreSession();
+});
+for (const event of ['pointerdown', 'keydown', 'touchstart']) {
+  window.addEventListener(event, (interaction) => {
+    if (interaction.isTrusted) renewOnInteraction();
+  }, { passive: true });
+}
+window.addEventListener('online', () => {
+  if (snapshot.status === 'unavailable') void restoreSession();
+});
 
 export function useAuth() {
-  const current = useSyncExternalStore(subscribe, () => session);
-  return { session: current, loading: false, user: current?.user ?? null, token: current?.token ?? null };
-}
-
-function readMemberships(userId: string): ShopMembership[] | undefined {
-  try {
-    const cached = localStorage.getItem(membershipsKey(userId));
-    if (!cached) return undefined;
-    const parsed: unknown = JSON.parse(cached);
-    return Array.isArray(parsed) ? parsed as ShopMembership[] : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function readActiveShopId() {
-  try {
-    return localStorage.getItem(activeShopKey);
-  } catch {
-    return null;
-  }
-}
-
-function storeActiveShopId(shopId: string | null) {
-  if (shopId === readActiveShopId()) return;
-  try {
-    if (shopId) {
-      localStorage.setItem(activeShopKey, shopId);
-    } else {
-      localStorage.removeItem(activeShopKey);
-    }
-  } catch { return; }
-  notify();
+  const current = useSyncExternalStore(subscribe, () => snapshot);
+  useEffect(() => {
+    if (snapshot.status === 'loading') void restoreSession();
+  }, []);
+  return {
+    session: current.session,
+    loading: current.status === 'loading',
+    unavailable: current.status === 'unavailable',
+    message: current.message,
+    user: current.session?.user ?? null,
+    userId: current.session?.user.id ?? null,
+    sessionId: current.session?.session.id ?? null,
+  };
 }
 
 export function useShopMemberships(userId: string | undefined) {
-  const { token, user } = useAuth();
-  const authenticated = Boolean(token && userId && user?.id === userId);
+  const { session, user, loading, message } = useAuth();
   const selected = useSyncExternalStore(subscribe, readActiveShopId);
-  const query = useQuery({
-    queryKey: ['memberships', authenticated ? userId : undefined],
-    enabled: authenticated,
-    initialData: () => (authenticated && userId ? readMemberships(userId) : undefined),
-    initialDataUpdatedAt: 0,
-    queryFn: async ({ signal }) => {
-      if (!authenticated || !token || !userId) return emptyMemberships;
-      try {
-        const data = await apiFetch<{ memberships: SessionMembership[] }>('/session', { token, signal });
-        const rows = data.memberships.map(({ shop, role }) => ({ shopId: shop.id, shops: shop, role }));
-        if (!signal.aborted && session?.token === token) {
-          try {
-            localStorage.setItem(membershipsKey(userId), JSON.stringify(rows));
-          } catch { /* The optional offline cache must not block online access. */ }
-        }
-        return rows;
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401 && session?.token === token) {
-          signOut();
-        }
-        throw error;
-      }
-    },
-  });
-
-  const memberships = authenticated ? (query.data ?? emptyMemberships) : emptyMemberships;
+  const memberships = useMemo(() => {
+    if (!session || user?.id !== userId) return emptyMemberships;
+    return session.memberships.map(({ shop, role }) => ({ shopId: shop.id, shops: shop, role }));
+  }, [session, user?.id, userId]);
   const fallbackId = memberships[0]?.shopId ?? null;
   const activeShopId = memberships.some((row) => row.shopId === selected) ? selected : fallbackId;
-  useEffect(() => {
-    if (authenticated && query.data) storeActiveShopId(activeShopId);
-  }, [activeShopId, authenticated, query.data, selected]);
-
-  const { refetch } = query;
-  const reload = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
   return {
-    memberships,
-    activeShopId,
-    loading: authenticated && query.isPending,
-    error: query.error?.message ?? null,
-    setActiveShopId: storeActiveShopId,
-    reload,
+    memberships, activeShopId, loading, error: message ?? null,
+    setActiveShopId: storeActiveShopId, reload: restoreSession,
   };
 }
 

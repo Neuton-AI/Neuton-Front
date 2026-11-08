@@ -8,16 +8,16 @@ import type { DocumentSource } from "@/features/uploads/types";
 
 export function useDocumentSource({
   source,
-  token,
+  userId,
   shopId,
 }: {
   source: DocumentSource;
-  token: string | null;
+  userId: string | null;
   shopId: string | null;
 }) {
   const queryClient = useQueryClient();
   const displayPath = source.preview?.storagePath ?? source.storagePath;
-  const query = useSignedDownloadUrl(token, shopId, displayPath);
+  const query = useSignedDownloadUrl(userId, shopId, displayPath);
   const [imageFailed, setImageFailed] = useState(false);
   const [opening, setOpening] = useState(false);
   const [openFailed, setOpenFailed] = useState(false);
@@ -32,7 +32,7 @@ export function useDocumentSource({
     setOpenFailed(false);
     try {
       const { url } = await queryClient.fetchQuery(
-        signedDownloadOptions(token, shopId, source.storagePath),
+        signedDownloadOptions(userId, shopId, source.storagePath),
       );
       if (target) target.location.href = url;
       else window.location.assign(url);
@@ -54,7 +54,7 @@ export function useDocumentSource({
     height: source.preview?.height,
     opening,
     openFailed,
-    canOpen: Boolean(token && shopId),
+    canOpen: Boolean(userId && shopId),
     openOriginal,
     handleImageError: () => setImageFailed(true),
   };

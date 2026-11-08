@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 type Tab = "me" | "shop";
 export function useProfilePage() {
-  const { user, token } = useAuth();
+  const { user, userId, message: sessionNotice } = useAuth();
 
   const { memberships, activeShopId, setActiveShopId, reload } =
     useShopMemberships(user?.id);
@@ -21,15 +21,19 @@ export function useProfilePage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const signOut = () => {
-    clearSession();
-    navigate("/signin", { replace: true });
+  const signOut = async (everywhere = false) => {
+    try {
+      await clearSession(everywhere);
+      navigate("/signin", { replace: true });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Sign-out could not be confirmed.');
+    }
   };
 
-  const createShopMutation = useCreateShop(token);
+  const createShopMutation = useCreateShop(userId);
 
   const createShop = async (name: string) => {
-    if (!token || createShopMutation.isPending || name.trim().length < 2)
+    if (!userId || createShopMutation.isPending || name.trim().length < 2)
       return;
     setNotice(null);
     try {
@@ -56,13 +60,14 @@ export function useProfilePage() {
     handleSelectShop,
     handleSaved,
     user,
-    token,
+    userId,
     memberships,
     activeShopId,
     activeShop,
     tab,
     setTab,
     notice,
+    sessionNotice,
     setNotice,
     signOut,
     createShop,

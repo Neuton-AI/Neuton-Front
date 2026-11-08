@@ -5,23 +5,23 @@ import { toNumber } from "@/lib/format";
 import { useEffect, useState } from "react";
 
 export function useShopTab({
-  token,
+  userId,
   shopId,
   role,
 
   onSaved,
   onNotice,
 }: {
-  token: string | null;
+  userId: string | null;
   shopId: string | null;
   role: "owner" | "admin" | "member" | undefined;
   fallbackName: string | undefined;
   onSaved: () => void;
   onNotice: (message: string) => void;
 }) {
-  const shopQuery = useShopSettings(token, shopId);
+  const shopQuery = useShopSettings(userId, shopId);
 
-  const updateShop = useUpdateShop(token, shopId);
+  const updateShop = useUpdateShop(userId, shopId);
 
   const shop = shopQuery.data?.shop ?? null;
 
@@ -52,7 +52,7 @@ export function useShopTab({
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!token || !shopId || !canEdit || updateShop.isPending) return;
+    if (!userId || !shopId || !canEdit || updateShop.isPending) return;
 
     const validationError = Object.values(
       validateFields(fields, formValues),

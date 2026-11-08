@@ -7,7 +7,7 @@ export type UploadCompleteResponse = {
   reason?: string;
 };
 
-export type UploadContext = { token: string | null; shopId: string | null };
+export type UploadContext = { userId: string | null; shopId: string | null };
 
 export type PresignedUploadSource = {
   sourceId: string;

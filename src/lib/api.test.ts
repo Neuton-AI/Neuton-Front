@@ -12,7 +12,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 function mockFetch(...responses: Response[]) {
   const fn = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>();
   for (const response of responses) fn.mockResolvedValueOnce(response);
-  vi.stubGlobal('fetch', fn);
+  vi.stubGlobal('fetch', (path: string, init?: RequestInit) =>
+    path === '/api/v1/auth/csrf' ? Promise.resolve(json({ token: 'proof' })) : fn(path, init));
   return fn;
 }
 
@@ -29,15 +30,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-/**
- * The base URL is read from the environment once at module load, so a test that
- * cares about it has to re-import the module against a stubbed env.
- */
-async function loadApi(env: Record<string, string> = {}) {
-  vi.stubEnv('VITE_API_BASE_URL', env.VITE_API_BASE_URL ?? 'https://api.test');
-  vi.resetModules();
-  return import('@/lib/api');
-}
+const loadApi = () => import('@/lib/api');
 
 describe('base URL', () => {
   it.each(['90', 'Wed, 21 Oct 2026 12:01:30 GMT'])('preserves Retry-After %s and the response trace ID for classification', async (retryAfter) => {
@@ -55,41 +48,23 @@ describe('base URL', () => {
 
     await apiFetch('/receipts?limit=50');
 
-    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.test/api/v1/receipts?limit=50');
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/v1/receipts?limit=50');
   });
 
-  it('strips a trailing slash so paths never double up', async () => {
-    const { apiFetch } = await loadApi({ VITE_API_BASE_URL: 'https://api.test/' });
-    const fetchMock = mockFetch(json({}));
-
-    await apiFetch('/recipes');
-
-    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.test/api/v1/recipes');
-  });
-
-  it('falls back to the local API when the env var is absent', async () => {
-    vi.stubEnv('VITE_API_BASE_URL', '');
-    vi.resetModules();
-    const { apiFetch } = await import('@/lib/api');
-    const fetchMock = mockFetch(json({}));
-
-    await apiFetch('/recipes');
-
-    expect(fetchMock.mock.calls[0]![0]).toMatch(/\/api\/v1\/recipes$/);
-  });
 });
 
 describe('apiFetch', () => {
-  it('sends the auth context as a bearer token and the shop header', async () => {
+  it('uses same-origin credentials and the shop header', async () => {
     const { apiFetch } = await loadApi();
     const fetchMock = mockFetch(json({ ok: true }));
 
-    await apiFetch('/receipts?limit=50', { token: 'jwt-123', shopId: 'shop-abc' });
+    await apiFetch('/receipts?limit=50', { userId: 'user-123', shopId: 'shop-abc' });
 
     const init = fetchMock.mock.calls[0]![1];
     expect(init?.method).toBe('GET');
+    expect(init?.credentials).toBe('same-origin');
+    expect(init?.headers).not.toHaveProperty('Authorization');
     expect(init?.headers).toMatchObject({
-      Authorization: 'Bearer jwt-123',
       'x-shop-id': 'shop-abc',
     });
     // A GET with no body must not claim to be JSON.
@@ -104,7 +79,7 @@ describe('apiFetch', () => {
 
     const init = fetchMock.mock.calls[0]![1];
     expect(init?.body).toBe('{"path":"a/b.jpg"}');
-    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' });
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json', 'X-CSRF-Token': 'proof' });
   });
 
   it('returns undefined for a 204 rather than trying to parse an empty body', async () => {
@@ -149,7 +124,7 @@ describe('apiFetch', () => {
             statusCode: 401,
             code: 'UNAUTHORIZED',
             error: 'Unauthorized',
-            message: 'Missing bearer token',
+            message: 'Missing session cookie',
           },
           401,
         ),
@@ -158,7 +133,7 @@ describe('apiFetch', () => {
       await expect(apiFetch('/receipts')).rejects.toMatchObject({
         status: 401,
         code: 'UNAUTHORIZED',
-        message: 'Missing bearer token',
+        message: 'Missing session cookie',
       });
     });
 

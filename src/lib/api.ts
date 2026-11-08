@@ -1,7 +1,7 @@
 /**
  * Typed API client for the Neuton backend.
  *
- * Auth uses a Neuton JWT; the active shop travels in `x-shop-id` because the
+ * Auth uses same-origin cookies; the active shop travels in `x-shop-id` because the
  * API resolves shop membership server-side from that header.
  *
  * The Faro trace id travels as `x-trace-id` so a browser session, the API log
@@ -12,9 +12,49 @@
 
 import { faro } from '@grafana/faro-web-sdk';
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
-).replace(/\/$/, '');
+const API_BASE_URL = '/api/v1';
+let csrf: Promise<string> | undefined;
+let userId: string | null | undefined;
+let sessionId: string | null = null;
+let shopId: string | null | undefined;
+let account = new AbortController();
+let shop = new AbortController();
+let onSessionFailure: ((status: number) => void) | undefined;
+
+export function resetCsrf() { csrf = undefined; }
+
+export function setRequestSession(nextUserId: string | null, nextSessionId: string | null, onFailure: (status: number) => void) {
+  account.abort();
+  account = new AbortController();
+  userId = nextUserId;
+  sessionId = nextSessionId;
+  onSessionFailure = onFailure;
+  resetCsrf();
+}
+
+export function setRequestShop(nextShopId: string | null) {
+  if (nextShopId === shopId) return;
+  shop.abort();
+  shop = new AbortController();
+  shopId = nextShopId;
+}
+
+function csrfProof() {
+  if (csrf) return csrf;
+  const pending = apiFetch<{ token: string }>('/auth/csrf', { method: 'POST' }).then(({ token }) => token);
+  csrf = pending;
+  void pending.catch(() => { if (csrf === pending) resetCsrf(); });
+  return pending;
+}
+
+export function requestScopeSignal(owner?: string | null, targetShop?: string | null, signal?: AbortSignal) {
+  if ((owner && userId !== undefined && owner !== userId) || (targetShop && shopId !== undefined && targetShop !== shopId)) {
+    throw new DOMException('The request scope changed', 'AbortError');
+  }
+  const signals = [signal, owner || targetShop ? account.signal : undefined, targetShop ? shop.signal : undefined]
+    .filter((item): item is AbortSignal => Boolean(item));
+  return signals.length > 1 ? AbortSignal.any(signals) : signals[0];
+}
 
 export class ApiError extends Error {
   constructor(
@@ -32,7 +72,8 @@ export class ApiError extends Error {
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
-  token?: string | null;
+  userId?: string | null;
+  sessionId?: string | null;
   shopId?: string | null;
   signal?: AbortSignal;
   syncSnapshot?: boolean;
@@ -76,12 +117,29 @@ function readError(
 
 export async function apiFetch<T>(
   path: string,
-  { method = 'GET', body, token, shopId, signal, sync, syncSnapshot }: RequestOptions = {},
+  options: RequestOptions = {},
 ): Promise<T> {
+  try {
+    return await send<T>(path, options);
+  } catch (error) {
+    if (!['/auth/signin', '/auth/signup'].includes(path) || !(error instanceof ApiError) || error.status !== 403 ||
+      !['Invalid CSRF proof', 'Browser context expired'].includes(error.message)) throw error;
+    resetCsrf();
+    return send<T>(path, options);
+  }
+}
+
+async function send<T>(path: string, { method = 'GET', body, userId: owner, sessionId: expectedSession, shopId: targetShop, signal, sync, syncSnapshot }: RequestOptions): Promise<T> {
+  const scoped = Boolean(owner || targetShop);
+  const abortSignal = requestScopeSignal(owner, targetShop, signal);
+  abortSignal?.throwIfAborted();
   const headers: Record<string, string> = {};
+  const reference = expectedSession ?? (scoped ? sessionId : null);
+  if (reference) headers['X-Session-Id'] = reference;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (shopId) headers['x-shop-id'] = shopId;
+  if (method !== 'GET' && path !== '/auth/csrf') headers['X-CSRF-Token'] = await csrfProof();
+  abortSignal?.throwIfAborted();
+  if (targetShop) headers['x-shop-id'] = targetShop;
   if (syncSnapshot) headers['x-sync-snapshot'] = 'true';
   if (sync) {
     headers['x-sync-id'] = sync.id;
@@ -94,11 +152,12 @@ export async function apiFetch<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
+      signal: abortSignal,
+      credentials: 'same-origin',
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError')
@@ -109,11 +168,13 @@ export async function apiFetch<T>(
     );
   }
 
+  abortSignal?.throwIfAborted();
   if (response.status === 204) return undefined as T;
 
   // A non-JSON body (HTML from a proxy, empty 502) must not throw out of
   // JSON.parse, which would surface as an unhandled SyntaxError.
   const text = await response.text();
+  abortSignal?.throwIfAborted();
   let payload: unknown = null;
   if (text) {
     try {
@@ -124,6 +185,7 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
+    if (scoped && (response.status === 401 || response.status === 503)) onSessionFailure?.(response.status);
     const { message, code } = readError(payload, response.status);
     const retryAfter = response.headers.get('Retry-After');
     const seconds = retryAfter === null ? NaN : Number(retryAfter);

@@ -27,7 +27,7 @@ vi.mock("@/features/auth/auth", async (importOriginal) => ({
     session: authState.session,
     loading: authState.loading,
     user: authState.session?.user ?? null,
-    token: null,
+    userId: null,
   }),
 }));
 

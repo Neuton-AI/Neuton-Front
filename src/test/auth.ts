@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import { buildShop } from './factories/shops.factory';
 
 export const authState = {
-  token: 'token-1' as string | null,
+  userId: 'userId-1' as string | null,
   activeShopId: 'shop-1' as string | null,
   role: 'owner' as 'owner' | 'admin' | 'member',
   loading: false,
@@ -16,7 +16,7 @@ export const authMock = {
   signOut,
   useAuth: () => ({
     user: { id: 'u1', email: 'testtest@gmail.com' },
-    token: authState.token,
+    userId: authState.userId,
     loading: authState.loading,
   }),
   useShopMemberships: () => ({
@@ -33,7 +33,7 @@ export const authMock = {
 };
 export function resetAuth() {
   Object.assign(authState, {
-    token: 'token-1',
+    userId: 'userId-1',
     activeShopId: 'shop-1',
     role: 'owner',
     loading: false,

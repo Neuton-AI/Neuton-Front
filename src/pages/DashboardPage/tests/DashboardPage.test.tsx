@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const SHOP_ID = "shop-1";
 
 vi.mock("@/features/auth/auth", () => ({
-  useAuth: () => ({ user: { id: "u1" }, token: "test-token", loading: false }),
+  useAuth: () => ({ user: { id: "u1" }, userId: "test-userId", loading: false }),
   useShopMemberships: () => ({
     memberships: [
       {
@@ -102,7 +102,7 @@ function stubDashboard(
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
-      const period = (new URL(url).searchParams.get("period") ??
+      const period = (new URL(url, window.location.origin).searchParams.get("period") ??
         "30d") as DashboardPeriod;
       return {
         ok: true,

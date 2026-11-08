@@ -61,18 +61,15 @@ export async function readSyncEvents(
   }
 }
 
-/** Provider-independent HTTP stream; authorization stays in headers. */
+/** Provider-independent HTTP stream using the same-origin session cookie. */
 export function connectLiveSync(
-  context: { token: string; shopId: string },
+  context: { shopId: string; sessionId?: string | null; onInvalid?: (status: number) => void },
   receive: () => void,
 ) {
   const controller = new AbortController();
   let retry: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   let attempt = 0;
-  const base = (
-    import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
-  ).replace(/\/$/, '');
   const connect = async () => {
     const connection = new AbortController();
     const abort = () => connection.abort();
@@ -83,15 +80,19 @@ export function connectLiveSync(
     };
     try {
       touch();
-      const response = await fetch(`${base}/api/v1/sync/events`, {
+      const response = await fetch('/api/v1/sync/events', {
         headers: {
-          Authorization: `Bearer ${context.token}`,
           'x-shop-id': context.shopId,
+          ...(context.sessionId ? { 'x-session-id': context.sessionId } : {}),
           Accept: 'text/event-stream',
         },
         signal: connection.signal,
+        credentials: 'same-origin',
       });
-      if (response.status === 401 || response.status === 403) return;
+      if (response.status === 401 || response.status === 403 || response.status === 503) {
+        if (!controller.signal.aborted) context.onInvalid?.(response.status);
+        return;
+      }
       if (
         !response.ok ||
         !response.body ||

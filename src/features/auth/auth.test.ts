@@ -5,101 +5,99 @@ import { buildShop } from '@/test/factories/shops.factory';
 import { apiPath } from '@/test/mocks/handlers/context';
 import { server } from '@/test/mocks/server';
 import { renderHookWithProviders } from '@/test/render';
-import { signIn, signOut, signUp, useAuth, useShopMemberships } from './auth';
 
-const user = { id: 'u1', email: 'neuton@example.com', fullName: 'Test User', avatarUrl: null };
+const user = { id: 'u1', email: 'neuton@example.test', fullName: 'Test User', avatarUrl: null };
 const credentials = { email: user.email, password: 'a long test password' };
-const token = `header.${btoa(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 }))}.signature`;
-const activeShopKey = 'neuton.activeShopId';
+const shop = buildShop({ id: 'confirmed-shop' });
+const expires = new Date(Date.now() + 86_400_000).toISOString();
+const session = {
+  id: 'session-reference', lastActivityAt: new Date().toISOString(),
+  idleExpiresAt: expires, absoluteExpiresAt: expires, nextRenewalAt: expires,
+};
+const authorized = () => HttpResponse.json({ user, session, memberships: [{ role: 'owner', shop }] });
 
 afterEach(() => {
-  signOut();
   localStorage.clear();
-  sessionStorage.clear();
+  vi.resetModules();
 });
 
-it('signs up immediately, keeps the token in memory, and sends it for memberships', async () => {
-  const shop = buildShop({ id: 'actual-shop' });
-  const body = { ...credentials, fullName: user.fullName };
+it('signs up with a CSRF proof and restores only server-confirmed shops after reload', async () => {
+  let signedIn = false;
   server.use(
     http.post(apiPath('/auth/signup'), async ({ request }) => {
-      expect(await request.json()).toEqual(body);
-      return HttpResponse.json({ token, user }, { status: 201 });
+      expect(request.credentials).toBe('same-origin');
+      expect(request.headers.get('x-csrf-token')).toBe('test-csrf');
+      expect(request.headers.has('authorization')).toBe(false);
+      expect(await request.json()).toEqual({ ...credentials, fullName: user.fullName });
+      signedIn = true;
+      return HttpResponse.json({ user }, { status: 201 });
     }),
-    http.get(apiPath('/session'), ({ request }) => {
-      expect(request.headers.get('authorization')).toBe(`Bearer ${token}`);
-      return HttpResponse.json({ user, memberships: [{ role: 'owner', shop }] });
-    }),
+    http.get(apiPath('/session'), () => signedIn ? authorized() : new HttpResponse(null, { status: 401 })),
   );
-  localStorage.setItem(activeShopKey, 'stale-shop');
-  const { result } = renderHookWithProviders(() => {
-    const auth = useAuth();
-    return { auth, shops: useShopMemberships(auth.user?.id) };
-  });
-  await act(() => signUp(body));
-  expect(result.current.auth.token).toBe(token);
-  await waitFor(() => expect(result.current.shops.activeShopId).toBe(shop.id));
-  expect(localStorage.getItem(activeShopKey)).toBe(shop.id);
-  expect(JSON.stringify(localStorage)).not.toContain(token);
-  expect(JSON.stringify(sessionStorage)).not.toContain(token);
-
+  localStorage.setItem('neuton.activeShopId', 'stale-shop');
+  const auth = await import('./auth');
+  await auth.signUp({ ...credentials, fullName: user.fullName });
+  expect(localStorage.getItem('neuton.activeShopId')).toBe(shop.id);
+  expect(JSON.stringify(localStorage)).not.toContain(session.id);
   vi.resetModules();
-  const freshModule = await import('./auth');
-  const fresh = renderHookWithProviders(freshModule.useAuth);
-  expect(fresh.result.current.token).toBeNull();
-
-  act(signOut);
-  expect(result.current.auth.token).toBeNull();
-  expect(result.current.shops.memberships).toEqual([]);
-  expect(localStorage.getItem(`neuton.memberships:${user.id}`)).toBeNull();
+  const fresh = await import('./auth');
+  const { result } = renderHookWithProviders(() => {
+    const current = fresh.useAuth();
+    return { current, shops: fresh.useShopMemberships(current.user?.id) };
+  });
+  expect(result.current.current.loading).toBe(true);
+  await waitFor(() => expect(result.current.current.user).toEqual(user));
+  expect(result.current.shops.activeShopId).toBe(shop.id);
 });
 
-it('signs in with the same endpoint contract and surfaces bad credentials', async () => {
-  server.use(http.post(apiPath('/auth/signin'), async ({ request }) => {
-    const input = await request.json();
-    if (JSON.stringify(input) === JSON.stringify(credentials)) {
-      return HttpResponse.json({ token, user });
-    }
-    return HttpResponse.json({ error: { message: 'Invalid email or password' } }, { status: 401 });
-  }));
-  await expect(signIn({ ...credentials, password: 'wrong' })).rejects.toThrow('Invalid email or password');
-  await signIn(credentials);
-  expect(renderHookWithProviders(useAuth).result.current.user).toEqual(user);
-});
-
-it('keeps the selected shop while valid and clears it after membership removal', async () => {
-  const shops = [buildShop({ id: 'first' }), buildShop({ id: 'selected' })];
-  let memberships = shops.map((shop) => ({ shop, role: 'owner' }));
+it('surfaces bad credentials and distinguishes restore outage from anonymous', async () => {
   server.use(
-    http.post(apiPath('/auth/signin'), () => HttpResponse.json({ token, user })),
-    http.get(apiPath('/session'), () => HttpResponse.json({ memberships })),
+    http.post(apiPath('/auth/signin'), async ({ request }) => {
+      const input = await request.json();
+      if (JSON.stringify(input) === JSON.stringify(credentials)) return HttpResponse.json({ user });
+      return HttpResponse.json({ error: { message: 'Invalid email or password' } }, { status: 401 });
+    }),
+    http.get(apiPath('/session'), () => new HttpResponse(null, { status: 503 })),
   );
-  localStorage.setItem(activeShopKey, 'selected');
-  await signIn(credentials);
-  const { result } = renderHookWithProviders(() => useShopMemberships(user.id));
-  await waitFor(() => expect(result.current.activeShopId).toBe('selected'));
-
-  memberships = [];
-  await act(() => result.current.reload());
-  await waitFor(() => expect(localStorage.getItem(activeShopKey)).toBeNull());
-  expect(result.current.activeShopId).toBeNull();
+  const auth = await import('./auth');
+  await expect(auth.signIn({ ...credentials, password: 'wrong' })).rejects.toThrow('Invalid email or password');
+  const { result } = renderHookWithProviders(auth.useAuth);
+  await waitFor(() => expect(result.current.unavailable).toBe(true));
+  expect(result.current.user).toBeNull();
+  server.use(http.get(apiPath('/session'), authorized));
+  await act(() => auth.signIn(credentials));
+  expect(result.current.user).toEqual(user);
 });
 
-it('keeps cached shops available offline only within the authenticated account', async () => {
-  const shop = buildShop({ id: 'cached' });
-  localStorage.setItem(`neuton.memberships:${user.id}`, JSON.stringify([
-    { shopId: shop.id, shops: shop, role: 'owner' },
-  ]));
+it('requires recent foreground interaction and shares concurrent renewal calls', async () => {
+  let renewals = 0;
   server.use(
-    http.post(apiPath('/auth/signin'), () => HttpResponse.json({ token, user })),
-    http.get(apiPath('/session'), () => HttpResponse.error()),
+    http.get(apiPath('/session'), () => HttpResponse.json({ user, session: { ...session, nextRenewalAt: new Date(0).toISOString() }, memberships: [] })),
+    http.post(apiPath('/auth/session/renew'), () => { renewals++; return HttpResponse.json(session); }),
   );
-  const { result } = renderHookWithProviders(() => ({
-    own: useShopMemberships(user.id),
-    other: useShopMemberships('u2'),
-  }));
-  expect(result.current.own.activeShopId).toBeNull();
-  await act(() => signIn(credentials));
-  await waitFor(() => expect(result.current.own.activeShopId).toBe(shop.id));
-  expect(result.current.other.memberships).toEqual([]);
+  const auth = await import('./auth');
+  const visibility = vi.spyOn(document, 'visibilityState', 'get');
+  visibility.mockReturnValue('hidden');
+  await auth.restoreSession();
+  auth.renewOnInteraction();
+  expect(renewals).toBe(0);
+  visibility.mockReturnValue('visible');
+  auth.renewOnInteraction();
+  auth.renewOnInteraction();
+  await waitFor(() => expect(renewals).toBe(1));
+});
+
+it('reports an unconfirmed logout-all separately when the current session is lost', async () => {
+  server.use(
+    http.get(apiPath('/session'), authorized),
+    http.post(apiPath('/auth/logout-all'), () => HttpResponse.error()),
+  );
+  const auth = await import('./auth');
+  const { result } = renderHookWithProviders(auth.useAuth);
+  await waitFor(() => expect(result.current.user).toEqual(user));
+  await act(async () => { await expect(auth.signOut(true)).rejects.toThrow(); });
+  expect(result.current.message).toBe('Sign-out everywhere could not be confirmed.');
+  server.use(http.get(apiPath('/session'), () => new HttpResponse(null, { status: 401 })));
+  await act(() => auth.restoreSession());
+  expect(result.current.message).toBe('This browser is signed out. Sign-out everywhere could not be confirmed.');
 });

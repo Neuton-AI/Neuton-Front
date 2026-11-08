@@ -183,7 +183,7 @@ describe("useNewOrderPage", () => {
     });
     await act(() => result.current.submit(event));
     expect(result.current.itemsError).toMatch(/outside the allowed range/);
-    authState.token = null;
+    authState.userId = null;
     await act(() => result.current.submit(event));
     expect(navigate).not.toHaveBeenCalled();
   });

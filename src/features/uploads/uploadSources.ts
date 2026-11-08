@@ -6,7 +6,7 @@ import {
   type UploadCompleteResponse,
 } from './types';
 import type { UploadContext } from './types';
-import { apiFetch, ApiError } from '@/lib/api';
+import { apiFetch, ApiError, requestScopeSignal } from '@/lib/api';
 
 export const MAX_UPLOAD_SOURCES = 4;
 export const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
@@ -34,6 +34,7 @@ export type UploadSession = {
 };
 
 type UploadSourcesOptions = {
+  signal?: AbortSignal;
   context: UploadContext;
   session?: UploadSession | null;
   onProgress?: (session: UploadSession) => void;
@@ -88,8 +89,11 @@ export async function uploadSources(
     onProgress,
     persistProgress,
     orderId,
+    signal: callerSignal,
   }: UploadSourcesOptions,
 ): Promise<UploadCompleteResponse> {
+  const signal = requestScopeSignal(context.userId, context.shopId, callerSignal);
+  signal?.throwIfAborted();
   const validationError = validateUploadFiles(files);
   if (validationError) throw new Error(validationError);
   if (
@@ -166,6 +170,7 @@ export async function uploadSources(
       const presign = await apiFetch<GroupPresignResponse>('/uploads/presign', {
         method: 'POST',
         ...context,
+        signal,
         body: session.uploadId
           ? {
               uploadId: session.uploadId,
@@ -225,6 +230,7 @@ export async function uploadSources(
             method: presign.method,
             headers: { 'Content-Type': source.file.type },
             body: source.file,
+            signal,
           });
           if (!response.ok)
             throw new ApiError('Storage upload failed', response.status);
@@ -261,6 +267,7 @@ export async function uploadSources(
     const result = await apiFetch<UploadCompleteResponse>('/uploads/complete', {
       method: 'POST',
       ...context,
+      signal,
       body: { uploadId: session.uploadId },
     });
     if (!result.queued) {

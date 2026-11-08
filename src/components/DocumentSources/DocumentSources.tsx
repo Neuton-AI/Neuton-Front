@@ -4,17 +4,17 @@ import type { DocumentSource } from "@/features/uploads/types";
 import { useDocumentSource } from "./DocumentSources.module";
 
 interface IDocumentSourceView {
-  token: string | null;
+  userId: string | null;
   shopId: string | null;
   source: DocumentSource;
 }
 
 const DocumentSourceView: React.FC<IDocumentSourceView> = ({
   source,
-  token,
+  userId,
   shopId,
 }) => {
-  const preview = useDocumentSource({ source, token, shopId });
+  const preview = useDocumentSource({ source, userId, shopId });
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
@@ -71,7 +71,7 @@ const DocumentSourceView: React.FC<IDocumentSourceView> = ({
 };
 
 interface IDocumentSources {
-  token: string | null;
+  userId: string | null;
   shopId: string | null;
   sources: DocumentSource[];
 }

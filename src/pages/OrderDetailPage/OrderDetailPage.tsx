@@ -58,7 +58,7 @@ export const OrderDetailPage: React.FC = () => {
             {order.sources?.length ? (
               <SheetSection title="Original scans">
                 <DocumentSources
-                  token={model.token}
+                  userId={model.userId}
                   shopId={model.activeShopId}
                   sources={order.sources}
                 />

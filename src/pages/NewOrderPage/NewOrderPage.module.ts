@@ -25,7 +25,7 @@ export type NewOrderRecipe = Omit<
 
 const today = () => new Date().toISOString().slice(0, 10);
 export function useNewOrderPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, userId, loading: authLoading } = useAuth();
 
   const {
     memberships,
@@ -51,8 +51,8 @@ export function useNewOrderPage() {
 
   const currency = shop?.currency ?? "USD";
 
-  const recipesQuery = useOrderableRecipes(token, activeShopId);
-  const catalogQuery = useRecipes(token, activeShopId);
+  const recipesQuery = useOrderableRecipes(userId, activeShopId);
+  const catalogQuery = useRecipes(userId, activeShopId);
 
   const orderable = recipesQuery.data?.recipes ?? [];
   const incompleteRecipes = (catalogQuery.data?.recipes ?? []).filter(
@@ -108,7 +108,7 @@ export function useNewOrderPage() {
 
   const debouncedDistanceKm = useDebouncedValue(deliveryDistanceKm, 250);
 
-  const quoteQuery = useOrderQuote(token, activeShopId, {
+  const quoteQuery = useOrderQuote(userId, activeShopId, {
     items: JSON.parse(debouncedItemsKey) as {
       recipeId: string;
       quantity: number;
@@ -133,7 +133,7 @@ export function useNewOrderPage() {
 
   const quoting = quoteQuery.isFetching;
 
-  const createOrder = useCreateOrder(token, activeShopId);
+  const createOrder = useCreateOrder(userId, activeShopId);
 
   const quantityOf = (recipeId: string) =>
     lines.find((line) => line.recipe.id === recipeId)?.quantity ?? 0;
@@ -159,7 +159,7 @@ export function useNewOrderPage() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!token || !activeShopId || items.length === 0 || createOrder.isPending)
+    if (!userId || !activeShopId || items.length === 0 || createOrder.isPending)
       return;
 
     const validationError = Object.values(

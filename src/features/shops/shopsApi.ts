@@ -1,7 +1,7 @@
 import { shopsKeys } from '@/features/shops/keys';
 import { type Shop } from '@/features/shops/types';
 import { apiFetch } from '@/lib/api';
-import type { ShopId, Token } from '@/lib/queryTypes';
+import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {
   useMutation,
@@ -11,11 +11,11 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
-export function useShopSettings(token: Token, shopId: ShopId): UseQueryResult<{ shop: Shop }> {
+export function useShopSettings(userId: UserId, shopId: ShopId): UseQueryResult<{ shop: Shop }> {
   return useQuery({
     queryKey: shopsKeys.shop(shopId),
-    queryFn: ({ signal }) => apiFetch<{ shop: Shop }>('/shop', { token, shopId, signal }),
-    enabled: enabled(token, shopId),
+    queryFn: ({ signal }) => apiFetch<{ shop: Shop }>('/shop', { userId, shopId, signal }),
+    enabled: enabled(userId, shopId),
   });
 }
 
@@ -28,22 +28,22 @@ export type UpdateShopBody = {
 };
 
 export function useUpdateShop(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<{ shop: Shop }, Error, UpdateShopBody> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: UpdateShopBody) =>
-      apiFetch<{ shop: Shop }>('/shop', { method: 'PATCH', token, shopId, body }),
+      apiFetch<{ shop: Shop }>('/shop', { method: 'PATCH', userId, shopId, body }),
     onSuccess: (data) => {
       queryClient.setQueryData(shopsKeys.shop(shopId), data);
     },
   });
 }
 
-export function useCreateShop(token: Token): UseMutationResult<{ shop: Shop }, Error, string> {
+export function useCreateShop(userId: UserId): UseMutationResult<{ shop: Shop }, Error, string> {
   return useMutation({
     mutationFn: (name: string) =>
-      apiFetch<{ shop: Shop }>('/shops', { method: 'POST', token, body: { name } }),
+      apiFetch<{ shop: Shop }>('/shops', { method: 'POST', userId, body: { name } }),
   });
 }

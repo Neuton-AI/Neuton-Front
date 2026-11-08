@@ -59,20 +59,11 @@ export type PendingPull = {
 export const documentKey = (scope: Scope, kind: Kind, id: string) =>
   `${scope.key}:${kind}:${id}`;
 
-/** JWT subject namespaces local data; server authorization remains the API's responsibility. */
+/** Preserve the existing partition using the server-confirmed account and shop IDs. */
 export function scopeFor(
-  token: string | null | undefined,
+  userId: string | null | undefined,
   shopId: string | null | undefined,
 ): Scope {
-  if (!token || !shopId) throw new Error('Sign in');
-  const part = token.split('.')[1];
-  const userId = part
-    ? (
-        JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as {
-          sub?: string;
-        }
-      ).sub
-    : undefined;
-  if (!userId) throw new Error('Session expired');
+  if (!userId || !shopId) throw new Error('Sign in');
   return { userId, shopId, key: `${userId}:${shopId}` };
 }

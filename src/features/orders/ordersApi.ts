@@ -3,7 +3,7 @@ import { ordersKeys } from '@/features/orders/keys';
 import type { StatusFilter } from '@/features/orders/types';
 import { type Order, type OrderDetail, type OrderQuote } from '@/features/orders/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
-import type { ShopId, Token } from '@/lib/queryTypes';
+import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {
   keepPreviousData,
@@ -15,7 +15,7 @@ import {
 } from '@tanstack/react-query';
 
 export function useOrders(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   statusFilter: StatusFilter,
 ): UseQueryResult<{ orders: Order[]; total: number }> {
@@ -24,27 +24,27 @@ export function useOrders(
     queryFn: ({ signal }) =>
       apiFetch<{ orders: Order[]; total: number }>(
         statusFilter === 'all' ? '/orders?limit=100' : `/orders?limit=100&status=${statusFilter}`,
-        { token, shopId, signal },
+        { userId, shopId, signal },
       ),
-    enabled: enabled(token, shopId),
+    enabled: enabled(userId, shopId),
   });
 }
 
 export function useOrder(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   id: string,
 ): UseQueryResult<{ order: OrderDetail }> {
   return useQuery({
     queryKey: ordersKeys.order(shopId, id),
     queryFn: ({ signal }) =>
-      apiFetch<{ order: OrderDetail }>(`/orders/${id}`, { token, shopId, signal }),
-    enabled: enabled(token, shopId) && Boolean(id),
+      apiFetch<{ order: OrderDetail }>(`/orders/${id}`, { userId, shopId, signal }),
+    enabled: enabled(userId, shopId) && Boolean(id),
   });
 }
 
 export function useOrderQuote(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
   inputs: { items: { recipeId: string; quantity: number }[]; distanceKm: number; enabled: boolean },
 ): UseQueryResult<OrderQuote> {
@@ -53,18 +53,18 @@ export function useOrderQuote(
     queryFn: ({ signal }) =>
       apiFetch<OrderQuote>('/orders/quote', {
         method: 'POST',
-        token,
+        userId,
         shopId,
         signal,
         body: { deliveryDistanceKm: inputs.distanceKm, items: inputs.items },
       }),
-    enabled: enabled(token, shopId) && inputs.enabled && inputs.items.length > 0,
+    enabled: enabled(userId, shopId) && inputs.enabled && inputs.items.length > 0,
     placeholderData: keepPreviousData,
   });
 }
 
 export function useCreateOrder(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<{ order: Order; totals: { netProfit: number } }, Error, CreateOrderBody> {
   const queryClient = useQueryClient();
@@ -72,7 +72,7 @@ export function useCreateOrder(
     mutationFn: (body: CreateOrderBody) =>
       apiFetch<{ order: Order; totals: { netProfit: number } }>('/orders', {
         method: 'POST',
-        token,
+        userId,
         shopId,
         body,
       }),
@@ -92,7 +92,7 @@ export type CreateOrderBody = {
 };
 
 export function useMarkOrderDelivered(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<{ order: OrderDetail }, Error, { id: string }> {
   const queryClient = useQueryClient();
@@ -100,7 +100,7 @@ export function useMarkOrderDelivered(
     mutationFn: ({ id }) =>
       apiFetch<{ order: OrderDetail }>(`/orders/${id}/verify`, {
         method: 'POST',
-        token,
+        userId,
         shopId,
       }),
     onSuccess: (data, { id }) => {
@@ -117,13 +117,13 @@ export function useMarkOrderDelivered(
 }
 
 export function useDeleteOrder(
-  token: Token,
+  userId: UserId,
   shopId: ShopId,
 ): UseMutationResult<undefined, Error, { id: string }> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }) =>
-      apiFetch<undefined>(`/orders/${id}`, { method: 'DELETE', token, shopId }),
+      apiFetch<undefined>(`/orders/${id}`, { method: 'DELETE', userId, shopId }),
     onSuccess: (_data, { id }) => {
       queryClient.removeQueries({ queryKey: ordersKeys.order(shopId, id) });
       void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
