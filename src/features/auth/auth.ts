@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { ShopMembership } from '@/features/shops/types';
 import { logoutCleanup } from '@/features/sync/store';
-import { ApiError, apiFetch, resetCsrf, setRequestSession, setRequestShop } from '@/lib/api';
+import { ApiError, apiFetch, requestScopeSignal, resetCsrf, setRequestSession, setRequestShop } from '@/lib/api';
 
 type Credentials = { email: string; password: string };
 export type SessionMetadata = {
@@ -32,6 +32,7 @@ let snapshot: AuthSnapshot = { status: 'loading', session: null };
 let revision = 0;
 let restoring: { revision: number; result: Promise<void> } | undefined;
 let renewal: Promise<void> | undefined;
+let changingPassword = false;
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let logoutUnconfirmed: string | undefined;
 
@@ -59,6 +60,8 @@ function storeActiveShopId(id: string | null) {
 }
 
 function sessionFailure(status: number) {
+  // In-flight requests can still refer to the old session while its replacement is being confirmed.
+  if (changingPassword) return;
   if (status === 401) update({ status: 'anonymous', session: null });
   else update({ status: 'unavailable', session: null, message: unavailableMessage });
 }
@@ -132,6 +135,41 @@ async function authenticate(path: string, body: Credentials & { fullName?: strin
 export const signIn = (credentials: Credentials) => authenticate('/auth/signin', credentials);
 export const signUp = (credentials: Credentials & { fullName: string }) => authenticate('/auth/signup', credentials);
 
+export async function changePassword(body: { currentPassword: string; newPassword: string }) {
+  const current = snapshot.session;
+  if (!current || changingPassword) return 'unconfirmed';
+
+  changingPassword = true;
+  const started = ++revision;
+  try {
+    // A renewal response can set the old cookie. Let it finish before asking for a new one.
+    await renewal;
+    if (started !== revision) return 'unconfirmed';
+
+    let confirmed = false;
+    try {
+      const result = await apiFetch<{ ok: boolean }>('/profile/password', {
+        method: 'POST', body, sessionId: current.session.id, signal: requestScopeSignal(current.user.id),
+      });
+      confirmed = result?.ok === true;
+    } catch (error) {
+      if (error instanceof ApiError && [400, 429, 503].includes(error.status)) throw error;
+    }
+
+    if (started !== revision) return 'unconfirmed';
+    // Discard any session reads or proofs that started before the password response.
+    revision++;
+    resetCsrf();
+    await restoreSession();
+    const restored = snapshot.session;
+    const replaced = restored?.user.id === current.user.id && restored.session.id !== current.session.id;
+    if (confirmed || replaced) channel?.postMessage('changed');
+    return confirmed && replaced ? 'changed' : 'unconfirmed';
+  } finally {
+    changingPassword = false;
+  }
+}
+
 export async function signOut(everywhere = false) {
   const started = ++revision;
   const current = snapshot.session;
@@ -168,8 +206,10 @@ export async function endSession(id: string) {
 
 export function renewOnInteraction() {
   const current = snapshot.session;
-  if (!current || renewal || document.visibilityState !== 'visible' ||
-    Date.now() < Date.parse(current.session.nextRenewalAt)) return;
+  if (!current || renewal || changingPassword || document.visibilityState !== 'visible' ||
+    Date.now() < Date.parse(current.session.nextRenewalAt)) {
+    return;
+  }
   renewal = apiFetch<SessionMetadata>('/auth/session/renew', { method: 'POST', userId: current.user.id })
     .then((session) => {
       if (snapshot.session?.session.id === current.session.id && session.id === current.session.id) {

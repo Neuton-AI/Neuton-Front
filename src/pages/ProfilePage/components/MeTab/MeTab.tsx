@@ -2,6 +2,7 @@ import type React from "react";
 import { IconStore } from "@/components/icons";
 import type { ShopMembership } from "@/features/shops/types";
 import { CreateShopForm } from "./CreateShopForm/CreateShopForm";
+import { PasswordChangeForm } from "./PasswordChangeForm";
 interface IMeTab {
   email: string;
   memberships: ShopMembership[];
@@ -25,6 +26,8 @@ export const MeTab: React.FC<IMeTab> = ({
         <p className="eyebrow">Signed in as</p>
         <p className="truncate text-body font-medium text-ink">{email}</p>
       </section>
+
+      <PasswordChangeForm email={email} />
 
       <section>
         <h2 className="eyebrow">Your shops</h2>
