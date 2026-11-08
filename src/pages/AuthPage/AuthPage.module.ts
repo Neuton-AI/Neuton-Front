@@ -92,7 +92,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       type: "password",
       autoComplete: isSignIn ? "current-password" : "new-password",
       required: true,
-      minLength: isSignIn ? undefined : 15,
+      minLength: isSignIn ? undefined : 8,
       maxLength: 128,
     },
   ];

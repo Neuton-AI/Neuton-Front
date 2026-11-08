@@ -158,19 +158,21 @@ describe("AuthPage sign in", () => {
 });
 
 describe("AuthPage sign up", () => {
-  it("adds the full name field and sends it with the signup credentials", async () => {
+  it("submits signup credentials with an eight-character password", async () => {
     const user = userEvent.setup();
     renderWithRouter(<AuthPage mode="signup" />, { route: "/signup" });
 
     await user.type(screen.getByLabelText("Full name"), "Test User");
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
-    await user.type(screen.getByLabelText("Password"), "test-test-test-pass");
+    const password = screen.getByLabelText("Password");
+    expect(password).toHaveAttribute("minlength", "8");
+    await user.type(password, "testpass");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() =>
       expect(auth.signUp).toHaveBeenCalledWith({
         email: "testtest@gmail.com",
-        password: "test-test-test-pass",
+        password: "testpass",
         fullName: "Test User",
       }),
     );
