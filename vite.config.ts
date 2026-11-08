@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
+  envDir: process.env.NEUTON_SKIP_ENV_FILES === '1' ? false : undefined,
   plugins: [
     react(),
     VitePWA({
