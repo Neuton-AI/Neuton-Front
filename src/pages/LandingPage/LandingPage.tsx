@@ -11,18 +11,18 @@ import {
 } from "./components/LandingPricing/LandingPricing";
 
 export const LandingPage: React.FC = () => {
-  const { menuOpen, handleToggleMenu, handleCloseMenu } = useLandingPage();
+  const { menuOpen, returnTo, handleToggleMenu, handleCloseMenu } = useLandingPage();
   return (
     <div className="shell min-h-screen bg-surface-canvas text-ink antialiased">
       <LandingNav menuOpen={menuOpen} onToggle={handleToggleMenu} />
-      {menuOpen ? <LandingMenu onNavigate={handleCloseMenu} /> : null}
+      {menuOpen ? <LandingMenu onNavigate={handleCloseMenu} returnTo={returnTo} /> : null}
       <LandingHero />
       <LandingPreview />
       <LandingHow />
       <LandingFeatures />
       <LandingPricing />
       <LandingCta />
-      <LandingFooter />
+      <LandingFooter returnTo={returnTo} />
     </div>
   );
 };

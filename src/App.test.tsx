@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authState = vi.hoisted(() => ({
   session: null as { user: { id: string } } | null,
   loading: false,
+  unavailable: false,
 }));
 
 const authActions = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ vi.mock("@/features/auth/auth", async (importOriginal) => ({
   useAuth: () => ({
     session: authState.session,
     loading: authState.loading,
+    unavailable: authState.unavailable,
     user: authState.session?.user ?? null,
     userId: null,
   }),
@@ -88,12 +90,12 @@ function renderApp(route: string) {
 beforeEach(() => {
   authState.session = null;
   authState.loading = false;
+  authState.unavailable = false;
 });
 
 describe("RequireAuth", () => {
   it("waits on the loader instead of redirecting while the session resolves", async () => {
-    // Redirecting mid-resolve bounces a signed-in user to sign-in on every
-    // hard refresh.
+    // Redirecting mid-resolve bounces a signed-in user out on every hard refresh.
     authState.loading = true;
     authState.session = { user: { id: "u1" } };
 
@@ -104,25 +106,23 @@ describe("RequireAuth", () => {
     expect(screen.queryByRole("heading", { name: "Dashboard" })).toBeNull();
   });
 
-  it("sends an anonymous visitor from a protected route to sign-in", async () => {
-    authState.session = null;
-
-    renderApp("/dashboard");
-
-    await waitFor(() =>
-      expect(screen.getByTestId("where")).toHaveTextContent("/signin"),
-    );
-  });
-
-  it("never mounts the protected page for an anonymous visitor", async () => {
-    authState.session = null;
+  it.each([false, true])("shows the landing page from a protected route with no session (unavailable: %s)", async (unavailable) => {
+    authState.unavailable = unavailable;
 
     renderApp("/orders/o-123");
 
-    await waitFor(() =>
-      expect(screen.getByTestId("where")).toHaveTextContent("/signin"),
-    );
+    await screen.findByRole("heading", { name: "Just upload. Neuton takes care of the numbers." });
+    expect(screen.getByTestId("where")).toHaveTextContent("/landing");
     expect(screen.queryByRole("heading", { name: "Order detail" })).toBeNull();
+  });
+
+  it("shows the landing page when the root session check is unavailable", async () => {
+    authState.unavailable = true;
+
+    renderApp("/");
+
+    await screen.findByRole("heading", { name: "Just upload. Neuton takes care of the numbers." });
+    expect(screen.getByTestId("where")).toHaveTextContent(/^\/$/);
   });
 
   it("leaves the sign-in route reachable without a session", async () => {
@@ -230,10 +230,7 @@ describe("deep-link round trip", () => {
     authActions.signIn.mockClear();
   });
 
-  it("brings the user back to the deep link they originally asked for", async () => {
-    // The whole point of the guard storing `state.from`: a link to a specific
-    // order that hits a signed-out user must not dump them on the dashboard
-    // after they sign in.
+  it("returns to a protected deep link after signing in from the landing page", async () => {
     const user = userEvent.setup();
 
     authActions.signIn.mockImplementationOnce(async () => {
@@ -242,10 +239,8 @@ describe("deep-link round trip", () => {
 
     renderApp("/orders/o-123");
 
-    await waitFor(() =>
-      expect(screen.getByTestId("where")).toHaveTextContent("/signin"),
-    );
-
+    await user.click(await screen.findByRole("link", { name: "Log in" }));
+    expect(screen.getByTestId("where")).toHaveTextContent("/signin");
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
     await user.type(screen.getByLabelText("Password"), "testTest");
     await user.click(screen.getByRole("button", { name: "Sign in" }));

@@ -85,7 +85,7 @@ export const LandingPricing: React.FC = () => {
   );
 };
 
-export const LandingFooter: React.FC = () => {
+export const LandingFooter: React.FC<{ returnTo?: string }> = ({ returnTo }) => {
   return (
     <footer className="flex flex-col gap-6 bg-surface-dark px-6 py-10">
       <div className="flex items-center gap-2.5">
@@ -105,7 +105,7 @@ export const LandingFooter: React.FC = () => {
         <a href="#pricing" className="transition-colors hover:text-white">
           Pricing
         </a>
-        <Link to="/signin" className="transition-colors hover:text-white">
+        <Link to="/signin" state={{ from: returnTo }} className="transition-colors hover:text-white">
           Log in
         </Link>
         <a
