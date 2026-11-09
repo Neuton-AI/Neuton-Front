@@ -1,5 +1,5 @@
 import { renderWithRouter } from "@/test/render";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -158,24 +158,45 @@ describe("AuthPage sign in", () => {
 });
 
 describe("AuthPage sign up", () => {
-  it("submits signup credentials with an eight-character password", async () => {
+  it("submits signup credentials with a ten-unit password", async () => {
     const user = userEvent.setup();
     renderWithRouter(<AuthPage mode="signup" />, { route: "/signup" });
 
     await user.type(screen.getByLabelText("Full name"), "Test User");
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
     const password = screen.getByLabelText("Password");
-    expect(password).toHaveAttribute("minlength", "8");
-    await user.type(password, "testpass");
+    expect(password).toHaveAttribute("minlength", "10");
+    await user.type(password, "testpass10");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() =>
       expect(auth.signUp).toHaveBeenCalledWith({
         email: "testtest@gmail.com",
-        password: "testpass",
+        password: "testpass10",
         fullName: "Test User",
       }),
     );
+  });
+
+  it("accepts 128 UTF-16 units and blocks a longer signup password", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<AuthPage mode="signup" />, { route: "/signup" });
+    await user.type(screen.getByLabelText("Full name"), "Test User");
+    await user.type(screen.getByLabelText("Email"), "unicode@example.test");
+    const password = screen.getByLabelText("Password");
+    const limit = "😀".repeat(64);
+    const form = password.closest("form")!;
+
+    fireEvent.change(password, { target: { value: limit + "a" } });
+    fireEvent.submit(form);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Password is too long.");
+    expect(auth.signUp).not.toHaveBeenCalled();
+
+    fireEvent.change(password, { target: { value: limit } });
+    fireEvent.submit(form);
+    await waitFor(() => expect(auth.signUp).toHaveBeenCalledWith({
+      email: "unicode@example.test", password: limit, fullName: "Test User",
+    }));
   });
 
   it("swaps the copy between sign in and sign up", () => {

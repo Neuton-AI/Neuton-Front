@@ -92,8 +92,9 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       type: "password",
       autoComplete: isSignIn ? "current-password" : "new-password",
       required: true,
-      minLength: isSignIn ? undefined : 8,
+      minLength: isSignIn ? undefined : 10,
       maxLength: 128,
+      hint: isSignIn ? undefined : "Use 10 to 128 characters.",
     },
   ];
   const handleFieldChange = (name: keyof typeof formValues, value: string) => {

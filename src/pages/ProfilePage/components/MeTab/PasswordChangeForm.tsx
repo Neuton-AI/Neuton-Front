@@ -19,9 +19,9 @@ export function PasswordChangeForm({ email }: { email: string }) {
       </Field>
       <Field label="New password" htmlFor={`${id}-new`}>
         <Input id={`${id}-new`} name="newPassword" type="password" autoComplete="new-password"
-          aria-describedby={`${id}-requirements`} required minLength={8} maxLength={128} disabled={pending}
+          aria-describedby={`${id}-requirements`} required minLength={10} maxLength={128} disabled={pending}
           value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-        <p id={`${id}-requirements`} className="text-label text-ink-muted">Use 8 to 128 characters.</p>
+        <p id={`${id}-requirements`} className="text-label text-ink-muted">Use 10 to 128 characters.</p>
       </Field>
       <Button type="submit" loading={pending}>Change password</Button>
       {notice && <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>}

@@ -53,8 +53,10 @@ export function validateFields<V extends FormValues>(
     }
     if (field.kind === "custom" || field.visible?.(values) === false) continue;
     const value = values[field.name];
-    if (field.required && !value.trim())
+    const requiredValue = field.type === "password" ? value : value.trim();
+    if (field.required && !requiredValue) {
       errors[field.name] = `${field.label} is required.`;
+    }
     else if (
       value &&
       field.minLength !== undefined &&
