@@ -21,6 +21,37 @@ afterEach(() => {
   vi.resetModules();
 });
 
+it('finishes Google sign-in with fresh CSRF proof and refreshes the server session', async () => {
+  const calls: string[] = [];
+  server.use(
+    http.get(apiPath('/auth/google/status'), () => HttpResponse.json({ enabled: true })),
+    http.post(apiPath('/auth/session/renew'), () => HttpResponse.json(session)),
+    http.post(apiPath('/auth/csrf'), () => {
+      calls.push('csrf');
+      return HttpResponse.json({ token: `proof-${calls.length}` });
+    }),
+    http.post(apiPath('/auth/google/complete'), async ({ request }) => {
+      calls.push('complete');
+      expect(request.headers.get('x-csrf-token')).toBe('proof-2');
+      expect(await request.json()).toEqual({ completionId: 'completion-fixture' });
+      return HttpResponse.json({ outcome: 'signed_up', destination: '/dashboard' });
+    }),
+    http.get(apiPath('/session'), () => {
+      calls.push('session');
+      return authorized();
+    }),
+  );
+  const auth = await import('./auth');
+  expect(await auth.googleSignInAvailable()).toBe(true);
+  expect(calls).toEqual([]);
+  const { apiFetch } = await import('@/lib/api');
+  await apiFetch('/auth/session/renew', { method: 'POST' });
+  await auth.completeGoogleSignIn('completion-fixture');
+  expect(calls).toEqual(['csrf', 'csrf', 'complete', 'session']);
+  const { result } = renderHookWithProviders(auth.useAuth);
+  expect(result.current.user).toEqual(user);
+});
+
 it('signs up with a CSRF proof and restores only server-confirmed shops after reload', async () => {
   let signedIn = false;
   server.use(

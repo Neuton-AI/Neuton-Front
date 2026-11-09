@@ -15,12 +15,14 @@
 <body>
   <div id="root"></div>
   <script type="module">
+    import { isGoogleCompletionDocument } from '/src/features/auth/google-return.ts';
     import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
     import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
     const collector = import.meta.env.VITE_FARO_COLLECTOR_URL;
     const collectorToken = import.meta.env.VITE_FARO_TOKEN;
-    if (collector && collectorToken) {
+    // Navigation timing can retain the original fragment after history.replaceState.
+    if (!isGoogleCompletionDocument && collector && collectorToken) {
       try {
         initializeFaro({
           url: collector + '/' + collectorToken,

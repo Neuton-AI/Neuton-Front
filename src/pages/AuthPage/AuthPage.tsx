@@ -42,11 +42,18 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
             radius="input"
             block
             loading={model.busy}
+            disabled={model.googleBusy}
             className="h-12"
           >
             {model.busy ? "Working…" : submitLabel}
           </Button>
         </form>
+        {model.googleEnabled && (
+          <Button type="button" variant="secondary" size="lg" radius="input" block
+            loading={model.googleBusy} disabled={model.busy} onClick={model.startGoogle} className="mt-4 h-12">
+            Continue with Google
+          </Button>
+        )}
       </div>
     </div>
   );

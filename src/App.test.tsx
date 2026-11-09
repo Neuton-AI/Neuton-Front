@@ -19,6 +19,7 @@ const authState = vi.hoisted(() => ({
 const authActions = vi.hoisted(() => ({
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
+  googleSignInAvailable: vi.fn(async () => false),
 }));
 
 vi.mock("@/features/auth/auth", async (importOriginal) => ({

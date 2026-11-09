@@ -121,19 +121,46 @@ export function restoreSession() {
   return result;
 }
 
-async function authenticate(path: string, body: Credentials & { fullName?: string }) {
+async function authenticate(path: string, body: (Credentials & { fullName?: string }) | { completionId: string }) {
   const started = ++revision;
   await apiFetch(path, { method: 'POST', body });
   if (started !== revision) return;
+  await confirmSignedInSession();
+}
+
+async function confirmSignedInSession() {
   logoutUnconfirmed = undefined;
   resetCsrf();
   await restoreSession();
-  if (!snapshot.session) throw new Error(unavailableMessage);
+  if (!snapshot.session) throw new ApiError(unavailableMessage, 503, 'SESSION_CONFIRMATION_FAILED');
   channel?.postMessage('changed');
 }
 
 export const signIn = (credentials: Credentials) => authenticate('/auth/signin', credentials);
 export const signUp = (credentials: Credentials & { fullName: string }) => authenticate('/auth/signup', credentials);
+
+export async function googleSignInAvailable() {
+  return (await apiFetch<{ enabled: boolean }>('/auth/google/status'))?.enabled === true;
+}
+
+export async function startGoogleSignIn(signal: AbortSignal) {
+  resetCsrf();
+  const { authorizationUrl } = await apiFetch<{ authorizationUrl: string }>('/auth/google/start', {
+    method: 'POST', body: { purpose: 'sign_in' }, signal,
+  });
+  signal.throwIfAborted();
+  window.location.assign(authorizationUrl);
+}
+
+export async function completeGoogleSignIn(completionId: string) {
+  resetCsrf();
+  await authenticate('/auth/google/complete', { completionId });
+}
+
+export async function retryGoogleSession() {
+  revision++;
+  await confirmSignedInSession();
+}
 
 export async function changePassword(body: { currentPassword: string; newPassword: string }) {
   const current = snapshot.session;

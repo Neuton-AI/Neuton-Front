@@ -14,10 +14,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({
   signIn: vi.fn(),
   signUp: vi.fn(),
+  googleSignInAvailable: vi.fn(),
+  startGoogleSignIn: vi.fn(),
 }));
 
 vi.mock("@/features/auth/auth", () => ({
   ...auth,
+  useAuth: () => ({ session: null, loading: false }),
 }));
 
 const { AuthPage } = await import("@/pages/AuthPage/AuthPage");
@@ -43,6 +46,8 @@ beforeEach(() => {
   auth.signUp.mockReset();
   auth.signIn.mockResolvedValue(undefined);
   auth.signUp.mockResolvedValue(undefined);
+  auth.googleSignInAvailable.mockReset().mockResolvedValue(false);
+  auth.startGoogleSignIn.mockReset().mockResolvedValue(undefined);
 });
 
 describe("AuthPage sign in", () => {
@@ -140,10 +145,19 @@ describe("AuthPage sign in", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("offers only email and password", () => {
+  it("hides Google when the backend reports it is unavailable", async () => {
     renderAuth("/signin");
-    expect(screen.queryByRole("button", { name: "Google" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apple" })).not.toBeInTheDocument();
+    await waitFor(() => expect(auth.googleSignInAvailable).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Google option and lets users retry after cancellation", async () => {
+    auth.googleSignInAvailable.mockResolvedValue(true);
+    renderAuth("/signin?google=canceled");
+    expect(screen.getByRole("alert")).toHaveTextContent("Google sign-in was canceled");
+    const button = await screen.findByRole("button", { name: "Continue with Google" });
+    await userEvent.click(button);
+    expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
   });
 
   it("has segment control with Sign In active", () => {

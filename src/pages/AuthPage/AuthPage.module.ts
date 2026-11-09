@@ -1,13 +1,24 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { signIn, signUp } from "@/features/auth/auth";
-import { useEffect, useState } from "react";
+import { googleSignInAvailable, signIn, signUp, startGoogleSignIn, useAuth } from "@/features/auth/auth";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 type Mode = "signin" | "signup";
+
+function googleNotice(search: string) {
+  switch (new URLSearchParams(search).get('google')) {
+    case 'canceled': return 'Google sign-in was canceled. You can try again.';
+    case 'retry': return 'Google sign-in could not be verified. Start again.';
+    case 'unavailable': return 'Google sign-in is temporarily unavailable. Try again or sign in with a password.';
+    default: return null;
+  }
+}
+
 export function useAuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
 
   const location = useLocation();
+  const { session, loading } = useAuth();
 
   const [email, setEmail] = useState("");
 
@@ -18,6 +29,9 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const [busy, setBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const googleStart = useRef<AbortController>();
 
   const [segment, setSegment] = useState<Mode>(mode);
 
@@ -26,9 +40,48 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     setSegment(mode);
   }, [mode]);
 
+  useEffect(() => {
+    let active = true;
+    const check = () => {
+      void googleSignInAvailable().then((enabled) => {
+        if (active) setGoogleEnabled(enabled);
+      }).catch(() => undefined);
+    };
+    const returned = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        googleStart.current?.abort();
+        setGoogleBusy(false);
+      }
+    };
+    check();
+    window.addEventListener('online', check);
+    window.addEventListener('pageshow', returned);
+    return () => {
+      active = false;
+      googleStart.current?.abort();
+      window.removeEventListener('online', check);
+      window.removeEventListener('pageshow', returned);
+    };
+  }, []);
+
+  const startGoogle = async () => {
+    if (busy || googleBusy) return;
+    const controller = new AbortController();
+    googleStart.current = controller;
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      await startGoogleSignIn(controller.signal);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      setError(cause instanceof Error ? cause.message : 'Google sign-in could not start. Try again.');
+      setGoogleBusy(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || googleBusy) return;
     const validationError = Object.values(
       validateFields(fields, formValues),
     )[0];
@@ -107,7 +160,10 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     formValues,
     handleFieldChange,
     busy,
-    error,
+    error: error ?? googleNotice(location.search),
+    googleEnabled: googleEnabled && !session && !loading,
+    googleBusy,
+    startGoogle,
     setSegment,
     submit,
     isSignIn,
