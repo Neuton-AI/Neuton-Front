@@ -11,6 +11,14 @@ export function usePasswordChangeForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
+    if (currentPassword.length === 0 || currentPassword.length > 128) {
+      setNotice({ tone: 'error', text: 'Enter your current password.' });
+      return;
+    }
+    if (newPassword.length < 10 || newPassword.length > 128) {
+      setNotice({ tone: 'error', text: 'Use 10 to 128 characters for your new password.' });
+      return;
+    }
     setPending(true);
     setNotice(undefined);
 

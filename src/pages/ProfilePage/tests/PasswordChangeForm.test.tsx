@@ -43,6 +43,33 @@ async function fillForm() {
   return { user, current, replacement, submit: screen.getByRole('button', { name: 'Change password' }) };
 }
 
+it('enforces the UTF-16 boundary for a newly set password', async () => {
+  const changes = vi.fn();
+  server.use(http.post(apiPath('/profile/password'), async ({ request }) => {
+    changes(await request.json());
+    sessionId = 'unicode-replacement-session';
+    return HttpResponse.json({ ok: true });
+  }));
+  const { current, replacement, submit } = await fillForm();
+  const form = submit.closest('form')!;
+  const limit = '😀'.repeat(64);
+  fireEvent.change(current, { target: { value: limit + 'a' } });
+  fireEvent.submit(form);
+  expect(await screen.findByText('Enter your current password.')).toBeInTheDocument();
+  expect(changes).not.toHaveBeenCalled();
+
+  fireEvent.change(current, { target: { value: limit } });
+  fireEvent.change(replacement, { target: { value: limit + 'a' } });
+  fireEvent.submit(form);
+  expect(await screen.findByText('Use 10 to 128 characters for your new password.')).toBeInTheDocument();
+  expect(changes).not.toHaveBeenCalled();
+
+  fireEvent.change(replacement, { target: { value: limit } });
+  fireEvent.submit(form);
+  await waitFor(() => expect(changes).toHaveBeenCalledWith({ currentPassword: limit, newPassword: limit }));
+  await screen.findByText('Password changed.');
+});
+
 it('submits once and restores the replacement session with fresh proof for the next write', async () => {
   const original = sessionId;
   let releaseResponse!: () => void;
