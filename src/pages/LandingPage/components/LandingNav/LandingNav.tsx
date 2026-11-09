@@ -70,9 +70,10 @@ export const LandingNav: React.FC<ILandingNav> = ({ menuOpen, onToggle }) => {
 
 interface ILandingMenu {
   onNavigate: () => void;
+  returnTo?: string;
 }
 
-export const LandingMenu: React.FC<ILandingMenu> = ({ onNavigate }) => {
+export const LandingMenu: React.FC<ILandingMenu> = ({ onNavigate, returnTo }) => {
   return (
     <div className="animate-in fade-in border-b border-hairline bg-surface-canvas px-6 py-4">
       <nav className="flex flex-col gap-3 font-sans text-[15px]">
@@ -100,6 +101,7 @@ export const LandingMenu: React.FC<ILandingMenu> = ({ onNavigate }) => {
         <div className="my-1 h-[1px] bg-hairline" />
         <Link
           to="/signin"
+          state={{ from: returnTo }}
           onClick={onNavigate}
           className="py-1 font-medium text-brand-primary-active hover:text-brand-primary"
         >

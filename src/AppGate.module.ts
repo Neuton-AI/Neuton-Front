@@ -1,15 +1,13 @@
-import { restoreSession, useAuth } from "@/features/auth/auth";
+import { useAuth } from "@/features/auth/auth";
 import { useLocation } from "react-router-dom";
 
-export function checkSession() { void restoreSession(); }
-
 export function useRootRedirect() {
-  const { session, loading, unavailable, message } = useAuth();
-  return { session, loading, unavailable, message };
+  const { session, loading } = useAuth();
+  return { session, loading };
 }
 
 export function useRequireAuth() {
-  const { session, loading, unavailable, message } = useAuth();
+  const { session, loading } = useAuth();
   const location = useLocation();
-  return { session, loading, unavailable, message, from: location.pathname };
+  return { session, loading, from: location.pathname };
 }
