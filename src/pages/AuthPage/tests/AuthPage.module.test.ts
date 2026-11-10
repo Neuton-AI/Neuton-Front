@@ -11,6 +11,9 @@ const boundary = vi.hoisted(() => ({
 vi.mock("@/features/auth/auth", () => ({
   signIn: boundary.signIn,
   signUp: boundary.signUp,
+  googleSignInAvailable: async () => false,
+  startGoogleSignIn: async () => {},
+  useAuth: () => ({ session: null, loading: false }),
 }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),

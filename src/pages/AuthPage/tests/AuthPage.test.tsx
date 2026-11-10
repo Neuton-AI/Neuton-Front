@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
 
 /**
  * AuthPage owns one behaviour that nothing else in the app can cover: after a
@@ -14,6 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({
   signIn: vi.fn(),
   signUp: vi.fn(),
+  googleSignInAvailable: vi.fn(),
+  startGoogleSignIn: vi.fn(),
+  restoreSession: vi.fn(),
+  useAuth: vi.fn(),
 }));
 
 vi.mock("@/features/auth/auth", () => ({
@@ -43,6 +48,10 @@ beforeEach(() => {
   auth.signUp.mockReset();
   auth.signIn.mockResolvedValue(undefined);
   auth.signUp.mockResolvedValue(undefined);
+  auth.googleSignInAvailable.mockReset().mockResolvedValue(false);
+  auth.startGoogleSignIn.mockReset().mockResolvedValue(undefined);
+  auth.restoreSession.mockReset().mockResolvedValue(undefined);
+  auth.useAuth.mockReset().mockReturnValue({ session: null, loading: false });
 });
 
 describe("AuthPage sign in", () => {
@@ -140,10 +149,41 @@ describe("AuthPage sign in", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("offers only email and password", () => {
+  it("hides Google when the backend reports it is unavailable", async () => {
     renderAuth("/signin");
-    expect(screen.queryByRole("button", { name: "Google" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apple" })).not.toBeInTheDocument();
+    await waitFor(() => expect(auth.googleSignInAvailable).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Google option and lets users retry after cancellation", async () => {
+    auth.googleSignInAvailable.mockResolvedValue(true);
+    renderAuth("/signin?google=canceled");
+    expect(screen.getByRole("alert")).toHaveTextContent("Google sign-in was canceled");
+    const button = await screen.findByRole("button", { name: "Continue with Google" });
+    await userEvent.click(button);
+    expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["signin", "signup"] as const)("silently opens the dashboard from %s with a valid session", async (mode) => {
+    auth.useAuth.mockReturnValue({ session: { user: { email: "existing@example.test" } }, loading: false });
+    renderAuth("/" + mode, mode);
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/dashboard"));
+    expect(screen.queryByRole("button", { name: "Continue to Neuton" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+    expect(auth.startGoogleSignIn).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the cookie after a Google session conflict and silently enters the app", async () => {
+    auth.googleSignInAvailable.mockResolvedValue(true);
+    auth.startGoogleSignIn.mockRejectedValue(new ApiError("Your session changed", 409, "GOOGLE_SESSION_CHANGED"));
+    auth.restoreSession.mockImplementation(async () => {
+      auth.useAuth.mockReturnValue({ session: { user: { email: "other-tab@example.test" } }, loading: false });
+    });
+    renderAuth("/signin");
+    await userEvent.click(await screen.findByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/dashboard"));
+    expect(auth.restoreSession).toHaveBeenCalledTimes(1);
+    expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
   });
 
   it("has segment control with Sign In active", () => {

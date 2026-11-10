@@ -21,6 +21,94 @@ afterEach(() => {
   vi.resetModules();
 });
 
+it.each(['sign_in', 'link'] as const)('finishes Google %s with fresh CSRF proof and refreshes the server session', async (purpose) => {
+  const calls: string[] = [];
+  server.use(
+    http.get(apiPath('/auth/google/status'), () => HttpResponse.json({ enabled: true })),
+    http.post(apiPath('/auth/session/renew'), () => HttpResponse.json(session)),
+    http.post(apiPath('/auth/csrf'), () => {
+      calls.push('csrf');
+      return HttpResponse.json({ token: `proof-${calls.length}` });
+    }),
+    http.post(apiPath('/auth/google/complete'), async ({ request }) => {
+      calls.push('complete');
+      expect(request.headers.get('x-csrf-token')).toBe('proof-2');
+      const completion = { completionId: 'completion-fixture' };
+      expect(await request.json()).toEqual(purpose === 'link' ? { ...completion, purpose } : completion);
+      return HttpResponse.json({ outcome: 'completed' });
+    }),
+    http.get(apiPath('/session'), () => {
+      calls.push('session');
+      return authorized();
+    }),
+  );
+  const auth = await import('./auth');
+  expect(await auth.googleSignInAvailable()).toBe(true);
+  expect(calls).toEqual([]);
+  const { apiFetch } = await import('@/lib/api');
+  await apiFetch('/auth/session/renew', { method: 'POST' });
+  await auth.completeGoogleSignIn('completion-fixture', purpose);
+  expect(calls).toEqual(['csrf', 'csrf', 'complete', 'session']);
+  const { result } = renderHookWithProviders(auth.useAuth);
+  expect(result.current.user).toEqual(user);
+});
+
+it('keeps a pending unlink from racing a password change and refreshes the existing session', async () => {
+  let linked = true;
+  const change = vi.fn();
+  let beginUnlink!: () => void;
+  const unlinkStarted = new Promise<void>((resolve) => { beginUnlink = resolve; });
+  let releaseUnlink!: () => void;
+  const unlinkPending = new Promise<void>((resolve) => { releaseUnlink = resolve; });
+  server.use(
+    http.get(apiPath('/session'), () => HttpResponse.json({ user, session, memberships: [], googleLinked: linked, hasPassword: true })),
+    http.delete(apiPath('/auth/google/link'), async () => {
+      beginUnlink();
+      await unlinkPending;
+      linked = false;
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post(apiPath('/profile/password'), () => {
+      change();
+      return HttpResponse.json({ ok: true });
+    }),
+  );
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const pending = auth.unlinkGoogle();
+  await unlinkStarted;
+  try {
+    await expect(auth.changePassword({ currentPassword: 'current password', newPassword: 'new password' }))
+      .rejects.toMatchObject({ code: 'SIGN_IN_METHOD_BUSY' });
+  } finally {
+    releaseUnlink();
+  }
+  await pending;
+  expect(change).not.toHaveBeenCalled();
+  const { result } = renderHookWithProviders(auth.useAuth);
+  expect(result.current.sessionId).toBe(session.id);
+  expect(result.current.session?.googleLinked).toBe(false);
+});
+
+it('refreshes the password flag when another session already set the first password', async () => {
+  let hasPassword = false;
+  server.use(
+    http.get(apiPath('/session'), () => HttpResponse.json({ user, session, memberships: [], googleLinked: true, hasPassword })),
+    http.post(apiPath('/auth/password/add'), () => {
+      hasPassword = true;
+      return HttpResponse.json({
+        error: { code: 'PASSWORD_ALREADY_SET', message: 'Use Change password to update your existing password.' },
+      }, { status: 409 });
+    }),
+  );
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  await expect(auth.addPassword('another new password')).rejects.toMatchObject({ code: 'PASSWORD_ALREADY_SET' });
+  const { result } = renderHookWithProviders(auth.useAuth);
+  expect(result.current.sessionId).toBe(session.id);
+  expect(result.current.session?.hasPassword).toBe(true);
+});
+
 it('signs up with a CSRF proof and restores only server-confirmed shops after reload', async () => {
   let signedIn = false;
   server.use(

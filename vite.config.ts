@@ -2,11 +2,41 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+function googleCompletionDocument(loadHtml: (url: string) => Promise<string>) {
+  return (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void) => {
+    const url = request.url;
+    if (!url || !/^\/auth\/complete\/?(?:\?|$)/.test(url) || !['GET', 'HEAD'].includes(request.method ?? '')) {
+      next();
+      return;
+    }
+    void loadHtml(url).then((html) => {
+      response.setHeader('Content-Type', 'text/html; charset=utf-8');
+      response.setHeader('Cache-Control', 'no-store');
+      response.setHeader('Referrer-Policy', 'no-referrer');
+      response.end(request.method === 'HEAD' ? undefined : html);
+    }, next);
+  };
+}
 
 export default defineConfig({
   envDir: process.env.NEUTON_SKIP_ENV_FILES === '1' ? false : undefined,
   plugins: [
     react(),
+    {
+      name: 'google-completion-headers',
+      configureServer(server) {
+        const index = resolve(server.config.root, 'index.html');
+        server.middlewares.use(googleCompletionDocument(async (url) => server.transformIndexHtml(url, await readFile(index, 'utf8'))));
+      },
+      configurePreviewServer(server) {
+        const index = resolve(server.config.root, server.config.build.outDir, 'index.html');
+        server.middlewares.use(googleCompletionDocument(() => readFile(index, 'utf8')));
+      },
+    },
     VitePWA({
       registerType: 'prompt',
       injectRegister: 'auto',

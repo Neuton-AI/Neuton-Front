@@ -1,13 +1,26 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { signIn, signUp } from "@/features/auth/auth";
-import { useEffect, useState } from "react";
+import { googleSignInAvailable, restoreSession, signIn, signUp, startGoogleSignIn, useAuth } from "@/features/auth/auth";
+import { ApiError } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 type Mode = "signin" | "signup";
+
+function googleNotice(search: string) {
+  switch (new URLSearchParams(search).get('google')) {
+    case 'canceled': return 'Google sign-in was canceled. You can try again.';
+    case 'retry': return 'Google sign-in could not be verified. Start again.';
+    case 'unavailable': return 'Google sign-in is temporarily unavailable. Try again or sign in with a password.';
+    default: return null;
+  }
+}
+
 export function useAuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
 
   const location = useLocation();
+  const { session, loading, unavailable, message: sessionMessage } = useAuth();
+  const destination = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   const [email, setEmail] = useState("");
 
@@ -18,6 +31,9 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const [busy, setBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const googleStart = useRef<AbortController>();
 
   const [segment, setSegment] = useState<Mode>(mode);
 
@@ -26,9 +42,53 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     setSegment(mode);
   }, [mode]);
 
+  useEffect(() => {
+    let active = true;
+    const check = () => {
+      void googleSignInAvailable().then((enabled) => {
+        if (active) setGoogleEnabled(enabled);
+      }).catch(() => undefined);
+    };
+    const returned = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        googleStart.current?.abort();
+        setGoogleBusy(false);
+        void restoreSession();
+      }
+    };
+    check();
+    window.addEventListener('online', check);
+    window.addEventListener('pageshow', returned);
+    return () => {
+      active = false;
+      googleStart.current?.abort();
+      window.removeEventListener('online', check);
+      window.removeEventListener('pageshow', returned);
+    };
+  }, []);
+
+  const startGoogle = async () => {
+    if (busy || googleBusy || session || loading || unavailable) return;
+    const controller = new AbortController();
+    googleStart.current = controller;
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      await startGoogleSignIn(controller.signal);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      if (cause instanceof ApiError && cause.code === 'GOOGLE_SESSION_CHANGED') {
+        await restoreSession();
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Google sign-in could not start. Try again.');
+      }
+      setGoogleBusy(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || googleBusy) return;
     const validationError = Object.values(
       validateFields(fields, formValues),
     )[0];
@@ -45,14 +105,24 @@ export function useAuthPage({ mode }: { mode: Mode }) {
         await signUp({ email, password, fullName });
       }
 
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from ?? "/dashboard", { replace: true });
+      navigate(destination, { replace: true });
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : "Something went wrong. Try again.",
       );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkSession = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await restoreSession();
     } finally {
       setBusy(false);
     }
@@ -102,12 +172,22 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     else if (name === "password") setPassword(value);
     else setFullName(value);
   };
+  const notice = error ?? googleNotice(location.search);
+  const sessionNotice = unavailable ? sessionMessage : null;
   return {
     fields,
     formValues,
     handleFieldChange,
     busy,
-    error,
+    error: notice ?? sessionNotice,
+    loading,
+    unavailable,
+    signedIn: Boolean(session),
+    destination,
+    checkSession,
+    googleEnabled: googleEnabled && !session && !loading && !unavailable,
+    googleBusy,
+    startGoogle,
     setSegment,
     submit,
     isSignIn,

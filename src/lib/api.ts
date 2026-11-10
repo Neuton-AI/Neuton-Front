@@ -41,7 +41,9 @@ export function setRequestShop(nextShopId: string | null) {
 
 function csrfProof() {
   if (csrf) return csrf;
-  const pending = apiFetch<{ token: string }>('/auth/csrf', { method: 'POST' }).then(({ token }) => token);
+  const bootstrap = () => apiFetch<{ token: string }>('/auth/csrf', { method: 'POST' }).then(({ token }) => token);
+  // Serialize initial cookie creation across tabs when the browser supports Web Locks.
+  const pending = navigator.locks ? Promise.resolve(navigator.locks.request('neuton-csrf-bootstrap', bootstrap)) : bootstrap();
   csrf = pending;
   void pending.catch(() => { if (csrf === pending) resetCsrf(); });
   return pending;
