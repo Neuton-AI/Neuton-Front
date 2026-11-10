@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
 
 /**
  * AuthPage owns one behaviour that nothing else in the app can cover: after a
@@ -16,11 +17,12 @@ const auth = vi.hoisted(() => ({
   signUp: vi.fn(),
   googleSignInAvailable: vi.fn(),
   startGoogleSignIn: vi.fn(),
+  restoreSession: vi.fn(),
+  useAuth: vi.fn(),
 }));
 
 vi.mock("@/features/auth/auth", () => ({
   ...auth,
-  useAuth: () => ({ session: null, loading: false }),
 }));
 
 const { AuthPage } = await import("@/pages/AuthPage/AuthPage");
@@ -48,6 +50,8 @@ beforeEach(() => {
   auth.signUp.mockResolvedValue(undefined);
   auth.googleSignInAvailable.mockReset().mockResolvedValue(false);
   auth.startGoogleSignIn.mockReset().mockResolvedValue(undefined);
+  auth.restoreSession.mockReset().mockResolvedValue(undefined);
+  auth.useAuth.mockReset().mockReturnValue({ session: null, loading: false });
 });
 
 describe("AuthPage sign in", () => {
@@ -157,6 +161,28 @@ describe("AuthPage sign in", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Google sign-in was canceled");
     const button = await screen.findByRole("button", { name: "Continue with Google" });
     await userEvent.click(button);
+    expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["signin", "signup"] as const)("silently opens the dashboard from %s with a valid session", async (mode) => {
+    auth.useAuth.mockReturnValue({ session: { user: { email: "existing@example.test" } }, loading: false });
+    renderAuth("/" + mode, mode);
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/dashboard"));
+    expect(screen.queryByRole("button", { name: "Continue to Neuton" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+    expect(auth.startGoogleSignIn).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the cookie after a Google session conflict and silently enters the app", async () => {
+    auth.googleSignInAvailable.mockResolvedValue(true);
+    auth.startGoogleSignIn.mockRejectedValue(new ApiError("Your session changed", 409, "GOOGLE_SESSION_CHANGED"));
+    auth.restoreSession.mockImplementation(async () => {
+      auth.useAuth.mockReturnValue({ session: { user: { email: "other-tab@example.test" } }, loading: false });
+    });
+    renderAuth("/signin");
+    await userEvent.click(await screen.findByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/dashboard"));
+    expect(auth.restoreSession).toHaveBeenCalledTimes(1);
     expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
   });
 

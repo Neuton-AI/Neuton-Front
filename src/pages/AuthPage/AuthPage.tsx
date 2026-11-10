@@ -1,6 +1,8 @@
 import type React from "react";
 import { FormFields } from "@/components/FormFields/FormFields";
+import { FullPageLoader } from "@/components/feedback";
 import { Button } from "@/components/ui";
+import { Navigate } from "react-router-dom";
 import {
   AuthHeading,
   AuthModeTabs,
@@ -16,6 +18,8 @@ interface IAuthPage {
 export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
   const model = useAuthPage({ mode });
   const submitLabel = model.isSignIn ? "Sign in" : "Create account";
+  if (model.loading) return <FullPageLoader label="Checking your session" />;
+  if (model.signedIn && !model.busy) return <Navigate to={model.destination} replace />;
   return (
     <div className="shell">
       <div className="flex flex-1 flex-col justify-center px-6 pb-10">
@@ -35,6 +39,9 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
               {model.error}
             </p>
           ) : null}
+          {model.unavailable && (
+            <Button variant="outline" onClick={model.checkSession} loading={model.busy}>Check session again</Button>
+          )}
           <Button
             type="submit"
             variant="primary"

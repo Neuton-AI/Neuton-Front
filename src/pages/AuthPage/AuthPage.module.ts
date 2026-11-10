@@ -1,6 +1,7 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { googleSignInAvailable, signIn, signUp, startGoogleSignIn, useAuth } from "@/features/auth/auth";
+import { googleSignInAvailable, restoreSession, signIn, signUp, startGoogleSignIn, useAuth } from "@/features/auth/auth";
+import { ApiError } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 type Mode = "signin" | "signup";
@@ -18,7 +19,8 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
 
   const location = useLocation();
-  const { session, loading } = useAuth();
+  const { session, loading, unavailable, message: sessionMessage } = useAuth();
+  const destination = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   const [email, setEmail] = useState("");
 
@@ -51,6 +53,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       if (event.persisted) {
         googleStart.current?.abort();
         setGoogleBusy(false);
+        void restoreSession();
       }
     };
     check();
@@ -65,7 +68,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   }, []);
 
   const startGoogle = async () => {
-    if (busy || googleBusy) return;
+    if (busy || googleBusy || session || loading || unavailable) return;
     const controller = new AbortController();
     googleStart.current = controller;
     setGoogleBusy(true);
@@ -74,7 +77,11 @@ export function useAuthPage({ mode }: { mode: Mode }) {
       await startGoogleSignIn(controller.signal);
     } catch (cause) {
       if (controller.signal.aborted) return;
-      setError(cause instanceof Error ? cause.message : 'Google sign-in could not start. Try again.');
+      if (cause instanceof ApiError && cause.code === 'GOOGLE_SESSION_CHANGED') {
+        await restoreSession();
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Google sign-in could not start. Try again.');
+      }
       setGoogleBusy(false);
     }
   };
@@ -98,14 +105,24 @@ export function useAuthPage({ mode }: { mode: Mode }) {
         await signUp({ email, password, fullName });
       }
 
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from ?? "/dashboard", { replace: true });
+      navigate(destination, { replace: true });
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : "Something went wrong. Try again.",
       );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkSession = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await restoreSession();
     } finally {
       setBusy(false);
     }
@@ -155,13 +172,20 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     else if (name === "password") setPassword(value);
     else setFullName(value);
   };
+  const notice = error ?? googleNotice(location.search);
+  const sessionNotice = unavailable ? sessionMessage : null;
   return {
     fields,
     formValues,
     handleFieldChange,
     busy,
-    error: error ?? googleNotice(location.search),
-    googleEnabled: googleEnabled && !session && !loading,
+    error: notice ?? sessionNotice,
+    loading,
+    unavailable,
+    signedIn: Boolean(session),
+    destination,
+    checkSession,
+    googleEnabled: googleEnabled && !session && !loading && !unavailable,
     googleBusy,
     startGoogle,
     setSegment,

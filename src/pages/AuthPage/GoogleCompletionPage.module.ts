@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { completeGoogleSignIn, retryGoogleSession } from '@/features/auth/auth';
+import { completeGoogleSignIn, restoreSession, retryGoogleSession } from '@/features/auth/auth';
 import { takeGoogleCompletion, type GooglePurpose } from '@/features/auth/google-return';
 import { ApiError } from '@/lib/api';
 
@@ -52,7 +52,12 @@ export function useGoogleCompletionPage() {
     let active = true;
     void request.current.then(() => {
       if (active) navigate(purpose.current === 'link' ? '/profile' : '/dashboard', { replace: true });
-    }, (cause: unknown) => {
+    }, async (cause: unknown) => {
+      if (purpose.current === 'sign_in' && cause instanceof ApiError && cause.code === 'GOOGLE_SESSION_CHANGED') {
+        await restoreSession();
+        if (active) navigate('/signin?google=retry', { replace: true });
+        return;
+      }
       if (active) setError(messageFor(cause, purpose.current));
     });
     return () => { active = false; };
