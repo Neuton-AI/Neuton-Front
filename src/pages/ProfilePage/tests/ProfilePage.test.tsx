@@ -5,6 +5,7 @@ import { expect, it, vi } from "vitest";
 import { ProfilePage } from "../ProfilePage";
 import { useProfilePage, type ProfilePageModel } from "../ProfilePage.module";
 vi.mock("../ProfilePage.module", () => ({ useProfilePage: vi.fn() }));
+vi.mock("@/features/auth/auth", () => ({ useAuth: () => ({ session: null }) }));
 it("renders account status and forwards tab and sign-out actions", async () => {
   const model: ProfilePageModel = {
     role: undefined,

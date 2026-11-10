@@ -2,6 +2,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { ShopMembership } from '@/features/shops/types';
 import { logoutCleanup } from '@/features/sync/store';
 import { ApiError, apiFetch, requestScopeSignal, resetCsrf, setRequestSession, setRequestShop } from '@/lib/api';
+import type { GooglePurpose } from './google-return';
 
 type Credentials = { email: string; password: string };
 export type SessionMetadata = {
@@ -16,6 +17,8 @@ type Session = {
   user: { id: string; email: string; fullName: string | null; avatarUrl: string | null };
   memberships: { shop: ShopMembership['shops']; role: ShopMembership['role'] }[];
   session: SessionMetadata;
+  hasPassword?: boolean;
+  googleLinked?: boolean;
 };
 type AuthSnapshot = {
   status: 'loading' | 'authenticated' | 'anonymous' | 'unavailable';
@@ -33,6 +36,7 @@ let revision = 0;
 let restoring: { revision: number; result: Promise<void> } | undefined;
 let renewal: Promise<void> | undefined;
 let changingPassword = false;
+let changingSignInMethod = false;
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let logoutUnconfirmed: string | undefined;
 
@@ -92,16 +96,21 @@ function update(next: AuthSnapshot) {
   notify();
 }
 
+async function readSession() {
+  const session = await apiFetch<Session>('/session');
+  if (!session?.user?.id || !session.session?.id || !Array.isArray(session.memberships) ||
+    !Number.isFinite(Date.parse(session.session.idleExpiresAt)) || !Number.isFinite(Date.parse(session.session.absoluteExpiresAt))) {
+    throw new Error('Invalid session response');
+  }
+  return session;
+}
+
 export function restoreSession() {
   const started = revision;
   if (restoring?.revision === started) return restoring.result;
   const result = (async () => {
     try {
-      const session = await apiFetch<Session>('/session');
-      if (!session?.user?.id || !session.session?.id || !Array.isArray(session.memberships) ||
-        !Number.isFinite(Date.parse(session.session.idleExpiresAt)) || !Number.isFinite(Date.parse(session.session.absoluteExpiresAt))) {
-        throw new Error('Invalid session response');
-      }
+      const session = await readSession();
       if (started === revision) update({ status: 'authenticated', session, message: logoutUnconfirmed });
     } catch (error) {
       if (started !== revision) return;
@@ -121,19 +130,23 @@ export function restoreSession() {
   return result;
 }
 
-async function authenticate(path: string, body: (Credentials & { fullName?: string }) | { completionId: string }) {
+async function authenticate(
+  path: string,
+  body: (Credentials & { fullName?: string }) | { completionId: string; purpose?: 'link' },
+  notifyOtherTabs = true,
+) {
   const started = ++revision;
   await apiFetch(path, { method: 'POST', body });
   if (started !== revision) return;
-  await confirmSignedInSession();
+  await confirmSignedInSession(notifyOtherTabs);
 }
 
-async function confirmSignedInSession() {
+async function confirmSignedInSession(notifyOtherTabs: boolean) {
   logoutUnconfirmed = undefined;
   resetCsrf();
   await restoreSession();
   if (!snapshot.session) throw new ApiError(unavailableMessage, 503, 'SESSION_CONFIRMATION_FAILED');
-  channel?.postMessage('changed');
+  if (notifyOtherTabs) channel?.postMessage('changed');
 }
 
 export const signIn = (credentials: Credentials) => authenticate('/auth/signin', credentials);
@@ -143,26 +156,74 @@ export async function googleSignInAvailable() {
   return (await apiFetch<{ enabled: boolean }>('/auth/google/status'))?.enabled === true;
 }
 
-export async function startGoogleSignIn(signal: AbortSignal) {
+function requireCurrentSession() {
+  if (!snapshot.session) throw new ApiError('Sign in again to manage your sign-in methods.', 401);
+  return snapshot.session;
+}
+
+export async function startGoogleSignIn(signal: AbortSignal, purpose: GooglePurpose = 'sign_in') {
+  const current = purpose === 'link' ? requireCurrentSession() : null;
   resetCsrf();
   const { authorizationUrl } = await apiFetch<{ authorizationUrl: string }>('/auth/google/start', {
-    method: 'POST', body: { purpose: 'sign_in' }, signal,
+    method: 'POST', body: { purpose }, sessionId: current?.session.id,
+    signal: requestScopeSignal(current?.user.id, undefined, signal),
   });
   signal.throwIfAborted();
   window.location.assign(authorizationUrl);
 }
 
-export async function completeGoogleSignIn(completionId: string) {
+export async function completeGoogleSignIn(completionId: string, purpose: GooglePurpose = 'sign_in') {
   resetCsrf();
-  await authenticate('/auth/google/complete', { completionId });
+  const body = purpose === 'link' ? { completionId, purpose } : { completionId };
+  await authenticate('/auth/google/complete', body, purpose === 'sign_in');
 }
 
-export async function retryGoogleSession() {
+export async function retryGoogleSession(purpose: GooglePurpose = 'sign_in') {
   revision++;
-  await confirmSignedInSession();
+  await confirmSignedInSession(purpose === 'sign_in');
 }
+
+const signInMethodBusy = () => new ApiError('Wait for the current sign-in method change to finish.', 409, 'SIGN_IN_METHOD_BUSY');
+
+async function refreshSignInMethods(current: Session, started: number) {
+  await restoring?.result;
+  if (started !== revision) return;
+  const refreshed = await readSession();
+  if (started !== revision) return;
+  if (refreshed.session.id !== current.session.id) {
+    throw new ApiError('Your session changed. Reload Profile to check your sign-in methods.', 409);
+  }
+  update({ status: 'authenticated', session: refreshed });
+}
+
+async function changeSignInMethod(path: string, method: 'POST' | 'DELETE', body?: { newPassword: string }) {
+  if (changingPassword || changingSignInMethod) throw signInMethodBusy();
+  const current = requireCurrentSession();
+  const started = revision;
+  changingSignInMethod = true;
+  resetCsrf();
+  try {
+    try {
+      await apiFetch(path, { method, body, sessionId: current.session.id, signal: requestScopeSignal(current.user.id) });
+    } catch (error) {
+      if (error instanceof ApiError && (error.code === 'PASSWORD_ALREADY_SET' || error.status === 0 || error.status >= 500)) {
+        await refreshSignInMethods(current, started).catch(() => undefined);
+      }
+      throw error;
+    }
+    await refreshSignInMethods(current, started).catch(() => {
+      throw new ApiError('Your change was saved. Reload Profile to check your sign-in methods.', 503);
+    });
+  } finally {
+    changingSignInMethod = false;
+  }
+}
+
+export const addPassword = (newPassword: string) => changeSignInMethod('/auth/password/add', 'POST', { newPassword });
+export const unlinkGoogle = () => changeSignInMethod('/auth/google/link', 'DELETE');
 
 export async function changePassword(body: { currentPassword: string; newPassword: string }) {
+  if (changingSignInMethod) throw signInMethodBusy();
   const current = snapshot.session;
   if (!current || changingPassword) return 'unconfirmed';
 
