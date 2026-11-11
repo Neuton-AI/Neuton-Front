@@ -1,0 +1,7 @@
+/auth/complete
+  Cache-Control: no-store
+  Referrer-Policy: no-referrer
+
+/auth/complete/
+  Cache-Control: no-store
+  Referrer-Policy: no-referrer
