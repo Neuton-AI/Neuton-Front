@@ -107,6 +107,48 @@ export const documents = (scope: string) =>
 export const writes = (scope: string) => rows<PendingWrite>('writes', scope);
 export const scans = (scope: string) => rows<PendingScan>('scans', scope);
 
+/** Remove every local row for one account and shop. Other shops in the same database stay. */
+export async function dropShopPartition(userId: string, shopId: string) {
+  const scope = `${userId}:${shopId}`;
+  await transaction([...STORES], async (tx) => {
+    for (const name of STORES) {
+      const objectStore = tx.objectStore(name);
+      const values = (await result(objectStore.index('scope').getAll(scope))) as { key: string }[];
+      for (const value of values) objectStore.delete(value.key);
+    }
+  });
+}
+
+/** Drop local shops the server no longer lists for this account. */
+export async function dropUnlistedShopPartitions(userId: string, shopIds: readonly string[]) {
+  const keep = new Set(shopIds);
+  const prefix = `${userId}:`;
+  const present = new Set<string>();
+  const db = await database();
+  const tx = db.transaction([...STORES], 'readonly');
+  const completed = new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = tx.onabort = () => reject(tx.error ?? new Error('Local storage transaction failed.'));
+  });
+  try {
+    for (const name of STORES) {
+      const values = (await result(tx.objectStore(name).getAll())) as { scope?: string }[];
+      for (const value of values) {
+        if (!value.scope?.startsWith(prefix)) continue;
+        present.add(value.scope.slice(prefix.length));
+      }
+    }
+    await completed;
+  } catch (error) {
+    try { tx.abort(); } catch { /* Already aborted or committed. */ }
+    await completed.catch(() => undefined);
+    throw error;
+  }
+  for (const shopId of present) {
+    if (!keep.has(shopId)) await dropShopPartition(userId, shopId);
+  }
+}
+
 /** Retain private pending work for the same account; drop synced records on explicit sign-out. */
 export async function logoutCleanup(userId: string) {
   await transaction(['documents', 'settings'], async (tx) => {
