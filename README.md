@@ -6,7 +6,7 @@ Start the API and run `npm run dev` for the frontend. Open
 `http://localhost:5173`. Vite forwards `/api` to `http://127.0.0.1:4000`.
 If your API runs on another port, set `NEUTON_API_UPSTREAM` to its address
 before starting Vite. For a custom frontend loopback port, also set the backend's
-`SESSION_ORIGIN` to the exact browser origin.
+`APP_ORIGIN` to the exact browser origin.
 
 Signup signs the user in immediately. The browser restores the HttpOnly cookie
 session and shop memberships after reload. Pending offline work remains scoped
@@ -15,7 +15,7 @@ to the same account and shop. Device sessions can be managed under Profile.
 In production, route `/api/*` on the public HTTPS app origin to the API before
 SPA fallback. Preserve the request method, body, `Origin`, `Cookie`, `Set-Cookie`,
 trace and shop/sync headers. Bypass proxy caching for API routes and stream
-SSE responses without buffering. Set the backend's `SESSION_ORIGIN` to the
+SSE responses without buffering. Set the backend's `APP_ORIGIN` to the
 public HTTPS app origin.
 
 ## PWA installation and offline shell
