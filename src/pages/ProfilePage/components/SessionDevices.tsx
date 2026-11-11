@@ -13,8 +13,8 @@ export function SessionDevices({ signOutEverywhere }: { signOutEverywhere: () =>
       <ul className="grid gap-3">
         {devices.map((device) => <li key={device.id} className="flex items-center justify-between gap-4">
           <div>
-            <p>{device.deviceLabel || (device.current ? 'This session' : 'Another session')}</p>
-            <p className="text-ink-muted">Last active {new Date(device.lastActivityAt).toLocaleString()}</p>
+            <p>{device.deviceLabel || 'Unknown'}{device.current ? ' · This device' : ''}</p>
+            <p className="text-ink-muted">Last seen {new Date(device.lastActivityAt).toLocaleString()}</p>
           </div>
           <button type="button" className="pressable" disabled={pending} onClick={() => void end(device.id)}>End session</button>
         </li>)}
