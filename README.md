@@ -12,11 +12,13 @@ Signup signs the user in immediately. The browser restores the HttpOnly cookie
 session and shop memberships after reload. Pending offline work remains scoped
 to the same account and shop. Device sessions can be managed under Profile.
 
-In production, route `/api/*` on the public HTTPS app origin to the API before
-SPA fallback. Preserve the request method, body, `Origin`, `Cookie`, `Set-Cookie`,
-trace and shop/sync headers. Bypass proxy caching for API routes and stream
-SSE responses without buffering. Set the backend's `APP_ORIGIN` to the
-public HTTPS app origin.
+In production, `functions/api/[[path]].ts` forwards `/api/*` to the API before
+SPA fallback. The browser stays on the Pages origin. The default upstream is
+`https://neuton-back.onrender.com`; set Pages `API_UPSTREAM` to another bare
+HTTPS origin when the API moves. Preserve the request method, body, `Origin`,
+`Cookie`, `Set-Cookie`, trace and shop/sync headers. Bypass proxy caching for
+API routes and stream SSE responses without buffering. Set the backend's
+`APP_ORIGIN` to the public HTTPS app origin.
 
 ## PWA installation and offline shell
 

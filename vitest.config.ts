@@ -16,7 +16,7 @@ export default mergeConfig(
       css: false,
       restoreMocks: true,
       clearMocks: true,
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.{ts,tsx}', 'functions/**/*.test.ts'],
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html', 'json-summary'],
