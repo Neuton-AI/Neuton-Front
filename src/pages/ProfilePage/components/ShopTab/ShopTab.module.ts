@@ -1,6 +1,6 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { useShopSettings, useUpdateShop } from "@/features/shops/shopsApi";
+import { useDeleteShop, useShopSettings, useUpdateShop } from "@/features/shops/shopsApi";
 import { toNumber } from "@/lib/format";
 import { useEffect, useState } from "react";
 
@@ -22,8 +22,14 @@ export function useShopTab({
   const shopQuery = useShopSettings(userId, shopId);
 
   const updateShop = useUpdateShop(userId, shopId);
+  const deleteShop = useDeleteShop(userId, shopId);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [typedName, setTypedName] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
 
   const shop = shopQuery.data?.shop ?? null;
+  const shopName = shop?.name ?? "";
+  const canDelete = role === "owner" && Boolean(shopId);
 
   const [form, setForm] = useState({
     storeAddress: "",
@@ -170,6 +176,29 @@ export function useShopTab({
   ];
   const handleFieldChange = (name: keyof typeof formValues, value: string) =>
     setForm((prev) => ({ ...prev, [name]: value }));
+  const confirmDeleteDisabled = typedName !== shopName || deleteShop.isPending || !shopName;
+  const openDelete = () => {
+    setTypedName("");
+    setDeleteMessage(null);
+    setDeleteOpen(true);
+  };
+  const closeDelete = () => {
+    if (deleteShop.isPending) return;
+    setDeleteOpen(false);
+    setTypedName("");
+    setDeleteMessage(null);
+  };
+  const confirmDelete = async () => {
+    if (confirmDeleteDisabled) return;
+    try {
+      await deleteShop.mutateAsync(typedName);
+      setDeleteOpen(false);
+      setTypedName("");
+      setDeleteMessage(null);
+    } catch (cause) {
+      setDeleteMessage(cause instanceof Error ? cause.message : "Could not delete this shop.");
+    }
+  };
   return {
     fields,
     formValues,
@@ -182,6 +211,17 @@ export function useShopTab({
     shopQueryError,
     handleRetry,
     shopQueryIsLoading,
+    canDelete,
+    shopName,
+    deleteOpen,
+    typedName,
+    setTypedName,
+    deleteMessage,
+    confirmDeleteDisabled,
+    deletePending: deleteShop.isPending,
+    openDelete,
+    closeDelete,
+    confirmDelete,
   };
 }
 export type ShopTabModel = ReturnType<typeof useShopTab>;

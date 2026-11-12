@@ -1,5 +1,6 @@
 import { shopsKeys } from '@/features/shops/keys';
 import { type Shop } from '@/features/shops/types';
+import { restoreSession } from '@/features/auth/auth';
 import { apiFetch } from '@/lib/api';
 import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
@@ -37,6 +38,16 @@ export function useUpdateShop(
       apiFetch<{ shop: Shop }>('/shop', { method: 'PATCH', userId, shopId, body }),
     onSuccess: (data) => {
       queryClient.setQueryData(shopsKeys.shop(shopId), data);
+    },
+  });
+}
+
+export function useDeleteShop(userId: UserId, shopId: ShopId): UseMutationResult<void, Error, string> {
+  return useMutation({
+    mutationFn: (name: string) =>
+      apiFetch<void>(`/shops/${shopId}`, { method: 'DELETE', userId, shopId, body: { name } }),
+    onSuccess: () => {
+      void restoreSession();
     },
   });
 }

@@ -120,6 +120,45 @@ describe("useShopTab", () => {
       "Target profit margin is outside the allowed range.",
     );
   });
+  it("requires the exact shop name and explains a mismatch", async () => {
+    let deleted = 0;
+    server.use(
+      http.delete(apiPath("/shops/shop-1"), async ({ request }) => {
+        deleted += 1;
+        const body = await request.json() as { name?: string };
+        if (body.name !== "testShop") {
+          return HttpResponse.json(
+            { error: { code: "CONFLICT", message: "The shop name does not match.", traceId: "trace" } },
+            { status: 409 },
+          );
+        }
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { result } = renderHookWithProviders(() => useShopTab(props));
+    await waitFor(() => expect(result.current.shopName).toBe("testShop"));
+    expect(result.current.canDelete).toBe(true);
+    const member = renderHookWithProviders(() => useShopTab({ ...props, role: "member" }));
+    await waitFor(() => expect(member.result.current.shopName).toBe("testShop"));
+    expect(member.result.current.canDelete).toBe(false);
+    act(() => result.current.openDelete());
+    act(() => result.current.setTypedName("testshop"));
+    expect(result.current.confirmDeleteDisabled).toBe(true);
+    await act(() => result.current.confirmDelete());
+    expect(deleted).toBe(0);
+    act(() => result.current.setTypedName("testShop"));
+    server.use(
+      http.delete(apiPath("/shops/shop-1"), () =>
+        HttpResponse.json(
+          { error: { code: "CONFLICT", message: "The shop name does not match.", traceId: "trace" } },
+          { status: 409 },
+        ),
+      ),
+    );
+    await act(() => result.current.confirmDelete());
+    expect(result.current.deleteMessage).toBe("The shop name does not match.");
+    expect(result.current.deleteOpen).toBe(true);
+  });
   it("leaves settings queries idle without a shop", () => {
     const { result } = renderHookWithProviders(() =>
       useShopTab({ ...props, shopId: null }),

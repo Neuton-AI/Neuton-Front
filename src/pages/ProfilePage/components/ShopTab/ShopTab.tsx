@@ -2,6 +2,7 @@ import type React from "react";
 import { FormFields } from "@/components/FormFields/FormFields";
 import { ErrorState, InlineNotice, Skeleton } from "@/components/feedback";
 import { Button } from "@/components/ui";
+import { DeleteShopDialog } from "./DeleteShopDialog";
 import { useShopTab } from "./ShopTab.module";
 
 interface IShopTab {
@@ -33,6 +34,17 @@ export const ShopTab: React.FC<IShopTab> = ({
     shopQueryError,
     handleRetry,
     shopQueryIsLoading,
+    canDelete,
+    shopName,
+    deleteOpen,
+    typedName,
+    setTypedName,
+    deleteMessage,
+    confirmDeleteDisabled,
+    deletePending,
+    openDelete,
+    closeDelete,
+    confirmDelete,
   } = useShopTab({ userId, shopId, role, fallbackName, onSaved, onNotice });
   if (!shopId) {
     return (
@@ -60,6 +72,7 @@ export const ShopTab: React.FC<IShopTab> = ({
     );
   }
   return (
+    <div className="flex flex-col gap-8">
     <form onSubmit={save} className="flex flex-col gap-3">
       {shopQueryError ? (
         <ErrorState
@@ -96,5 +109,28 @@ export const ShopTab: React.FC<IShopTab> = ({
         </p>
       )}
     </form>
+    {canDelete ? (
+      <section className="flex flex-col gap-3 border-t border-hairline pt-6">
+        <h2 className="text-[16px] font-bold text-ink">Danger Zone</h2>
+        <p className="text-body text-ink-muted">
+          Delete this shop permanently. This cannot be undone.
+        </p>
+        <Button type="button" variant="danger" size="sm" radius="input" onClick={openDelete}>
+          Delete shop
+        </Button>
+      </section>
+    ) : null}
+    <DeleteShopDialog
+      open={deleteOpen}
+      shopName={shopName}
+      typedName={typedName}
+      message={deleteMessage}
+      pending={deletePending}
+      confirmDisabled={confirmDeleteDisabled}
+      onTypedName={setTypedName}
+      onConfirm={() => void confirmDelete()}
+      onCancel={closeDelete}
+    />
+    </div>
   );
 };

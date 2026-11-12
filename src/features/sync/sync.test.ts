@@ -638,6 +638,21 @@ describe('local-first persistence and synchronization', () => {
     );
   });
 
+  it('drops one shop partition and leaves the other shop in place', async () => {
+    const other = scopeFor(userId, 'shop-two');
+    const otherDocument = { ...original, key: documentKey(other, 'recipe', id), scope: other.key };
+    await store.transaction(['documents', 'writes'], (tx) => {
+      tx.objectStore('documents').put(otherDocument);
+      tx.objectStore('writes').put({ key: `${scope.key}:write`, scope: scope.key, id: 'pending' });
+    });
+    await store.dropShopPartition(userId, context.shopId);
+    expect(await store.documents(scope.key)).toEqual([]);
+    expect(await store.writes(scope.key)).toEqual([]);
+    expect(await store.documents(other.key)).toEqual([otherDocument]);
+    await store.dropUnlistedShopPartitions(userId, [context.shopId]);
+    expect(await store.documents(other.key)).toEqual([]);
+  });
+
   it('clears synced records at logout but retains private pending work', async () => {
     await saveScan(
       [new File(['scan'], 'scan.jpg', { type: 'image/jpeg' })],

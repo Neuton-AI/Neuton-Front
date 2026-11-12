@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { ShopMembership } from '@/features/shops/types';
-import { logoutCleanup } from '@/features/sync/store';
+import { dropUnlistedShopPartitions, logoutCleanup } from '@/features/sync/store';
 import { ApiError, apiFetch, requestScopeSignal, resetCsrf, setRequestSession, setRequestShop } from '@/lib/api';
 import type { GooglePurpose } from './google-return';
 
@@ -111,6 +111,11 @@ export function restoreSession() {
   const result = (async () => {
     try {
       const session = await readSession();
+      try {
+        await dropUnlistedShopPartitions(session.user.id, session.memberships.map(({ shop }) => shop.id));
+      } catch {
+        // IndexedDB can fail closed. The next session load retries the drop.
+      }
       if (started === revision) update({ status: 'authenticated', session, message: logoutUnconfirmed });
     } catch (error) {
       if (started !== revision) return;
