@@ -149,10 +149,17 @@ describe("AuthPage sign in", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("hides Google when the backend reports it is unavailable", async () => {
-    renderAuth("/signin");
-    await waitFor(() => expect(auth.googleSignInAvailable).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+  it("shows Google for a signed-out visitor when the session check is unauthorized", async () => {
+    auth.useAuth.mockReturnValue({
+      session: null,
+      loading: false,
+      unavailable: true,
+      message: "Session unavailable. Check your connection and try again.",
+    });
+    renderAuth("/signup", "signup");
+    const button = await screen.findByRole("button", { name: "Continue with Google" });
+    await userEvent.click(button);
+    expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
   });
 
   it("shows the Google option and lets users retry after cancellation", async () => {

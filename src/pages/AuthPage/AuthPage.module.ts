@@ -1,6 +1,6 @@
 import type { FormField } from "@/components/FormFields/schema";
 import { validateFields } from "@/components/FormFields/schema";
-import { googleSignInAvailable, restoreSession, signIn, signUp, startGoogleSignIn, useAuth } from "@/features/auth/auth";
+import { restoreSession, signIn, signUp, startGoogleSignIn, useAuth } from "@/features/auth/auth";
 import { ApiError } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -31,7 +31,6 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const [busy, setBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
-  const [googleEnabled, setGoogleEnabled] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const googleStart = useRef<AbortController>();
 
@@ -43,12 +42,6 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   }, [mode]);
 
   useEffect(() => {
-    let active = true;
-    const check = () => {
-      void googleSignInAvailable().then((enabled) => {
-        if (active) setGoogleEnabled(enabled);
-      }).catch(() => undefined);
-    };
     const returned = (event: PageTransitionEvent) => {
       if (event.persisted) {
         googleStart.current?.abort();
@@ -56,19 +49,15 @@ export function useAuthPage({ mode }: { mode: Mode }) {
         void restoreSession();
       }
     };
-    check();
-    window.addEventListener('online', check);
     window.addEventListener('pageshow', returned);
     return () => {
-      active = false;
       googleStart.current?.abort();
-      window.removeEventListener('online', check);
       window.removeEventListener('pageshow', returned);
     };
   }, []);
 
   const startGoogle = async () => {
-    if (busy || googleBusy || session || loading || unavailable) return;
+    if (busy || googleBusy || session) return;
     const controller = new AbortController();
     googleStart.current = controller;
     setGoogleBusy(true);
@@ -185,7 +174,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     signedIn: Boolean(session),
     destination,
     checkSession,
-    googleEnabled: googleEnabled && !session && !loading && !unavailable,
+    googleEnabled: !session,
     googleBusy,
     startGoogle,
     setSegment,

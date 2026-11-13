@@ -1,6 +1,5 @@
 import type React from "react";
 import { FormFields } from "@/components/FormFields/FormFields";
-import { FullPageLoader } from "@/components/feedback";
 import { Button } from "@/components/ui";
 import { Navigate } from "react-router-dom";
 import {
@@ -18,7 +17,6 @@ interface IAuthPage {
 export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
   const model = useAuthPage({ mode });
   const submitLabel = model.isSignIn ? "Sign in" : "Create account";
-  if (model.loading) return <FullPageLoader label="Checking your session" />;
   if (model.signedIn && !model.busy) return <Navigate to={model.destination} replace />;
   return (
     <div className="shell">
