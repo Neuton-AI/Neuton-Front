@@ -2,23 +2,22 @@
 
 ## Sign-in
 
-Start the API and run `npm run dev` for the frontend. Open
-`http://localhost:5173`. Vite forwards `/api` to `http://127.0.0.1:4000`.
-If your API runs on another port, set `NEUTON_API_UPSTREAM` to its address
-before starting Vite. For a custom frontend loopback port, also set the backend's
-`APP_ORIGIN` to the exact browser origin.
+Set `VITE_API_BASE_URL` to the API origin, then start the API and run `npm run dev`.
+Open `http://localhost:5173`. The dev server and preview server refuse to start
+without `VITE_API_BASE_URL`. Vite forwards `/api` to that origin. The browser
+keeps calling `/api/v1` on the page's own address. For a custom frontend
+loopback port, also set the backend's `APP_ORIGIN` to the exact browser origin.
 
 Signup signs the user in immediately. The browser restores the HttpOnly cookie
 session and shop memberships after reload. Pending offline work remains scoped
 to the same account and shop. Device sessions can be managed under Profile.
 
-In production, `functions/api/[[path]].ts` forwards `/api/*` to the API before
-SPA fallback. The browser stays on the Pages origin. The default upstream is
-`https://neuton-back.onrender.com`; set Pages `API_UPSTREAM` to another bare
-HTTPS origin when the API moves. Preserve the request method, body, `Origin`,
-`Cookie`, `Set-Cookie`, trace and shop/sync headers. Bypass proxy caching for
-API routes and stream SSE responses without buffering. Set the backend's
-`APP_ORIGIN` to the public HTTPS app origin.
+In production, `functions/api/[[path]].ts` forwards `/api/*` to `VITE_API_BASE_URL`
+before SPA fallback. Pages must set `VITE_API_BASE_URL` to one bare HTTPS origin.
+There is no fallback host. The browser stays on the Pages origin. Preserve the
+request method, body, `Origin`, `Cookie`, `Set-Cookie`, trace and shop/sync
+headers. Bypass proxy caching for API routes and stream SSE responses without
+buffering. Set the backend's `APP_ORIGIN` to the public HTTPS app origin.
 
 ## PWA installation and offline shell
 

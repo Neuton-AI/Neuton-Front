@@ -4,7 +4,7 @@ import { proxyApiRequest } from './api-proxy';
 function context(url: string, init: RequestInit = {}, upstream?: string) {
   return {
     request: new Request(url, init),
-    env: { API_UPSTREAM: upstream },
+    env: { VITE_API_BASE_URL: upstream },
   };
 }
 
@@ -17,13 +17,13 @@ describe('Pages API proxy', () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(upstream);
     const response = await proxyApiRequest(context('https://neuton-front.pages.dev/api/v1/session', {
       headers: { cookie: 'neuton-csrf=proof', origin: 'https://neuton-front.pages.dev', host: 'neuton-front.pages.dev' },
-    }), fetchImpl);
+    }, 'https://api.example.test'), fetchImpl);
 
     expect(response).toBe(upstream);
     expect(fetchImpl).toHaveBeenCalledOnce();
     const [destination, init] = fetchImpl.mock.calls[0];
     expect(destination).toBeInstanceOf(URL);
-    expect((destination as URL).href).toBe('https://neuton-back.onrender.com/api/v1/session');
+    expect((destination as URL).href).toBe('https://api.example.test/api/v1/session');
     expect(init?.method).toBe('GET');
     expect(init?.redirect).toBe('manual');
     expect(init?.body).toBeUndefined();
@@ -51,7 +51,7 @@ describe('Pages API proxy', () => {
 
   it('refuses an upstream that is not one HTTPS origin', async () => {
     const fetchImpl = vi.fn<typeof fetch>();
-    for (const upstream of ['http://neuton-back.onrender.com', 'https://user:secret@api.example.test', 'https://api.example.test/api', 'not a url']) {
+    for (const upstream of [undefined, '', '   ', 'http://api.example.test', 'https://user:secret@api.example.test', 'https://api.example.test/api', 'not a url']) {
       const response = await proxyApiRequest(context('https://neuton-front.pages.dev/api/v1/session', {}, upstream), fetchImpl);
       expect(response.status).toBe(502);
       expect(response.headers.get('cache-control')).toBe('no-store');

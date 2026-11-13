@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
@@ -22,10 +22,38 @@ function googleCompletionDocument(loadHtml: (url: string) => Promise<string>) {
   };
 }
 
+function readApiUpstream(mode: string): string | undefined {
+  const fromProcess = process.env.VITE_API_BASE_URL?.trim();
+  if (fromProcess) return fromProcess;
+  if (process.env.NEUTON_SKIP_ENV_FILES === '1') return undefined;
+  const fromFile = loadEnv(mode, process.cwd(), '').VITE_API_BASE_URL?.trim();
+  if (fromFile) return fromFile;
+  return undefined;
+}
+
+function requireApiUpstream(mode: string): string {
+  const upstream = readApiUpstream(mode);
+  if (!upstream) {
+    throw new Error('VITE_API_BASE_URL is required. Set it to the API origin before starting the server.');
+  }
+  return upstream;
+}
+
 export default defineConfig({
   envDir: process.env.NEUTON_SKIP_ENV_FILES === '1' ? false : undefined,
   plugins: [
     react(),
+    {
+      name: 'api-upstream',
+      configureServer(server) {
+        if (process.env.VITEST === 'true') return;
+        server.config.server.proxy = { '/api': requireApiUpstream(server.config.mode) };
+      },
+      configurePreviewServer(server) {
+        if (process.env.VITEST === 'true') return;
+        server.config.preview.proxy = { '/api': requireApiUpstream(server.config.mode) };
+      },
+    },
     {
       name: 'google-completion-headers',
       configureServer(server) {
@@ -84,9 +112,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { '/api': process.env.NEUTON_API_UPSTREAM ?? 'http://127.0.0.1:3000' },
   },
-  preview: { proxy: { '/api': process.env.NEUTON_API_UPSTREAM ?? 'http://127.0.0.1:3000' } },
   build: {
     rollupOptions: {
       output: {
