@@ -1,141 +1,11 @@
-import type React from "react";
 import { BottomNav } from "@/components/BottomNav/BottomNav";
-import { Fab } from "@/components/Fab/Fab";
-import { useFabNavigation } from "@/components/Fab/Fab.module";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { StatCard } from "@/components/StatCard/StatCard";
 import { renderWithRouter } from "@/test/render";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useLocation } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-
-/**
- * These are the persistent navigation chrome. The promises worth protecting
- * are structural: the FAB only offers actions the caller actually wired up, it
- * dismisses on Escape, BottomNav marks the active tab for assistive tech, and
- * StatCard never renders a half-built value.
- */
-
-describe("Fab", () => {
-  it("starts collapsed with a single button and no expanded state", () => {
-    renderWithRouter(<Fab />);
-
-    const trigger = screen.getByRole("button", { name: "Open actions" });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.queryByRole("button", { name: "Scan with camera" }),
-    ).toBeNull();
-  });
-
-  it("reveals an action only when the caller supplied its handler", async () => {
-    // The actions list is filtered on onClick, so a missing handler means the
-    // action must not appear as a dead button.
-    const user = userEvent.setup();
-    renderWithRouter(<Fab onCapture={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Open actions" }));
-
-    expect(
-      screen.getByRole("button", { name: /Scan with camera/ }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Upload file/ })).toBeNull();
-  });
-
-  it("flips aria-expanded and relabels itself while open", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<Fab onCapture={vi.fn()} onUploadFile={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Open actions" }));
-
-    expect(
-      screen.getByRole("button", { name: "Close actions" }),
-    ).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("runs the action handler once and closes itself", async () => {
-    const user = userEvent.setup();
-    const onCapture = vi.fn();
-    renderWithRouter(<Fab onCapture={onCapture} />);
-
-    await user.click(screen.getByRole("button", { name: "Open actions" }));
-    await user.click(screen.getByRole("button", { name: /Scan with camera/ }));
-
-    expect(onCapture).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByRole("button", { name: "Open actions" }),
-    ).toBeInTheDocument();
-  });
-
-  it("dismisses on Escape", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<Fab onCapture={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Open actions" }));
-    await user.keyboard("{Escape}");
-
-    expect(
-      screen.queryByRole("button", { name: /Scan with camera/ }),
-    ).toBeNull();
-  });
-
-  it("dismisses when a pointer goes down outside the FAB", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(
-      <div>
-        <Fab onCapture={vi.fn()} />
-        <button type="button">Somewhere else</button>
-      </div>,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Open actions" }));
-    expect(
-      screen.getByRole("button", { name: /Scan with camera/ }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Somewhere else" }));
-
-    expect(
-      screen.queryByRole("button", { name: /Scan with camera/ }),
-    ).toBeNull();
-  });
-});
-
-describe("useFabNavigation", () => {
-  const Harness: React.FC = () => {
-    const { onCapture, onUploadFile } = useFabNavigation();
-    const { pathname, search } = useLocation();
-    return (
-      <>
-        <button type="button" onClick={onCapture}>
-          camera
-        </button>
-        <button type="button" onClick={onUploadFile}>
-          file
-        </button>
-        <output data-testid="where">
-          {pathname}
-          {search}
-        </output>
-      </>
-    );
-  };
-
-  it("routes camera and file to the capture flow with the right source", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<Harness />, { route: "/catalog" });
-
-    await user.click(screen.getByRole("button", { name: "camera" }));
-    expect(screen.getByTestId("where")).toHaveTextContent(
-      "/capture?source=camera",
-    );
-
-    await user.click(screen.getByRole("button", { name: "file" }));
-    expect(screen.getByTestId("where")).toHaveTextContent(
-      "/capture?source=file",
-    );
-  });
-});
 
 describe("BottomNav", () => {
   it("is a labelled primary navigation landmark", () => {
@@ -146,16 +16,32 @@ describe("BottomNav", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders all four destinations as real links", () => {
+  it("renders the capture link between Catalog and Orders", () => {
     renderWithRouter(<BottomNav />, { route: "/dashboard" });
 
     const links = screen.getAllByRole("link");
     expect(links.map((a) => a.getAttribute("href"))).toEqual([
       "/dashboard",
       "/catalog",
+      "/capture",
       "/orders",
       "/profile",
     ]);
+  });
+
+  it("opens the capture route directly from the center action", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(
+      <Routes>
+        <Route path="/dashboard" element={<BottomNav />} />
+        <Route path="/capture" element={<h1>Capture</h1>} />
+      </Routes>,
+      { route: "/dashboard" },
+    );
+
+    await user.click(screen.getByRole("link", { name: "Scan or upload" }));
+
+    expect(screen.getByRole("heading", { name: "Capture" })).toBeInTheDocument();
   });
 
   it('marks exactly the active tab with aria-current="page"', () => {

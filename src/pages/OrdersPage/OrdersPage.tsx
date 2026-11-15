@@ -1,10 +1,9 @@
 import type React from "react";
 import { BottomNav } from "@/components/BottomNav/BottomNav";
-import { Fab } from "@/components/Fab/Fab";
 import { ErrorState } from "@/components/feedback";
 import { Layout } from "@/components/Layout/Layout";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
-import { Link } from "react-router-dom";
+import { NewOrderAction } from "./components/NewOrderAction/NewOrderAction";
 import { OrderFilters } from "./components/OrderFilters/OrderFilters";
 import { OrderRow } from "./components/OrderRow/OrderRow";
 import { OrdersEmpty } from "./components/OrdersEmpty/OrdersEmpty";
@@ -17,7 +16,7 @@ export const OrdersPage: React.FC = () => {
     <Layout
       className="shell"
       mainContent={
-        <div className="flex-1 pb-44">
+        <div className="flex-1 pb-[calc(var(--bottom-nav-height)+100px)]">
           <PageHeader
             eyebrow="YOUR SALES"
             title="Orders"
@@ -49,19 +48,7 @@ export const OrdersPage: React.FC = () => {
           </div>
         </div>
       }
-      actions={
-        <Fab
-          {...model.fabNavigation}
-          action={
-            <Link
-              to="/orders/new"
-              className="pressable flex h-14 w-full items-center justify-center rounded-pill bg-brand-primary text-[14px] font-medium text-ink-on-primary shadow-[0_8px_24px_rgba(204,120,92,0.32)] transition-colors"
-            >
-              Add New Order
-            </Link>
-          }
-        />
-      }
+      actions={<NewOrderAction />}
       footer={<BottomNav />}
     />
   );

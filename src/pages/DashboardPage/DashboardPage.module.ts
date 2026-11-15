@@ -1,4 +1,3 @@
-import { useFabNavigation } from "@/components/Fab/Fab.module";
 import { useDashboardSummary } from "@/features/analytics/analyticsApi";
 import type { DashboardPeriod } from "@/features/analytics/types";
 import { useChartSeries } from "@/features/analytics/usePeriodSeries";
@@ -27,8 +26,6 @@ export function useDashboardPage() {
   } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
-
-  const fabNavigation = useFabNavigation();
 
   const navigate = useNavigate();
 
@@ -83,7 +80,6 @@ export function useDashboardPage() {
     shopsLoading,
     shopsError,
     setActiveShopId,
-    fabNavigation,
     period,
     setPeriod,
     profitability,

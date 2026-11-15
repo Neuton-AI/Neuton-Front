@@ -1,6 +1,5 @@
 import type React from "react";
 import { BottomNav } from "@/components/BottomNav/BottomNav";
-import { Fab } from "@/components/Fab/Fab";
 import { Layout } from "@/components/Layout/Layout";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { CatalogBody } from "./components/CatalogBody/CatalogBody";
@@ -23,8 +22,7 @@ export const CatalogPage: React.FC = () => {
           <CatalogBody model={model} />
         </div>
       }
-      actions={<Fab {...model.fabNavigation} />}
-      footer={<BottomNav />}
+      footer={<BottomNav captureKind={model.captureKind} />}
     />
   );
 };

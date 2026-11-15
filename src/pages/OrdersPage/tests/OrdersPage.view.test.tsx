@@ -7,7 +7,6 @@ import { useOrdersPage, type OrdersPageModel } from "../OrdersPage.module";
 vi.mock("../OrdersPage.module", () => ({ useOrdersPage: vi.fn() }));
 it("renders module errors and forwards retry and status-selection actions", async () => {
   const model: OrdersPageModel = {
-    fabNavigation: { onCapture: vi.fn(), onUploadFile: vi.fn() },
     statusFilter: "all",
     setStatusFilter: vi.fn(),
     error: new Error("offline"),

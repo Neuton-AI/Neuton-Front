@@ -1,4 +1,3 @@
-import { useFabNavigation } from "@/components/Fab/Fab.module";
 import {
   useAuth,
   useCurrentShop,
@@ -21,8 +20,6 @@ export function useOrdersPage() {
   const { memberships, activeShopId } = useShopMemberships(user?.id);
 
   const shop = useCurrentShop(memberships, activeShopId);
-
-  const fabNavigation = useFabNavigation();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -55,7 +52,6 @@ export function useOrdersPage() {
     void refetch();
   };
   return {
-    fabNavigation,
     statusFilter,
     setStatusFilter,
     error,
