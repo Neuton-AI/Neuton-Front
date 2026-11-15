@@ -321,3 +321,17 @@ describe("CatalogPage recipes tab incomplete cost", () => {
 vi.mock("@/features/sync/documentsApi", async () => ({
   documentFetch: (await import("@/lib/api")).apiFetch,
 }));
+
+it.each([
+  ["/catalog", "/capture?kind=recipe"],
+  ["/catalog?tab=receipts", "/capture"],
+  ["/catalog?tab=inventory", "/capture"],
+])("opens capture with the matching default from %s", (route, capturePath) => {
+  api.apiFetch.mockResolvedValue({ recipes: [], receipts: [], items: [] });
+  renderWithRouter(<CatalogPage />, { route });
+
+  expect(screen.getByRole("link", { name: "Scan or upload" })).toHaveAttribute(
+    "href",
+    capturePath,
+  );
+});

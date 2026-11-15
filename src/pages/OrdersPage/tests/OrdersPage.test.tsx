@@ -130,7 +130,7 @@ describe("OrdersPage", () => {
     expect(mayaLink).toBeDefined();
   });
 
-  it("renders the bottom CTA Add New Order button alongside the FAB above the bottom nav", async () => {
+  it("keeps Add New Order separate from the capture link in the bottom nav", () => {
     api.apiFetch.mockResolvedValueOnce({ orders: sampleOrders, total: 2 });
     renderWithRouter(<OrdersPage />);
 
@@ -138,8 +138,12 @@ describe("OrdersPage", () => {
     expect(ctaButton).toBeInTheDocument();
     expect(ctaButton).toHaveAttribute("href", "/orders/new");
 
-    const fabTrigger = screen.getByRole("button", { name: "Open actions" });
-    expect(fabTrigger).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    expect(nav).not.toContainElement(ctaButton);
+    expect(screen.getByRole("link", { name: "Scan or upload" })).toHaveAttribute(
+      "href",
+      "/capture",
+    );
   });
 
   it("renders empty state matching Brilliant design when no orders exist", async () => {

@@ -1,4 +1,4 @@
-import { useFabNavigation, type MediaKind } from "@/components/Fab/Fab.module";
+import type { MediaKind } from "@/features/uploads/types";
 import {
   useAuth,
   useCurrentShop,
@@ -17,10 +17,8 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "inventory", label: "Inventory" },
 ];
 
-const TAB_TO_KIND: Record<Tab, MediaKind> = {
+const CAPTURE_KIND: Partial<Record<Tab, MediaKind>> = {
   recipes: "recipe",
-  inventory: "receipt",
-  receipts: "receipt",
 };
 export function useCatalogPage() {
   const location = useLocation();
@@ -38,8 +36,6 @@ export function useCatalogPage() {
   const tab: Tab = TABS.some((t) => t.key === requestedTab)
     ? (requestedTab as Tab)
     : "recipes";
-
-  const fabNavigation = useFabNavigation(TAB_TO_KIND[tab]);
 
   // Each tab is its own query, enabled only while visible: `/recipes` costs
   // every recipe against live inventory, so fetching all three on mount is both
@@ -114,7 +110,7 @@ export function useCatalogPage() {
     },
     shop,
     tab,
-    fabNavigation,
+    captureKind: CAPTURE_KIND[tab],
     recipes,
     inventory,
     receipts,

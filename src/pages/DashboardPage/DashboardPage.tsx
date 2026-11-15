@@ -1,6 +1,5 @@
 import type React from "react";
 import { BottomNav } from "@/components/BottomNav/BottomNav";
-import { Fab } from "@/components/Fab/Fab";
 import { ErrorState, FullPageLoader } from "@/components/feedback";
 import { Layout } from "@/components/Layout/Layout";
 import { InstallAppPopover } from "@/features/pwa/InstallApp";
@@ -34,7 +33,6 @@ export const DashboardPage: React.FC = () => {
           <DashboardMetrics {...model} />
         </div>
       }
-      actions={<Fab {...model.fabNavigation} />}
       footer={<BottomNav />}
     />
   );
