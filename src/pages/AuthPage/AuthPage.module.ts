@@ -19,7 +19,7 @@ export function useAuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
 
   const location = useLocation();
-  const { session, loading, unavailable, message: sessionMessage } = useAuth();
+  const { session, message: signOutNotice = null } = useAuth();
   const destination = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   const [email, setEmail] = useState("");
@@ -106,17 +106,6 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     }
   };
 
-  const checkSession = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await restoreSession();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const isSignIn = segment === "signin";
 
   const formValues = { email, password, fullName };
@@ -162,18 +151,14 @@ export function useAuthPage({ mode }: { mode: Mode }) {
     else setFullName(value);
   };
   const notice = error ?? googleNotice(location.search);
-  const sessionNotice = unavailable ? sessionMessage : null;
   return {
     fields,
     formValues,
     handleFieldChange,
     busy,
-    error: notice ?? sessionNotice,
-    loading,
-    unavailable,
+    error: notice ?? signOutNotice,
     signedIn: Boolean(session),
     destination,
-    checkSession,
     googleEnabled: !session,
     googleBusy,
     startGoogle,

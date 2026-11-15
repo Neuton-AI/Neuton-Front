@@ -37,9 +37,6 @@ export const AuthPage: React.FC<IAuthPage> = ({ mode }) => {
               {model.error}
             </p>
           ) : null}
-          {model.unavailable && (
-            <Button variant="outline" onClick={model.checkSession} loading={model.busy}>Check session again</Button>
-          )}
           <Button
             type="submit"
             variant="primary"

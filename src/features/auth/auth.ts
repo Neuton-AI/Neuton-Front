@@ -29,7 +29,6 @@ type AuthSnapshot = {
 const activeShopKey = 'neuton.activeShopId';
 const listeners = new Set<() => void>();
 const emptyMemberships: ShopMembership[] = [];
-const unavailableMessage = 'Session unavailable. Check your connection and try again.';
 const channel = typeof window.BroadcastChannel === 'function' ? new BroadcastChannel('neuton-session') : null;
 let snapshot: AuthSnapshot = { status: 'loading', session: null };
 let revision = 0;
@@ -67,7 +66,7 @@ function sessionFailure(status: number) {
   // In-flight requests can still refer to the old session while its replacement is being confirmed.
   if (changingPassword) return;
   if (status === 401) update({ status: 'anonymous', session: null });
-  else update({ status: 'unavailable', session: null, message: unavailableMessage });
+  else update({ status: 'unavailable', session: null });
 }
 
 function update(next: AuthSnapshot) {
@@ -126,7 +125,7 @@ export function restoreSession() {
           update({ status: 'anonymous', session: null });
         }
       } else {
-        update({ status: 'unavailable', session: null, message: logoutUnconfirmed ?? unavailableMessage });
+        update({ status: 'unavailable', session: null, message: logoutUnconfirmed });
       }
     }
   })();
@@ -150,7 +149,9 @@ async function confirmSignedInSession(notifyOtherTabs: boolean) {
   logoutUnconfirmed = undefined;
   resetCsrf();
   await restoreSession();
-  if (!snapshot.session) throw new ApiError(unavailableMessage, 503, 'SESSION_CONFIRMATION_FAILED');
+  if (!snapshot.session) {
+    throw new ApiError('Could not sign you in. Please try signing in again.', 503, 'SESSION_CONFIRMATION_FAILED');
+  }
   if (notifyOtherTabs) channel?.postMessage('changed');
 }
 

@@ -149,15 +149,20 @@ describe("AuthPage sign in", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows Google for a signed-out visitor when the session check is unauthorized", async () => {
+  it.each(["signin", "signup"] as const)("keeps %s usable when session restoration fails", async (mode) => {
     auth.useAuth.mockReturnValue({
       session: null,
       loading: false,
       unavailable: true,
-      message: "Session unavailable. Check your connection and try again.",
     });
-    renderAuth("/signup", "signup");
-    const button = await screen.findByRole("button", { name: "Continue with Google" });
+    renderAuth("/" + mode, mode);
+
+    expect(screen.getByTestId("where")).toHaveTextContent("/" + mode);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /check session/i })).not.toBeInTheDocument();
+    const submitLabel = mode === "signin" ? "Sign in" : "Create account";
+    expect(screen.getByRole("button", { name: submitLabel })).toBeEnabled();
+    const button = screen.getByRole("button", { name: "Continue with Google" });
     await userEvent.click(button);
     expect(auth.startGoogleSignIn).toHaveBeenCalledTimes(1);
   });

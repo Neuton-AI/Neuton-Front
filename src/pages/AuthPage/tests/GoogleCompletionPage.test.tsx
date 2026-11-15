@@ -41,7 +41,7 @@ it('returns to Profile after linking and retries session refresh without resubmi
     </Routes>,
     { route: '/auth/complete' },
   );
-  await userEvent.click(await screen.findByRole('button', { name: 'Retry session check' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
   expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument();
   expect(mock.complete).toHaveBeenCalledExactlyOnceWith('fixture', 'link');
   expect(mock.retry).toHaveBeenCalledTimes(1);
@@ -61,4 +61,18 @@ it('returns to the sign-in route to resolve a session that appeared during Googl
   expect(await screen.findByRole('heading', { name: 'Sign-in route' })).toBeInTheDocument();
   expect(mock.restore).toHaveBeenCalledTimes(1);
   expect(mock.complete).toHaveBeenCalledTimes(1);
+});
+
+it('returns to sign in when Google completion cannot confirm the sign-in', async () => {
+  mock.take.mockReturnValue({ completionId: 'fixture', purpose: 'sign_in' });
+  mock.complete.mockRejectedValue(new ApiError('Session unavailable', 503, 'SESSION_CONFIRMATION_FAILED'));
+  renderWithRouter(
+    <Routes>
+      <Route path="/auth/complete" element={<GoogleCompletionPage />} />
+      <Route path="/signin" element={<h1>Sign-in route</h1>} />
+    </Routes>,
+    { route: '/auth/complete' },
+  );
+
+  expect(await screen.findByRole('heading', { name: 'Sign-in route' })).toBeInTheDocument();
 });

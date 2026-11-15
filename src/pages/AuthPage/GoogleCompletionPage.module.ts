@@ -8,7 +8,7 @@ const restart = 'Google sign-in expired or changed. Start again.';
 
 function messageFor(error: unknown, purpose: GooglePurpose) {
   if (error instanceof ApiError && error.code === 'SESSION_CONFIRMATION_FAILED') {
-    return { message: error.message, to: null, label: 'Retry session check' };
+    return { message: 'Could not confirm Google linking. Try again.', to: null, label: 'Try again' };
   }
   if (purpose === 'link') {
     let message = error instanceof Error ? error.message : 'Google linking could not be verified. Start again from Profile.';
@@ -53,6 +53,10 @@ export function useGoogleCompletionPage() {
     void request.current.then(() => {
       if (active) navigate(purpose.current === 'link' ? '/profile' : '/dashboard', { replace: true });
     }, async (cause: unknown) => {
+      if (purpose.current === 'sign_in' && cause instanceof ApiError && cause.code === 'SESSION_CONFIRMATION_FAILED') {
+        if (active) navigate('/signin?google=retry', { replace: true });
+        return;
+      }
       if (purpose.current === 'sign_in' && cause instanceof ApiError && cause.code === 'GOOGLE_SESSION_CHANGED') {
         await restoreSession();
         if (active) navigate('/signin?google=retry', { replace: true });

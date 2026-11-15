@@ -152,6 +152,10 @@ it('surfaces bad credentials and distinguishes restore outage from anonymous', a
   const { result } = renderHookWithProviders(auth.useAuth);
   await waitFor(() => expect(result.current.unavailable).toBe(true));
   expect(result.current.user).toBeNull();
+  expect(result.current.message).toBeUndefined();
+  await act(async () => {
+    await expect(auth.signIn(credentials)).rejects.toMatchObject({ code: 'SESSION_CONFIRMATION_FAILED' });
+  });
   server.use(http.get(apiPath('/session'), authorized));
   await act(() => auth.signIn(credentials));
   expect(result.current.user).toEqual(user);
