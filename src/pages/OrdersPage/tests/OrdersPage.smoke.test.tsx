@@ -9,7 +9,7 @@ vi.mock(
   async () => (await import("@/test/auth")).authMock,
 );
 beforeEach(resetAuth);
-it("shows the real empty state through page, module, query and HTTP for every selected filter", async () => {
+it("shows the relevant empty state for All and Delivered", async () => {
   const user = userEvent.setup();
   renderWithRouter(<OrdersPage />);
   expect(
@@ -17,7 +17,7 @@ it("shows the real empty state through page, module, query and HTTP for every se
   ).toBeInTheDocument();
   await user.click(screen.getByRole("tab", { name: "Delivered" }));
   expect(
-    await screen.findByRole("heading", { name: "No orders yet" }),
+    await screen.findByRole("heading", { name: "No delivered orders" }),
   ).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Maya/ })).toBeNull();
 });

@@ -12,29 +12,31 @@ import { OrdersSkeleton } from "./components/OrdersSkeleton/OrdersSkeleton";
 
 export const OrdersPage: React.FC = () => {
   const model = useOrdersPage();
+  const hasOrders = model.visibleOrders.length > 0;
   return (
     <Layout
       className="shell"
       mainContent={
-        <div className="flex-1 pb-[calc(var(--bottom-nav-height)+100px)]">
+        <div className="flex flex-1 flex-col pb-[calc(var(--bottom-nav-height)+32px)]">
           <PageHeader
             eyebrow="YOUR SALES"
             title="Orders"
+            action={<NewOrderAction />}
             className="screen-header px-4"
           />
           <OrderFilters
             statusFilter={model.statusFilter}
             onSelect={model.setStatusFilter}
           />
-          <div className="mt-4 px-4">
-            {model.error ? (
+          <div className="mt-3 flex flex-1 flex-col gap-3 px-4">
+            {model.error && (
               <ErrorState message={model.message} onRetry={model.handleRetry} />
-            ) : null}
-            {model.loading ? (
-              <OrdersSkeleton />
-            ) : model.visibleOrders.length === 0 ? (
-              <OrdersEmpty />
-            ) : (
+            )}
+            {model.loading && <OrdersSkeleton />}
+            {!model.loading && !model.error && !hasOrders && (
+              <OrdersEmpty status={model.statusFilter} />
+            )}
+            {!model.loading && hasOrders && (
               <div className="flex flex-col gap-3">
                 {model.visibleOrders.map((order) => (
                   <OrderRow
@@ -48,7 +50,6 @@ export const OrdersPage: React.FC = () => {
           </div>
         </div>
       }
-      actions={<NewOrderAction />}
       footer={<BottomNav />}
     />
   );

@@ -7,7 +7,7 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "processing", label: "Processing" },
   { key: "delivered", label: "Delivered" },
-  { key: "cancelled", label: "Deleted" },
+  { key: "cancelled", label: "Canceled" },
 ];
 
 interface IOrderFilters {
@@ -23,7 +23,7 @@ export const OrderFilters: React.FC<IOrderFilters> = ({
     <div
       role="tablist"
       aria-label="Order status filter"
-      className="no-scrollbar mt-4 flex gap-1.5 overflow-x-auto px-4"
+      className="mx-4 mt-1 flex gap-1 rounded-card border border-hairline bg-surface-soft p-1"
     >
       {STATUS_FILTERS.map(({ key, label }) => (
         <button
@@ -32,10 +32,10 @@ export const OrderFilters: React.FC<IOrderFilters> = ({
           aria-selected={statusFilter === key}
           type="button"
           onClick={() => onSelect(key)}
-          className={`pressable flex shrink-0 items-center gap-1.5 rounded-pill px-3.5 py-2 text-label font-medium transition-colors duration-200 ${
+          className={`pressable flex min-w-max flex-1 items-center justify-center whitespace-nowrap rounded-input px-1 py-2 text-sm font-medium leading-[1.4] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary-active ${
             statusFilter === key
-              ? "bg-surface-dark text-ink-on-dark"
-              : "bg-surface-card text-ink-muted"
+              ? "bg-surface-card text-ink"
+              : "text-ink-muted"
           }`}
         >
           {label}
