@@ -1,6 +1,6 @@
 import type { Order } from "@/features/orders/types";
 import { renderWithRouter } from "@/test/render";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -97,7 +97,7 @@ describe("OrdersPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the Brilliant header with brand eyebrow and title, without redundant top plus button", async () => {
+  it("places the create link next to the Orders title", () => {
     api.apiFetch.mockResolvedValueOnce({ orders: sampleOrders, total: 2 });
     renderWithRouter(<OrdersPage />);
 
@@ -105,8 +105,11 @@ describe("OrdersPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Orders" }),
     ).toBeInTheDocument();
-    // Header should not contain a top right plus action button
-    expect(screen.queryByRole("link", { name: "New order" })).toBeNull();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("link", { name: "New order" })).toHaveAttribute(
+      "href",
+      "/orders/new",
+    );
   });
 
   it("renders order cards aligned with Brilliant component specifications", async () => {
@@ -130,11 +133,11 @@ describe("OrdersPage", () => {
     expect(mayaLink).toBeDefined();
   });
 
-  it("keeps Add New Order separate from the capture link in the bottom nav", () => {
+  it("keeps New order separate from the capture link in the bottom nav", () => {
     api.apiFetch.mockResolvedValueOnce({ orders: sampleOrders, total: 2 });
     renderWithRouter(<OrdersPage />);
 
-    const ctaButton = screen.getByRole("link", { name: "Add New Order" });
+    const ctaButton = screen.getByRole("link", { name: "New order" });
     expect(ctaButton).toBeInTheDocument();
     expect(ctaButton).toHaveAttribute("href", "/orders/new");
 
@@ -161,14 +164,13 @@ describe("OrdersPage", () => {
         "Log your first sale to start tracking revenue, delivery fees and profit per order.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("Tap Add New Order below")).toBeInTheDocument();
+    expect(screen.queryByText("Tap Add New Order below")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Add New Order" }),
+      screen.getByRole("link", { name: "New order" }),
     ).toBeInTheDocument();
   });
 
   it("shows a status badge per row", async () => {
-    const { within } = await import("@testing-library/react");
     api.apiFetch.mockResolvedValueOnce({ orders: sampleOrders, total: 2 });
     renderWithRouter(<OrdersPage />);
 
@@ -210,7 +212,7 @@ describe("OrdersPage", () => {
     });
   });
 
-  it("offers a Deleted filter that queries the voided orders", async () => {
+  it("offers a Canceled filter that queries the voided orders", async () => {
     const user = userEvent.setup();
     api.apiFetch.mockResolvedValue({ orders: sampleOrders, total: 2 });
     renderWithRouter(<OrdersPage />);
@@ -219,7 +221,7 @@ describe("OrdersPage", () => {
       expect(screen.getByText(/Maya C\. · #1048/)).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("tab", { name: "Deleted" }));
+    await user.click(screen.getByRole("tab", { name: "Canceled" }));
 
     await waitFor(() => {
       expect(api.apiFetch).toHaveBeenCalledWith(

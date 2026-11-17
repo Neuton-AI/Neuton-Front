@@ -28,7 +28,7 @@ export const OrderRow: React.FC<IOrderRow> = ({ order, currency }) => {
           isDeleted ? "bg-deleted-badge opacity-70" : "bg-surface-card"
         }`}
       >
-        <IconBag className="h-5 w-5" />
+        <IconBag className="h-4 w-4" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h2

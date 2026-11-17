@@ -17,9 +17,6 @@ export const OrdersEmpty: React.FC = () => {
         Log your first sale to start tracking revenue, delivery fees and profit
         per order.
       </p>
-      <p className="text-[13px] font-medium leading-normal text-ink-muted">
-        Tap Add New Order below
-      </p>
     </div>
   );
 };
