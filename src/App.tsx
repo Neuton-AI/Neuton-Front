@@ -3,6 +3,7 @@ import { AuthPage } from "@/pages/AuthPage/AuthPage";
 import { GoogleCompletionPage } from "@/pages/AuthPage/GoogleCompletionPage";
 import { googleCompletionPath } from "@/features/auth/google-return";
 import { LandingPage } from "@/pages/LandingPage/LandingPage";
+import { ErrorPage } from "@/pages/ErrorPage/ErrorPage";
 import { SyncStatus } from "@/features/sync/SyncStatus";
 import { useAppChrome } from "@/features/pwa/useAppChrome";
 import { Route, Routes, useMatch } from "react-router-dom";
@@ -21,6 +22,7 @@ export const App: React.FC = () => {
         <Route path="/signin" element={<AuthPage mode="signin" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path={googleCompletionPath} caseSensitive element={<GoogleCompletionPage />} />
+        <Route path="/error" element={<ErrorPage />} />
         <Route
           path="/*"
           element={

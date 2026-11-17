@@ -137,6 +137,18 @@ describe("RequireAuth", () => {
   });
 });
 
+describe("the /error route", () => {
+  it.each([false, true])("shows the error screen (signed in: %s)", async (signedIn) => {
+    authState.session = signedIn ? { user: { id: "u1" } } : null;
+    authState.loading = !signedIn;
+
+    renderApp("/error");
+
+    expect(await screen.findByRole("heading", { name: "Something went wrong" })).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent("/error");
+  });
+});
+
 describe("routing", () => {
   beforeEach(() => {
     authState.session = { user: { id: "u1" } };

@@ -16,8 +16,9 @@
   <div id="root"></div>
   <script type="module">
     import { isGoogleCompletionDocument } from '/src/features/auth/google-return.ts';
-    import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
+    import { initializeFaro, getWebInstrumentations, LogLevel } from '@grafana/faro-web-sdk';
     import { TracingInstrumentation } from '@grafana/faro-web-tracing';
+    import { redactFaroPageUrl } from '/src/components/ErrorBoundary/reportRenderError.ts';
 
     const collector = import.meta.env.VITE_FARO_COLLECTOR_URL;
     const collectorToken = import.meta.env.VITE_FARO_TOKEN;
@@ -30,6 +31,11 @@
             name: 'Neuton-Front',
             environment: import.meta.env.MODE,
             version: import.meta.env.VITE_APP_VERSION || 'dev',
+          },
+          beforeSend: redactFaroPageUrl,
+          // React also writes caught exceptions to console.error with the original message.
+          consoleInstrumentation: {
+            disabledLevels: [LogLevel.DEBUG, LogLevel.TRACE, LogLevel.LOG, LogLevel.ERROR],
           },
           instrumentations: [
             ...getWebInstrumentations(),

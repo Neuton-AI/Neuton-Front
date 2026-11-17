@@ -1,5 +1,6 @@
 import type React from "react";
 import { FullPageLoader } from "@/components/feedback";
+import { ErrorPage } from "@/pages/ErrorPage/ErrorPage";
 import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router-dom";
 
@@ -73,6 +74,7 @@ export const AuthenticatedRoutes: React.FC = () => {
         <Route path="catalog/receipts/:id" element={<ReceiptDetailPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="capture" element={<CapturePage />} />
+        <Route path="error" element={<ErrorPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
