@@ -1,6 +1,6 @@
 import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { buildShop } from '@/test/factories/shops.factory';
 import { apiPath } from '@/test/mocks/handlers/context';
 import { server } from '@/test/mocks/server';
@@ -16,9 +16,131 @@ const session = {
 };
 const authorized = () => HttpResponse.json({ user, session, memberships: [{ role: 'owner', shop }] });
 
+beforeEach(() => {
+  // Each module reload represents a separate browser; do not broadcast across test cases.
+  vi.stubGlobal('BroadcastChannel', undefined);
+});
+
 afterEach(() => {
   localStorage.clear();
   vi.resetModules();
+});
+
+it('keeps the current session and request scope when sync encounters a session-store outage', async () => {
+  server.use(
+    http.get(apiPath('/session'), authorized),
+    http.get(apiPath('/sync/check'), () => HttpResponse.json({
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Session store unavailable' },
+    }, { status: 503 })),
+  );
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const { apiFetch, requestScopeSignal } = await import('@/lib/api');
+  const signal = requestScopeSignal(user.id, shop.id);
+  const { result } = renderHookWithProviders(auth.useAuth);
+  await act(async () => {
+    await expect(apiFetch('/sync/check', { userId: user.id, shopId: shop.id })).rejects.toMatchObject({ status: 503 });
+  });
+  expect(result.current.sessionId).toBe(session.id);
+  expect(signal?.aborted).toBe(false);
+});
+
+it('silently rechecks the session and retries a request rejected with 401', async () => {
+  let checks = 0;
+  server.use(
+    http.get(apiPath('/session'), authorized),
+    http.get(apiPath('/sync/check'), () => {
+      checks++;
+      if (checks === 1) return new HttpResponse(null, { status: 401 });
+      return HttpResponse.json({ ok: true });
+    }),
+  );
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const { apiFetch } = await import('@/lib/api');
+  await expect(apiFetch('/sync/check', { userId: user.id, shopId: shop.id })).resolves.toEqual({ ok: true });
+  const { result } = renderHookWithProviders(auth.useAuth);
+  expect(result.current.sessionId).toBe(session.id);
+  expect(checks).toBe(2);
+});
+
+it('preserves an established session when a background session refresh is unavailable', async () => {
+  server.use(http.get(apiPath('/session'), authorized));
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const { result } = renderHookWithProviders(auth.useAuth);
+  server.use(http.get(apiPath('/session'), () => new HttpResponse(null, { status: 503 })));
+  await act(() => auth.restoreSession());
+  expect(result.current.sessionId).toBe(session.id);
+  expect(result.current.unavailable).toBe(false);
+});
+
+it('clears the session only after the server confirms it can no longer be restored', async () => {
+  server.use(http.get(apiPath('/session'), authorized));
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const { result } = renderHookWithProviders(auth.useAuth);
+  server.use(
+    http.get(apiPath('/session'), () => new HttpResponse(null, { status: 401 })),
+    http.get(apiPath('/sync/check'), () => new HttpResponse(null, { status: 401 })),
+  );
+  const { apiFetch } = await import('@/lib/api');
+  await act(async () => {
+    await expect(apiFetch('/sync/check', { userId: user.id, shopId: shop.id })).rejects.toMatchObject({ status: 401 });
+  });
+  expect(result.current.user).toBeNull();
+});
+
+it('shares concurrent silent recovery and limits each failed request to one retry', async () => {
+  let sessionReads = 0;
+  let checks = 0;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  server.use(
+    http.get(apiPath('/session'), async () => {
+      sessionReads++;
+      if (sessionReads > 1) await pending;
+      return authorized();
+    }),
+    http.get(apiPath('/sync/check'), () => {
+      checks++;
+      return new HttpResponse(null, { status: 401 });
+    }),
+  );
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const { apiFetch } = await import('@/lib/api');
+  const first = expect(apiFetch('/sync/check', { userId: user.id, shopId: shop.id })).rejects.toMatchObject({ status: 401 });
+  const second = expect(apiFetch('/sync/check', { userId: user.id, shopId: shop.id })).rejects.toMatchObject({ status: 401 });
+  await waitFor(() => expect(checks).toBe(2));
+  await waitFor(() => expect(sessionReads).toBe(2));
+  release();
+  await Promise.all([first, second]);
+  expect(sessionReads).toBe(2);
+  expect(checks).toBe(4);
+});
+
+it('retries foreground renewal after an outage without losing the current session', async () => {
+  let renewals = 0;
+  server.use(
+    http.get(apiPath('/session'), () => HttpResponse.json({ user,
+      session: { ...session, nextRenewalAt: new Date(0).toISOString() }, memberships: [] })),
+    http.post(apiPath('/auth/session/renew'), () => {
+      renewals++;
+      if (renewals === 1) return new HttpResponse(null, { status: 503 });
+      return HttpResponse.json(session);
+    }),
+  );
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const { result } = renderHookWithProviders(auth.useAuth);
+  auth.renewOnInteraction();
+  await waitFor(() => expect(renewals).toBe(1));
+  expect(result.current.sessionId).toBe(session.id);
+  auth.renewOnInteraction();
+  await waitFor(() => expect(result.current.session?.session.nextRenewalAt).toBe(session.nextRenewalAt));
+  expect(renewals).toBe(2);
 });
 
 it.each(['sign_in', 'link'] as const)('finishes Google %s with fresh CSRF proof and refreshes the server session', async (purpose) => {

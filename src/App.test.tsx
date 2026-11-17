@@ -72,8 +72,8 @@ vi.mock("@/pages/ReceiptDetailPage/ReceiptDetailPage", () => ({
 const { App } = await import("@/App");
 
 const WhereAmI = () => {
-  const { pathname, search } = useLocation();
-  return <output data-testid="where">{`${pathname}${search}`}</output>;
+  const { pathname, search, hash } = useLocation();
+  return <output data-testid="where">{`${pathname}${search}${hash}`}</output>;
 };
 
 function renderApp(route: string) {
@@ -107,13 +107,13 @@ describe("RequireAuth", () => {
     expect(screen.queryByRole("heading", { name: "Dashboard" })).toBeNull();
   });
 
-  it.each([false, true])("shows the landing page from a protected route with no session (unavailable: %s)", async (unavailable) => {
+  it.each([false, true])("shows sign-in from a protected route with no session (unavailable: %s)", async (unavailable) => {
     authState.unavailable = unavailable;
 
-    renderApp("/orders/o-123");
+    renderApp("/orders/o-123?tab=items#details");
 
-    await screen.findByRole("heading", { name: "Just upload. Neuton takes care of the numbers." });
-    expect(screen.getByTestId("where")).toHaveTextContent("/landing");
+    await screen.findByRole("heading", { name: "Welcome back" });
+    expect(screen.getByTestId("where")).toHaveTextContent("/signin");
     expect(screen.queryByRole("heading", { name: "Order detail" })).toBeNull();
   });
 
@@ -243,23 +243,23 @@ describe("deep-link round trip", () => {
     authActions.signIn.mockClear();
   });
 
-  it("returns to a protected deep link after signing in from the landing page", async () => {
+  it("returns to a protected deep link after signing in", async () => {
     const user = userEvent.setup();
 
     authActions.signIn.mockImplementationOnce(async () => {
       authState.session = { user: { id: "u1" } };
     });
 
-    renderApp("/orders/o-123");
+    renderApp("/orders/o-123?tab=items#details");
 
-    await user.click(await screen.findByRole("link", { name: "Log in" }));
+    await screen.findByRole("heading", { name: "Welcome back" });
     expect(screen.getByTestId("where")).toHaveTextContent("/signin");
     await user.type(screen.getByLabelText("Email"), "testtest@gmail.com");
     await user.type(screen.getByLabelText("Password"), "testTest");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
-      expect(screen.getByTestId("where")).toHaveTextContent("/orders/o-123"),
+      expect(screen.getByTestId("where")).toHaveTextContent("/orders/o-123?tab=items#details"),
     );
   });
 });

@@ -19,11 +19,11 @@ let sessionId: string | null = null;
 let shopId: string | null | undefined;
 let account = new AbortController();
 let shop = new AbortController();
-let onSessionFailure: ((status: number) => void) | undefined;
+let onSessionFailure: ((status: number) => Promise<boolean> | void) | undefined;
 
 export function resetCsrf() { csrf = undefined; }
 
-export function setRequestSession(nextUserId: string | null, nextSessionId: string | null, onFailure: (status: number) => void) {
+export function setRequestSession(nextUserId: string | null, nextSessionId: string | null, onFailure: (status: number) => Promise<boolean> | void) {
   account.abort();
   account = new AbortController();
   userId = nextUserId;
@@ -121,9 +121,16 @@ export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  const startedSession = sessionId;
   try {
     return await send<T>(path, options);
   } catch (error) {
+    if (error instanceof ApiError && error.status === 401 && (options.userId || options.shopId) &&
+      startedSession && startedSession === sessionId) {
+      const recovered = await onSessionFailure?.(401);
+      if (recovered && startedSession === sessionId) return send<T>(path, options);
+      throw error;
+    }
     if (!['/auth/signin', '/auth/signup'].includes(path) || !(error instanceof ApiError) || error.status !== 403 ||
       !['Invalid CSRF proof', 'Browser context expired'].includes(error.message)) throw error;
     resetCsrf();
@@ -187,7 +194,6 @@ async function send<T>(path: string, { method = 'GET', body, userId: owner, sess
   }
 
   if (!response.ok) {
-    if (scoped && (response.status === 401 || response.status === 503)) onSessionFailure?.(response.status);
     const { message, code } = readError(payload, response.status);
     const retryAfter = response.headers.get('Retry-After');
     const seconds = retryAfter === null ? NaN : Number(retryAfter);

@@ -19,6 +19,6 @@ interface IRequireAuth {
 export const RequireAuth: React.FC<IRequireAuth> = ({ children }) => {
   const { session, loading, from } = useRequireAuth();
   if (loading) return <FullPageLoader />;
-  if (!session) return <Navigate to="/landing" replace state={{ from }} />;
+  if (!session) return <Navigate to="/signin" replace state={{ from }} />;
   return children;
 };

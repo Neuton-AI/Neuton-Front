@@ -9,5 +9,5 @@ export function useRootRedirect() {
 export function useRequireAuth() {
   const { session, loading } = useAuth();
   const location = useLocation();
-  return { session, loading, from: location.pathname };
+  return { session, loading, from: location.pathname + location.search + location.hash };
 }

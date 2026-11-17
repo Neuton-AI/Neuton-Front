@@ -62,11 +62,12 @@ function storeActiveShopId(id: string | null) {
   notify();
 }
 
-function sessionFailure(status: number) {
+async function sessionFailure(status: number) {
   // In-flight requests can still refer to the old session while its replacement is being confirmed.
-  if (changingPassword) return;
-  if (status === 401) update({ status: 'anonymous', session: null });
-  else update({ status: 'unavailable', session: null });
+  if (changingPassword || status !== 401) return false;
+  const current = snapshot.session;
+  await restoreSession();
+  return Boolean(current && snapshot.session?.session.id === current.session.id && snapshot.status === 'authenticated');
 }
 
 function update(next: AuthSnapshot) {
@@ -88,7 +89,7 @@ function update(next: AuthSnapshot) {
   if (next.session) {
     const expires = Math.min(Date.parse(next.session.session.idleExpiresAt), Date.parse(next.session.session.absoluteExpiresAt));
     expiryTimer = setTimeout(() => {
-      update({ status: 'loading', session: null });
+      // Another tab may have extended the server session since this metadata was read.
       void restoreSession();
     }, Math.max(0, expires - Date.now()));
   }
@@ -125,7 +126,8 @@ export function restoreSession() {
           update({ status: 'anonymous', session: null });
         }
       } else {
-        update({ status: 'unavailable', session: null, message: logoutUnconfirmed });
+        // A store outage or lost connection does not prove an established session has ended.
+        if (!snapshot.session) update({ status: 'unavailable', session: null, message: logoutUnconfirmed });
       }
     }
   })();
