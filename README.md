@@ -12,6 +12,13 @@ Signup signs the user in immediately. The browser restores the HttpOnly cookie
 session and shop memberships after reload. Pending offline work remains scoped
 to the same account and shop. Device sessions can be managed under Profile.
 
+Temporary API or session-store outages preserve an established browser session.
+A scoped request rejected with `401` silently rechecks `/session` and retries once
+when the same session is confirmed. Concurrent rechecks share one request. Local
+expiry metadata also triggers a silent recheck because another tab may have renewed
+the session. Active foreground interaction renews eligible sessions; expired or
+revoked server sessions require sign-in at `/signin`, preserving the full return URL.
+
 In production, `functions/api/[[path]].ts` forwards `/api/*` to `VITE_API_BASE_URL`
 before SPA fallback. Pages must set `VITE_API_BASE_URL` to one bare HTTPS origin.
 There is no fallback host. The browser stays on the Pages origin. Preserve the
