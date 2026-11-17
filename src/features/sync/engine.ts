@@ -29,6 +29,7 @@ type Meta = { kind: Kind; id: string; updatedAt: number; deleted?: boolean };
 type Comparison = { toPush: Meta[]; toPull: Meta[] };
 const plural = { receipt: 'receipts', recipe: 'recipes', order: 'orders' };
 const running = new Map<string, Promise<void>>();
+const queued = new Map<string, Promise<void>>();
 const rerun = new Set<string>();
 export const syncActivity = new Map<
   string,
@@ -45,11 +46,27 @@ const authenticatedSessions = new Map<string, string | null | undefined>();
 export function syncDocuments(
   scope: Scope,
   context: RequestOptions,
-  options: { force?: boolean; sessionId?: string | null } = {},
+  options: {
+    force?: boolean;
+    sessionId?: string | null;
+    queueIfRunning?: boolean;
+  } = {},
 ): Promise<void> {
   if (!navigator.onLine) return Promise.resolve();
   const previous = running.get(scope.key);
-  if (previous) return previous;
+  if (previous) {
+    if (!options.queueIfRunning) return previous;
+    const pending = queued.get(scope.key);
+    if (pending) return pending;
+
+    // The active run may already have read the durable scan queue.
+    const next = previous.catch(() => undefined).then(() => {
+      queued.delete(scope.key);
+      return syncDocuments(scope, context, options);
+    });
+    queued.set(scope.key, next);
+    return next;
+  }
   const signal = requestScopeSignal(context.userId, context.shopId, context.signal);
   const sessionId = options.sessionId ?? context.userId;
   const reauthenticated = !authenticatedSessions.has(scope.key) || authenticatedSessions.get(scope.key) !== sessionId;

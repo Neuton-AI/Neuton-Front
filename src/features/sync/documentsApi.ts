@@ -282,5 +282,7 @@ export async function saveScan(
     revision: createdAt,
   });
   store.changed();
-  void syncDocuments(scope, context).catch(() => undefined);
+  void syncDocuments(scope, context, { queueIfRunning: true }).catch(
+    () => undefined,
+  );
 }

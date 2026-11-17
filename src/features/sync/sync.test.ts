@@ -751,6 +751,60 @@ describe('upload document continuity', () => {
     return scan;
   }
 
+  it.each([false, true])(
+    'drains scans saved during a sync without a new sync event (active run fails: %s)',
+    async (fails) => {
+      let startCheck!: () => void;
+      let releaseCheck!: () => void;
+      const checking = new Promise<void>((resolve) => {
+        startCheck = resolve;
+      });
+      const holdCheck = new Promise<void>((resolve) => {
+        releaseCheck = resolve;
+      });
+      let checks = 0;
+      const completedIds: string[] = [];
+      api.fetch.mockImplementation(async (path: string, options) => {
+        if (path === '/sync/check') {
+          checks++;
+          if (checks === 1) {
+            startCheck();
+            await holdCheck;
+            if (fails) throw new ApiError('Sync unavailable', 503);
+          }
+          return { toPush: [], toPull: [] };
+        }
+        if (path === '/uploads/complete') {
+          completedIds.push(options.body.uploadId);
+          return { queued: true };
+        }
+        throw new Error(`Unexpected request: ${path}`);
+      });
+      online();
+      const activeSync = syncDocuments(scope, context);
+      const settled = fails
+        ? expect(activeSync).rejects.toThrow('Sync unavailable')
+        : expect(activeSync).resolves.toBeUndefined();
+      await checking;
+      let pendingIds: string[];
+      try {
+        await queueScan('receipt');
+        await queueScan('recipe');
+        pendingIds = (await store.scans(scope.key)).map((scan) => scan.id);
+        expect(pendingIds).toHaveLength(2);
+        expect(completedIds).toEqual([]);
+      } finally {
+        releaseCheck();
+        await settled;
+      }
+      await waitFor(async () => {
+        expect(completedIds).toEqual(pendingIds);
+        expect(await store.scans(scope.key)).toEqual([]);
+        if (!fails) expect(checks).toBe(4);
+      });
+    },
+  );
+
   const documentKind = (kind: 'receipt' | 'recipe' | 'product') =>
     kind === 'product' ? 'recipe' : kind;
 
