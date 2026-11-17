@@ -10,14 +10,19 @@ const TABS: { key: Tab; label: string }[] = [
 interface ICatalogTabs {
   tab: Tab;
   onSelect: (tab: Tab) => void;
+  className?: string;
 }
 
-export const CatalogTabs: React.FC<ICatalogTabs> = ({ tab, onSelect }) => {
+export const CatalogTabs: React.FC<ICatalogTabs> = ({
+  tab,
+  onSelect,
+  className = "mt-4",
+}) => {
   return (
     <div
       role="tablist"
       aria-label="Catalog section"
-      className="mx-4 mt-4 flex gap-1 rounded-card border border-hairline bg-surface-soft p-1"
+      className={`mx-4 flex gap-1 rounded-card border border-hairline bg-surface-soft p-1 ${className}`}
     >
       {TABS.map(({ key, label }) => (
         <button

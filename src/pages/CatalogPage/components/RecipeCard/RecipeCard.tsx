@@ -1,5 +1,4 @@
 import type React from "react";
-import { IconPlus } from "@/components/icons";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { Link } from "react-router-dom";
 import type { CatalogPageModel } from "../../CatalogPage.module";
@@ -60,26 +59,6 @@ export const RecipeCard: React.FC<IRecipeCard> = ({
           </span>
         ) : null}
       </div>
-    </Link>
-  );
-};
-
-interface ICatalogCaptureLink {
-  to: string;
-  label: string;
-}
-
-export const CatalogCaptureLink: React.FC<ICatalogCaptureLink> = ({
-  to,
-  label,
-}) => {
-  return (
-    <Link
-      to={to}
-      className="pressable inline-flex items-center gap-1.5 rounded-pill bg-brand-primary px-4 py-2.5 text-label font-medium text-ink-on-primary"
-    >
-      <IconPlus className="h-4 w-4" />
-      {label}
     </Link>
   );
 };
