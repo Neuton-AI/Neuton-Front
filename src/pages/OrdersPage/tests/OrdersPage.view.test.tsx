@@ -20,6 +20,7 @@ it("renders module errors and forwards retry and status-selection actions", asyn
   renderWithRouter(<OrdersPage />);
   const user = userEvent.setup();
   expect(screen.getByRole("alert")).toHaveTextContent("offline");
+  expect(screen.queryByRole("heading", { name: "No orders yet" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Try again" }));
   expect(model.handleRetry).toHaveBeenCalledOnce();
   await user.click(screen.getByRole("tab", { name: "Delivered" }));
