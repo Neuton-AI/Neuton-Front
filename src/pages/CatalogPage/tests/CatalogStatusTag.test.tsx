@@ -29,12 +29,12 @@ it.each([
   expect(button.querySelector("svg")).toHaveAttribute("width", "16");
 });
 
-it("holds the label for two seconds after expansion finishes, then collapses", () => {
+it("holds the label for one second after expansion finishes, then collapses", () => {
   render(<CatalogStatusTag status="unverified" />);
   const button = screen.getByRole("button", { name: /Unverified/ });
   fireEvent.click(button);
   expect(button).toHaveAttribute("aria-expanded", "true");
-  act(() => vi.advanceTimersByTime(2000));
+  act(() => vi.advanceTimersByTime(1000));
   expect(button).toHaveAttribute("aria-expanded", "true");
   act(() => vi.advanceTimersByTime(300));
   expect(button).toHaveAttribute("aria-expanded", "false");
@@ -50,10 +50,10 @@ it("supports Enter and Space activation", async () => {
   await user.keyboard("{Enter}");
   expect(button).toHaveAttribute("aria-expanded", "true");
   await user.keyboard(" ");
-  expect(button).toHaveAttribute("aria-expanded", "true");
+  expect(button).toHaveAttribute("aria-expanded", "false");
 });
 
-it("keeps the two-second close with reduced motion", () => {
+it("keeps the one-second close with reduced motion", () => {
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({ matches: true })),
@@ -62,18 +62,19 @@ it("keeps the two-second close with reduced motion", () => {
   const button = screen.getByRole("button", { name: /Verified/ });
   fireEvent.click(button);
   expect(button).toHaveAttribute("aria-expanded", "true");
-  act(() => vi.advanceTimersByTime(1999));
+  act(() => vi.advanceTimersByTime(999));
   expect(button).toHaveAttribute("aria-expanded", "true");
   act(() => vi.advanceTimersByTime(1));
   expect(button).toHaveAttribute("aria-expanded", "false");
 });
 
-it("does not close on a second tap and resets when the document status changes", () => {
+it("closes on a second tap, cancels its timer, and resets on a status change", () => {
   const { rerender, unmount } = render(<CatalogStatusTag status="pending" />);
   const button = screen.getByRole("button", { name: /Pending/ });
   fireEvent.click(button);
   fireEvent.click(button);
-  expect(button).toHaveAttribute("aria-expanded", "true");
+  expect(button).toHaveAttribute("aria-expanded", "false");
+  expect(vi.getTimerCount()).toBe(0);
   rerender(<CatalogStatusTag status="processing" />);
   expect(screen.getByRole("button", { name: /Processing/ })).toHaveAttribute(
     "aria-expanded",

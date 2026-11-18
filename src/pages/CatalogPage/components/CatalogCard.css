@@ -26,11 +26,6 @@
   font-size: 18px;
   font-weight: 500;
   line-height: 140%;
-  transition: width 300ms ease-in-out;
-}
-.catalog-card:has(.catalog-status-tag[data-expanded="true"])
-  .catalog-card__title {
-  width: calc(100% - 126px);
 }
 .catalog-card__metadata {
   color: #6c6a64;

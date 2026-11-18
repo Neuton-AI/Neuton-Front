@@ -3,8 +3,9 @@
 ## Catalog cards
 
 Recipe and receipt cards use the current Paper catalog designs. Their status
-buttons expand independently of detail links, hold the full label for two seconds
-after the animation completes, then collapse. Reduced motion keeps the same hold
+buttons expand over the card text without resizing it, hold the full label for one second
+after the animation completes, then collapse. Clicking an open label closes it
+immediately with the reverse animation. Reduced motion keeps the same hold
 without the transition. Status comes from the document; local-only uploads display
 Uploading until the server snapshot replaces them.
 

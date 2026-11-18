@@ -19,7 +19,7 @@ export function CatalogStatusTag({ status }: { status: CatalogStatus }) {
 }
 
 function StatusTag({ status }: { status: CatalogStatus }) {
-  const { expanded, labelWidth, labelRef, expand, handleTransitionEnd } =
+  const { expanded, labelWidth, labelRef, toggle, handleTransitionEnd } =
     useCatalogStatusTag();
   const label = LABELS[status];
 
@@ -31,7 +31,7 @@ function StatusTag({ status }: { status: CatalogStatus }) {
       className={`catalog-status-tag catalog-status-tag--${status}`}
       data-expanded={expanded}
       style={{ width: expanded ? labelWidth + 46 : 24 }}
-      onClick={expand}
+      onClick={toggle}
       onTransitionEnd={handleTransitionEnd}
     >
       <span className="catalog-status-tag__label" aria-hidden="true">

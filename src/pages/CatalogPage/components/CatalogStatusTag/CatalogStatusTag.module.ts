@@ -31,14 +31,19 @@ export function useCatalogStatusTag() {
     closeTimer.current = setTimeout(() => setExpanded(false), delay);
   }
 
-  function expand() {
+  function toggle() {
+    if (expanded) {
+      clearTimeout(closeTimer.current);
+      setExpanded(false);
+      return;
+    }
     const reducedMotion = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
     ).matches;
     setExpanded(true);
     // Start the hold from actual transition completion; cover reduced motion
     // and interrupted transitions when no transition-end event is delivered.
-    scheduleClose(2000 + (reducedMotion ? 0 : 300));
+    scheduleClose(1000 + (reducedMotion ? 0 : 300));
   }
 
   function handleTransitionEnd(event: TransitionEvent<HTMLButtonElement>) {
@@ -47,9 +52,9 @@ export function useCatalogStatusTag() {
       event.target === event.currentTarget &&
       event.propertyName === "width"
     ) {
-      scheduleClose(2000);
+      scheduleClose(1000);
     }
   }
 
-  return { expanded, labelWidth, labelRef, expand, handleTransitionEnd };
+  return { expanded, labelWidth, labelRef, toggle, handleTransitionEnd };
 }

@@ -73,7 +73,7 @@ it.each(["recipe", "receipt"] as const)(
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("location")).toHaveTextContent("/catalog");
-    act(() => vi.advanceTimersByTime(2000));
+    act(() => vi.advanceTimersByTime(1000));
     expect(button).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(screen.getByRole("link"));
     expect(screen.getByTestId("location")).toHaveTextContent(
