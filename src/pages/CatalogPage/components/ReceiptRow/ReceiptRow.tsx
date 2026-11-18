@@ -4,38 +4,54 @@ import type { Receipt } from "@/features/receipts/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { ReceiptStatusPill } from "./ReceiptStatusPill/ReceiptStatusPill";
+import { CatalogThumbnail } from "../CatalogThumbnail/CatalogThumbnail";
+import "../CatalogCard.css";
+
 interface IReceiptRow {
   receipt: Receipt;
   currency: string;
 }
 
 export const ReceiptRow: React.FC<IReceiptRow> = ({ receipt, currency }) => {
+  const merchant = receipt.merchantName?.trim() || "Unknown merchant";
+  const count = receipt.localUpload ? undefined : receipt.items?.length;
   return (
-    <Link
-      to={`/catalog/receipts/${receipt.id}`}
-      className="pressable flex flex-col gap-2 rounded-card bg-surface-card p-4"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="min-w-0 flex-1 font-display text-[22px] leading-tight text-ink">
-          {receipt.merchantName?.trim() || "Unknown merchant"}
-        </h2>
-        <ReceiptStatusPill status={receipt.status} />
-      </div>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-label text-ink-muted">
-          {receipt.receiptDate
-            ? formatDate(receipt.receiptDate)
-            : "Date unavailable"}
-        </p>
-        <p className="font-display text-[20px] text-ink">
-          {receipt.totalAmount != null && receipt.totalAmount !== ""
-            ? formatMoney(receipt.totalAmount, receipt.currency ?? currency)
-            : "\u2014"}
-        </p>
-      </div>
+    <article className="catalog-card catalog-card--receipt">
+      <Link
+        to={`/catalog/receipts/${receipt.id}`}
+        className="catalog-card__link"
+      >
+        <CatalogThumbnail receipt />
+        <div className="catalog-card__body">
+          <h2 dir="auto" className="catalog-card__title" title={merchant}>
+            {merchant}
+          </h2>
+          <p className="catalog-card__metadata">
+            {receipt.receiptDate
+              ? formatDate(receipt.receiptDate)
+              : "Date unavailable"}
+          </p>
+          <div className="catalog-card__receipt-footer">
+            <p className="catalog-card__metadata">Items: {count ?? "—"}</p>
+            <p className="catalog-card__amount catalog-card__receipt-total">
+              {receipt.totalAmount != null && receipt.totalAmount !== ""
+                ? formatMoney(receipt.totalAmount, receipt.currency ?? currency)
+                : "—"}
+            </p>
+          </div>
+        </div>
+        {receipt.status === "failed" && receipt.errorMessage ? (
+          <span className="sr-only">{receipt.errorMessage}</span>
+        ) : null}
+      </Link>
       {receipt.status === "failed" && receipt.errorMessage ? (
-        <InlineNotice tone="error">{receipt.errorMessage}</InlineNotice>
+        <div className="px-3 pb-3">
+          <InlineNotice tone="error">{receipt.errorMessage}</InlineNotice>
+        </div>
       ) : null}
-    </Link>
+      <ReceiptStatusPill
+        status={receipt.localUpload ? "uploading" : receipt.status}
+      />
+    </article>
   );
 };

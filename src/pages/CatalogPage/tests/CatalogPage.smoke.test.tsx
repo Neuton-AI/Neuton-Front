@@ -12,7 +12,7 @@ vi.mock(
   async () => (await import("@/test/auth")).authMock,
 );
 beforeEach(resetAuth);
-it("shows a price for supermarket-linked ingredients without optional server counts", async () => {
+it("shows the unit cost for supermarket-linked ingredients without optional server counts", async () => {
   const recipe = buildRecipe();
   recipe.costing.ingredients[0]!.generalPriceId = "price-1";
   server.use(
@@ -23,7 +23,7 @@ it("shows a price for supermarket-linked ingredients without optional server cou
   renderWithRouter(<CatalogPage />);
   expect(
     await screen.findByRole("link", { name: /Tomato Soup/ }),
-  ).toHaveTextContent("$10.50");
+  ).toHaveTextContent("Unit cost $2.10");
   expect(screen.queryByText(/cost incomplete/)).toBeNull();
 });
 

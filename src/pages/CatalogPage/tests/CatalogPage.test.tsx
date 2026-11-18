@@ -300,7 +300,7 @@ describe("CatalogPage recipes tab incomplete cost", () => {
     };
   }
 
-  it("shows No price yet and the linked count instead of a fake $0 price", async () => {
+  it("shows only incomplete in the cost field instead of a fake zero price", async () => {
     api.apiFetch.mockImplementation(async (path: string) => {
       if (path.startsWith("/recipes")) return { recipes: [makeRecipe()] };
       if (path.startsWith("/inventory")) return { items: [] };
@@ -309,11 +309,10 @@ describe("CatalogPage recipes tab incomplete cost", () => {
 
     renderWithRouter(<CatalogPage />, { route: "/catalog" });
 
-    expect(await screen.findByText("No price yet")).toBeInTheDocument();
-    expect(screen.getByText("Incomplete")).toBeInTheDocument();
-    expect(
-      await screen.findByText("2 of 4 ingredients linked — cost incomplete"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("incomplete")).toBeInTheDocument();
+    expect(screen.queryByText("No price yet")).toBeNull();
+    expect(screen.queryByText(/ingredients linked/)).toBeNull();
+    expect(screen.queryByText("$0.00")).toBeNull();
   });
 });
 

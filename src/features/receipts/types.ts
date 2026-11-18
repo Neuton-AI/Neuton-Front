@@ -2,6 +2,10 @@ import type { DocumentSource } from '@/features/uploads/types';
 
 export type ReceiptStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 export type Receipt = {
+  /** Present on cached detail snapshots; absent on legacy/list-only data. */
+  items?: ReceiptItem[];
+  /** Presentation metadata from the local document envelope, never sent to the API. */
+  localUpload?: boolean;
   id: string;
   shopId: string;
   uploadedBy: string | null;

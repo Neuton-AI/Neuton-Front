@@ -1,13 +1,13 @@
 import type React from "react";
-import { formatMoney, formatQuantity } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { Link } from "react-router-dom";
 import type { CatalogPageModel } from "../../CatalogPage.module";
 import { RecipeStatusPill } from "../RecipeStatusPill/RecipeStatusPill";
-
-type Recipe = CatalogPageModel["recipes"][number];
+import { CatalogThumbnail } from "../CatalogThumbnail/CatalogThumbnail";
+import "../CatalogCard.css";
 
 interface IRecipeCard {
-  recipe: Recipe;
+  recipe: CatalogPageModel["recipes"][number];
   currency: string;
   state: CatalogPageModel["recipeNavigationState"];
 }
@@ -17,48 +17,56 @@ export const RecipeCard: React.FC<IRecipeCard> = ({
   currency,
   state,
 }) => {
-  const { total, linked, incomplete } = recipe;
+  const { incomplete } = recipe;
+  const status = recipe.localUpload ? "uploading" : recipe.status;
+  const hasUnitCost =
+    !incomplete &&
+    recipe.costing.unitCost != null &&
+    Number.isFinite(recipe.costing.unitCost);
+  let costLabel = "No price yet";
+  if (incomplete) {
+    costLabel = "incomplete";
+  } else if (hasUnitCost) {
+    costLabel = formatMoney(recipe.costing.unitCost, currency);
+  }
   return (
-    <Link
-      to={`/catalog/recipes/${recipe.id}`}
-      state={state}
-      className="pressable flex flex-col gap-2 rounded-card bg-surface-card p-4"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="font-display text-[22px] leading-tight text-ink">
-          {recipe.name}
-        </h2>
-        <span className="shrink-0 rounded-pill bg-brand-teal px-2 py-0.5 text-label font-medium text-ink">
-          {incomplete
-            ? "No price yet"
-            : formatMoney(recipe.costing.retailPrice, currency)}
-        </span>
-      </div>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-label text-ink-muted">
-          {recipe.prepTimeMinutes} min · yields{" "}
-          {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)}
-        </p>
-        <p className="shrink-0 text-label text-ink-muted">
-          cost{" "}
-          {incomplete
-            ? "incomplete"
-            : formatMoney(recipe.costing.unitCost, currency)}
-        </p>
-      </div>
-      {incomplete ? (
-        <p className="text-label font-medium text-ink-muted">
-          {linked} of {total} ingredients linked — cost incomplete
-        </p>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-2">
-        {recipe.status && <RecipeStatusPill status={recipe.status} />}
-        {incomplete ? (
-          <span className="rounded-pill bg-surface-cream-strong px-2 py-0.5 text-label font-medium text-ink-muted">
-            Incomplete
-          </span>
-        ) : null}
-      </div>
-    </Link>
+    <article className="catalog-card">
+      <Link
+        to={`/catalog/recipes/${recipe.id}`}
+        state={state}
+        className="catalog-card__link"
+      >
+        <CatalogThumbnail imageUrl={recipe.imageUrl} />
+        <div className="catalog-card__body">
+          <h2 dir="auto" className="catalog-card__title" title={recipe.name}>
+            {recipe.name}
+          </h2>
+          <p className="catalog-card__metadata flex items-center gap-1">
+            <svg
+              aria-hidden="true"
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="7" cy="7" r="5.833" />
+              <path d="M7 3.5V7l2.333 1.167" />
+            </svg>
+            {recipe.prepTimeMinutes} min
+          </p>
+          <p className="catalog-card__metadata flex flex-wrap items-center gap-x-1.5">
+            Unit cost{" "}
+            <span className="catalog-card__amount">
+              {costLabel}
+            </span>
+          </p>
+        </div>
+      </Link>
+      <RecipeStatusPill status={status} />
+    </article>
   );
 };

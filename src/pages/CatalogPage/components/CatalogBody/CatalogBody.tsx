@@ -17,7 +17,7 @@ export const CatalogBody: React.FC<ICatalogBody> = ({ model }) => {
       className={
         showInventoryGrid
           ? "mt-4 grid grid-cols-2 gap-x-5 gap-y-3 px-4"
-          : "mt-4 space-y-2.5 px-4"
+          : "mt-4 space-y-3 px-4"
       }
     >
       {errors[tab] ? (

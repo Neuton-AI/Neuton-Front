@@ -124,6 +124,25 @@ const online = () =>
     configurable: true,
   });
 
+it('projects local upload state without changing stored statuses or receipt item arrays', async () => {
+  const receiptId = 'receipt-count';
+  await store.transaction(['documents'], (tx) => {
+    tx.objectStore('documents').put({
+    ...original,
+    kind: 'receipt',
+    id: receiptId,
+    key: documentKey(scope, 'receipt', receiptId),
+    data: { id: receiptId, status: 'unverified', items: [{ id: 'line-1' }] },
+    });
+    tx.objectStore('documents').put({ ...original, localOnly: true });
+  });
+  const recipes = await documentFetch<{ recipes: { localUpload: boolean }[] }>('/recipes', context);
+  expect(recipes.recipes[0].localUpload).toBe(true);
+  const receipts = await documentFetch<{ receipts: { localUpload: boolean; items: { id: string }[] }[] }>('/receipts', context);
+  expect(receipts.receipts[0]).toMatchObject({ localUpload: false, items: [{ id: 'line-1' }] });
+  expect((await store.get<LocalDocument>('documents', key))?.data).not.toHaveProperty('localUpload');
+});
+
 it('recipe Save completes offline and persists a pending edit before reconnect', async () => {
   onlineManager.setOnline(false);
   const { result, queryClient } = renderHookWithProviders(() =>
