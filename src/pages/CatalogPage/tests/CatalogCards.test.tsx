@@ -148,8 +148,8 @@ it("does not infer verification from a complete cost or turn an incomplete cost 
   expect(
     screen.getByRole("button", { name: /Unverified/ }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByText("2 of 4 ingredients linked — cost incomplete"),
-  ).toBeInTheDocument();
+  expect(screen.getByText("incomplete")).toBeInTheDocument();
+  expect(screen.queryByText(/ingredients linked/)).toBeNull();
+  expect(screen.queryByText("No price yet")).toBeNull();
   expect(screen.queryByText("$0.00")).toBeNull();
 });

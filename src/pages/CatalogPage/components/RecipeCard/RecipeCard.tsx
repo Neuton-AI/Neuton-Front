@@ -17,12 +17,18 @@ export const RecipeCard: React.FC<IRecipeCard> = ({
   currency,
   state,
 }) => {
-  const { total, linked, incomplete } = recipe;
+  const { incomplete } = recipe;
   const status = recipe.localUpload ? "uploading" : recipe.status;
   const hasUnitCost =
     !incomplete &&
     recipe.costing.unitCost != null &&
     Number.isFinite(recipe.costing.unitCost);
+  let costLabel = "No price yet";
+  if (incomplete) {
+    costLabel = "incomplete";
+  } else if (hasUnitCost) {
+    costLabel = formatMoney(recipe.costing.unitCost, currency);
+  }
   return (
     <article className="catalog-card">
       <Link
@@ -55,21 +61,11 @@ export const RecipeCard: React.FC<IRecipeCard> = ({
           <p className="catalog-card__metadata flex flex-wrap items-center gap-x-1.5">
             Unit cost{" "}
             <span className="catalog-card__amount">
-              {hasUnitCost
-                ? formatMoney(recipe.costing.unitCost, currency)
-                : "No price yet"}
+              {costLabel}
             </span>
           </p>
         </div>
       </Link>
-      {incomplete ? (
-        <div className="px-3 pb-3 text-label text-ink-muted">
-          <span className="font-medium">Incomplete</span>
-          <p>
-            {linked} of {total} ingredients linked — cost incomplete
-          </p>
-        </div>
-      ) : null}
       <RecipeStatusPill status={status} />
     </article>
   );

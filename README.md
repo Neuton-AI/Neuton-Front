@@ -12,8 +12,8 @@ Uploading until the server snapshot replaces them.
 Receipt counts use the item arrays already downloaded by document sync. A cached
 snapshot without items, or an unprocessed local upload, shows `Items: —`; an actual
 empty item array shows `Items: 0`. Catalog reads do not request a detail per card.
-Unit costs preserve known zero values and show `No price yet` for unavailable or
-incomplete costs.
+Unit costs preserve known zero values, show `No price yet` for unavailable costs,
+and show `incomplete` for incomplete costs. Cards omit ingredient-link summaries.
 
 ## Sign-in
 
