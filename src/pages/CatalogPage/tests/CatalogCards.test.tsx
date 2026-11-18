@@ -15,6 +15,35 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it.each(["עוגת שוקולד עם קרם וניל", "Chocolate cake", "123 עוגת שוקולד"])(
+  "lets each catalog heading detect its own text direction (%s)",
+  (name) => {
+    const recipe = {
+      ...buildRecipe({ name }),
+      total: 1,
+      linked: 1,
+      incomplete: false,
+    };
+    renderWithRouter(
+      <>
+        <RecipeCard
+          recipe={recipe}
+          currency="USD"
+          state={{ recipeReturnTo: "/catalog" }}
+        />
+        <ReceiptRow
+          receipt={buildReceiptDetail({ merchantName: name })}
+          currency="USD"
+        />
+      </>,
+    );
+    for (const heading of screen.getAllByRole("heading", { name })) {
+      expect(heading).toHaveAttribute("dir", "auto");
+      expect(heading).toHaveAttribute("title", name);
+    }
+  },
+);
+
 it.each([null, 0])(
   "distinguishes an unavailable unit cost from zero (%s)",
   (unitCost) => {

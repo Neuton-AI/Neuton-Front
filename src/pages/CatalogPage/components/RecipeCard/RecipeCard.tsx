@@ -38,7 +38,7 @@ export const RecipeCard: React.FC<IRecipeCard> = ({
       >
         <CatalogThumbnail imageUrl={recipe.imageUrl} />
         <div className="catalog-card__body">
-          <h2 className="catalog-card__title" title={recipe.name}>
+          <h2 dir="auto" className="catalog-card__title" title={recipe.name}>
             {recipe.name}
           </h2>
           <p className="catalog-card__metadata flex items-center gap-1">

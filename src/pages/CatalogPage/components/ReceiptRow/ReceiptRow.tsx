@@ -23,7 +23,7 @@ export const ReceiptRow: React.FC<IReceiptRow> = ({ receipt, currency }) => {
       >
         <CatalogThumbnail receipt />
         <div className="catalog-card__body">
-          <h2 className="catalog-card__title" title={merchant}>
+          <h2 dir="auto" className="catalog-card__title" title={merchant}>
             {merchant}
           </h2>
           <p className="catalog-card__metadata">
