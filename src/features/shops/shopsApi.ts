@@ -25,7 +25,7 @@ export type UpdateShopBody = {
   targetProfitMargin: number;
   hourlyLaborCost: number;
   deliveryBaseFee: number;
-  deliveryRatePerKm: number;
+  deliveryRatePerKm?: number;
 };
 
 export function useUpdateShop(
