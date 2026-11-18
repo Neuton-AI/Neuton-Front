@@ -94,6 +94,8 @@ export type RecipeCosting = {
 };
 
 export type Recipe = {
+  /** Presentation metadata from the local document envelope, never sent to the API. */
+  localUpload?: boolean;
   sources?: DocumentSource[];
   id: string;
   shopId: string;

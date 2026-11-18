@@ -70,7 +70,12 @@ export async function documentFetch<T>(
     .sort((a, b) =>
       String(b.data.createdAt).localeCompare(String(a.data.createdAt)),
     )
-    .map((row) => row.data);
+    .map((row) => {
+      if (kind === 'receipt' || kind === 'recipe') {
+        return { ...row.data, localUpload: row.localOnly === true };
+      }
+      return row.data;
+    });
   return {
     [collection]: data,
     ...(kind === 'order' ? { total: data.length } : {}),

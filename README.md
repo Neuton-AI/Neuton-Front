@@ -1,5 +1,19 @@
 # Neuton-Front
 
+## Catalog cards
+
+Recipe and receipt cards use the current Paper catalog designs. Their status
+buttons expand independently of detail links, hold the full label for two seconds
+after the animation completes, then collapse. Reduced motion keeps the same hold
+without the transition. Status comes from the document; local-only uploads display
+Uploading until the server snapshot replaces them.
+
+Receipt counts use the item arrays already downloaded by document sync. A cached
+snapshot without items, or an unprocessed local upload, shows `Items: —`; an actual
+empty item array shows `Items: 0`. Catalog reads do not request a detail per card.
+Unit costs preserve known zero values and show `No price yet` for unavailable or
+incomplete costs.
+
 ## Sign-in
 
 Set `VITE_API_BASE_URL` to the API origin, then start the API and run `npm run dev`.

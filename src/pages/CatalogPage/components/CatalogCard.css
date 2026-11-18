@@ -1,0 +1,66 @@
+.catalog-card {
+  position: relative;
+  border-radius: 12px;
+  background: #efe9de;
+}
+.catalog-card__link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: inherit;
+}
+.catalog-card__body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.catalog-card__title {
+  width: calc(100% - 36px);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 140%;
+  transition: width 300ms ease-in-out;
+}
+.catalog-card:has(.catalog-status-tag[data-expanded="true"])
+  .catalog-card__title {
+  width: calc(100% - 126px);
+}
+.catalog-card__metadata {
+  color: #6c6a64;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 140%;
+}
+.catalog-card__amount {
+  color: #a9583e;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 140%;
+}
+.catalog-card__link:focus-visible {
+  outline: 2px solid #141413;
+  outline-offset: 3px;
+}
+.catalog-card--receipt .catalog-card__link {
+  min-height: 120px;
+}
+.catalog-card__receipt-footer {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.catalog-card__receipt-total {
+  margin-left: auto;
+  transform: translateY(12px);
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
