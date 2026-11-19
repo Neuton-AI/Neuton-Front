@@ -1,6 +1,6 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
-import type { StatusFilter } from '@/features/orders/types';
+import type { ReviewedCreateOrderBody, StatusFilter } from '@/features/orders/types';
 import { type Order, type OrderDetail, type OrderQuote } from '@/features/orders/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, UserId } from '@/lib/queryTypes';
@@ -69,6 +69,8 @@ export function useCreateOrder(
 ): UseMutationResult<{ order: Order; totals: { netProfit: number } }, Error, CreateOrderBody> {
   const queryClient = useQueryClient();
   return useMutation({
+    retry: false,
+    networkMode: 'always',
     mutationFn: (body: CreateOrderBody) =>
       apiFetch<{ order: Order; totals: { netProfit: number } }>('/orders', {
         method: 'POST',
@@ -83,7 +85,10 @@ export function useCreateOrder(
   });
 }
 
-export type CreateOrderBody = {
+export type CreateOrderBody = ReviewedCreateOrderBody | LegacyCreateOrderBody;
+
+/** Retained until the New Order caller is migrated in T09-T13/T17. */
+type LegacyCreateOrderBody = {
   customerName: string | null;
   orderDate: string;
   destinationAddress: string | null;

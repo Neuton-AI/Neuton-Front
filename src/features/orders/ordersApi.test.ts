@@ -5,7 +5,10 @@ import { server } from '@/test/mocks/server';
 import { createTestQueryClient, renderHookWithProviders } from '@/test/render';
 import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { onlineManager } from '@tanstack/react-query';
+import { orderReviewDetails } from './reviewConflict';
+import type { ReviewedCreateOrderBody } from './types';
 import { ordersKeys } from './keys';
 import {
   useCreateOrder,
@@ -144,3 +147,53 @@ describe('orders API contracts', () => {
 // Domain hook contracts use the network adapter; persistent synchronization has its own integration suite.
 vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
 import { vi } from 'vitest';
+
+
+afterEach(() => { act(() => onlineManager.setOnline(true)); });
+const reviewedPayload: ReviewedCreateOrderBody = {
+  customerName: 'Dana', orderDate: '2026-11-19T12:00:00Z', deliveryDate: '2026-11-20',
+  destinationAddress: 'Market Street', deliveryFee: '0.00',
+  items: [{ recipeId: '11111111-1111-1111-1111-111111111111', quantity: 2, expectedUnitPrice: '2.60' }],
+  confirmedUnavailableRecipeIds: [],
+};
+it('sends reviewed prices, final zero fee and dates without converting them to overrides', async () => {
+  let body: unknown;
+  server.use(http.post(apiPath('/orders'), async ({ request }) => {
+    body = await request.json();
+    return HttpResponse.json({ order: buildOrder({ deliveryDate: '2026-11-20' }), totals: { netProfit: 0 } });
+  }));
+  const { result } = renderHookWithProviders(() => useCreateOrder('userId-1', 'shop-1'));
+  await act(() => result.current.mutateAsync(reviewedPayload));
+  expect(body).toEqual(reviewedPayload);
+  expect(result.current.data?.order.deliveryDate).toBe('2026-11-20');
+});
+it('preserves review corrections and never inherits automatic create retries', async () => {
+  const client = createTestQueryClient();
+  client.setDefaultOptions({ mutations: { retry: 3, retryDelay: 0 } });
+  let calls = 0;
+  const details = { reasons: ['PRICE_CHANGED'], unavailable: [],
+    priceChanges: [{ recipeId: reviewedPayload.items[0].recipeId, name: 'Focaccia', expectedUnitPrice: '2.60', currentUnitPrice: '3.00' }],
+    currentItems: [{ recipeId: reviewedPayload.items[0].recipeId, name: 'Focaccia', unitPrice: '3.00', costComplete: true }] };
+  server.use(http.post(apiPath('/orders'), () => {
+    calls++;
+    return HttpResponse.json({ error: { code: 'ORDER_REVIEW_REQUIRED', message: 'Review the updated order.', details } }, { status: 409 });
+  }));
+  const { result } = renderHookWithProviders(() => useCreateOrder('userId-1', 'shop-1'), { queryClient: client });
+  await act(async () => { await result.current.mutateAsync(reviewedPayload).catch(() => undefined); });
+  expect(calls).toBe(1);
+  expect(orderReviewDetails(result.current.error)).toEqual(details);
+  expect(result.current.variables).toEqual(reviewedPayload);
+});
+it('fails an offline create instead of keeping a paused mutation that resumes on reconnection', async () => {
+  let calls = 0;
+  server.use(http.post(apiPath('/orders'), () => { calls++; return HttpResponse.error(); }));
+  onlineManager.setOnline(false);
+  const { result } = renderHookWithProviders(() => useCreateOrder('userId-1', 'shop-1'));
+  act(() => { void result.current.mutateAsync(reviewedPayload).catch(() => undefined); });
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(result.current.isPaused).toBe(false);
+  expect(result.current.error).toMatchObject({ status: 0 });
+  act(() => onlineManager.setOnline(true));
+  await act(async () => { await Promise.resolve(); });
+  expect(calls).toBe(1);
+});
