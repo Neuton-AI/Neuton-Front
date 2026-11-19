@@ -15,7 +15,6 @@ import {
   useDeleteOrder,
   useMarkOrderDelivered,
   useOrder,
-  useOrderQuote,
   useOrders,
 } from './ordersApi';
 
@@ -43,31 +42,9 @@ describe('orders API contracts', () => {
     expect(new URL(url).searchParams.get('status')).toBe('delivered');
     expect(new URL(url).searchParams.get('limit')).toBe('100');
   });
-  it('keeps detail disabled without an ID and quote disabled without items', () => {
+  it('keeps detail disabled without an ID', () => {
     const detail = renderHookWithProviders(() => useOrder('userId-1', 'shop-1', ''));
-    const quote = renderHookWithProviders(() =>
-      useOrderQuote('userId-1', 'shop-1', { items: [], distanceKm: 0, enabled: true }),
-    );
     expect(detail.result.current.fetchStatus).toBe('idle');
-    expect(quote.result.current.fetchStatus).toBe('idle');
-  });
-  it('posts the quote payload and exposes server failures', async () => {
-    let body: unknown;
-    server.use(
-      http.post(apiPath('/orders/quote'), async ({ request }) => {
-        body = await request.json();
-        return HttpResponse.json({ error: { message: 'Cannot price' } }, { status: 422 });
-      }),
-    );
-    const { result } = renderHookWithProviders(() =>
-      useOrderQuote('userId-1', 'shop-1', {
-        items: [{ recipeId: 'rp-1', quantity: 2 }],
-        distanceKm: 5,
-        enabled: true,
-      }),
-    );
-    await waitFor(() => expect(result.current.error?.message).toBe('Cannot price'));
-    expect(body).toEqual({ items: [{ recipeId: 'rp-1', quantity: 2 }], deliveryDistanceKm: 5 });
   });
   it('posts a new order and invalidates sales and dashboard caches', async () => {
     const client = createTestQueryClient();
@@ -84,13 +61,7 @@ describe('orders API contracts', () => {
     const { result } = renderHookWithProviders(() => useCreateOrder('userId-1', 'shop-1'), {
       queryClient: client,
     });
-    const payload = {
-      customerName: 'Ada',
-      orderDate: '2026-10-16',
-      destinationAddress: null,
-      deliveryDistanceKm: 3,
-      items: [{ recipeId: 'rp-1', quantity: 2 }],
-    };
+    const payload = reviewedPayload;
     await act(() => result.current.mutateAsync(payload));
     expect(body).toEqual(payload);
     expect(client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated).toBe(true);

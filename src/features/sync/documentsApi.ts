@@ -36,8 +36,6 @@ export async function documentFetch<T>(
   if (
     !kind ||
     (!id && context.method === 'POST') ||
-    id === 'orderable' ||
-    id === 'quote' ||
     action === 'barcode-price' ||
     action === 'manual-product'
   )

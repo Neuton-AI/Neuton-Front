@@ -42,7 +42,7 @@ export function NewOrderPage() {
               error={Boolean(model.error)} disabled={model.createOrderPending}
               onAdd={recipe => model.changeQuantity(recipe, 1)} />
           </section>
-          <OrderSummary subtotal={model.quoteSubtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
+          <OrderSummary subtotal={model.subtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
         </div>
         <footer className={styles.footer}>
           <button ref={saveRef} type='submit' formNoValidate={model.availableCount === 0}

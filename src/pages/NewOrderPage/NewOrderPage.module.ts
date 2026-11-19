@@ -42,15 +42,6 @@ export function useNewOrderPage() {
   }
   const fee = Number(form.formValues.deliveryFee);
   const safeFee = Number.isFinite(fee) && fee >= 0 ? fee : 0;
-  const available = draft.lines.filter(line => line.available);
-  const totalCost = available.reduce((sum, line) => sum + Number(line.unitCost) * line.quantity, 0);
-  const netProfitCents = available.filter(line => line.costComplete).reduce((sum, line) =>
-    sum + (Math.round(Number(line.unitPrice) * 100) - Number(line.unitCost) * 100) * line.quantity, 0);
-  const quote = draft.lines.length > 0 ? {
-    totalAmount: (Math.round(draft.subtotal * 100) + Math.round(safeFee * 100)) / 100,
-    deliveryFee: safeFee, totalCost, netProfit: netProfitCents / 100,
-    profitMarginPercent: draft.subtotal > 0 ? netProfitCents / draft.subtotal : 0,
-  } : null;
   const save = async (confirmedUnavailableRecipeIds?: string[]) => {
     if (!userId || !activeShopId || draft.lines.length === 0 || submitting.current === scopeToken) return;
     if (draft.availableCount === 0) { setError('No available items to save'); return; }
@@ -117,8 +108,8 @@ export function useNewOrderPage() {
   const itemsError = submitError || draft.error?.message;
   return {
     ...form, ...draft, authLoading, shopsLoading, activeShopId, draftScope: scope,
-    currency: shop?.currency ?? 'USD', itemsError, quote,
-    quoteSubtotal: draft.subtotal, draftDeliveryFee: safeFee, submit, reviewOpen, cancelReview, confirmReview,
+    currency: shop?.currency ?? 'USD', itemsError,
+    draftDeliveryFee: safeFee, submit, reviewOpen, cancelReview, confirmReview,
     createOrderPending: createOrder.isPending, handleBack: () => navigate('/orders'),
   };
 }

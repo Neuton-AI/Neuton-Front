@@ -39,8 +39,7 @@ describe('useNewOrderPage local integration', () => {
     await waitFor(() => expect(result.current.recipes).toHaveLength(1));
     act(() => result.current.changeQuantity(result.current.recipes[0]!, 2));
     expect(result.current.quantityOf(recipe.id)).toBe(2);
-    expect(result.current.quoteSubtotal).toBe(0);
-    expect(result.current.quote?.totalAmount).toBe(0);
+    expect(result.current.subtotal).toBe(0);
     expect(forbidden).toBe(0);
   });
   it('sends final zero fee, separate delivery date and reviewed prices without distance/overrides', async () => {

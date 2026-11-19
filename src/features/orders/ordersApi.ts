@@ -1,12 +1,11 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
 import type { ReviewedCreateOrderBody, StatusFilter } from '@/features/orders/types';
-import { type Order, type OrderDetail, type OrderQuote } from '@/features/orders/types';
+import { type Order, type OrderDetail } from '@/features/orders/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -43,35 +42,15 @@ export function useOrder(
   });
 }
 
-export function useOrderQuote(
-  userId: UserId,
-  shopId: ShopId,
-  inputs: { items: { recipeId: string; quantity: number }[]; distanceKm: number; enabled: boolean },
-): UseQueryResult<OrderQuote> {
-  return useQuery({
-    queryKey: ['order-quote', shopId, JSON.stringify(inputs.items), inputs.distanceKm],
-    queryFn: ({ signal }) =>
-      apiFetch<OrderQuote>('/orders/quote', {
-        method: 'POST',
-        userId,
-        shopId,
-        signal,
-        body: { deliveryDistanceKm: inputs.distanceKm, items: inputs.items },
-      }),
-    enabled: enabled(userId, shopId) && inputs.enabled && inputs.items.length > 0,
-    placeholderData: keepPreviousData,
-  });
-}
-
 export function useCreateOrder(
   userId: UserId,
   shopId: ShopId,
-): UseMutationResult<{ order: Order; totals: { netProfit: number } }, Error, CreateOrderBody> {
+): UseMutationResult<{ order: Order; totals: { netProfit: number } }, Error, ReviewedCreateOrderBody> {
   const queryClient = useQueryClient();
   return useMutation({
     retry: false,
     networkMode: 'always',
-    mutationFn: (body: CreateOrderBody) =>
+    mutationFn: (body: ReviewedCreateOrderBody) =>
       apiFetch<{ order: Order; totals: { netProfit: number } }>('/orders', {
         method: 'POST',
         userId,
@@ -84,17 +63,6 @@ export function useCreateOrder(
     },
   });
 }
-
-export type CreateOrderBody = ReviewedCreateOrderBody | LegacyCreateOrderBody;
-
-/** Retained until the New Order caller is migrated in T09-T13/T17. */
-type LegacyCreateOrderBody = {
-  customerName: string | null;
-  orderDate: string;
-  destinationAddress: string | null;
-  deliveryDistanceKm: number;
-  items: { recipeId: string; quantity: number }[];
-};
 
 export function useMarkOrderDelivered(
   userId: UserId,
