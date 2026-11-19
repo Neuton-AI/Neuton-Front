@@ -31,6 +31,14 @@ Use the arrow keys to highlight a recipe, Enter to add it, or Escape to dismiss.
 The list scrolls within the visual viewport and opens above the button when
 there is more room there. Zero and partial prices remain selectable.
 
+Unavailable selections keep their names and quantities, with disabled counters
+and an active remove button. The selected count includes them and the total
+excludes them. Availability and price notices can appear together. Save opens
+the Paper `51C-0` confirmation for a mixed order. It can only confirm the
+reviewed draft and sends the unavailable recipe IDs alongside the full
+selection. Go back or Escape restores focus to Save. An order with no
+available items cannot reach the API.
+
 Verification includes real HTTP smoke tests for ordinary order creation,
 component tests for line controls and discard behavior, initialization/refetch
 tests, and timezone-boundary tests. Chrome visual checks use the production

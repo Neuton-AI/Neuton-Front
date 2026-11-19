@@ -20,8 +20,10 @@
 .feeInput span { @apply text-ink-muted; font-size: 15px; }
 .feeInput input { width: 100%; background: transparent; text-align: right; }
 .feeInput input::-webkit-inner-spin-button { appearance: none; }
-.itemsHeading { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
-.itemsHeading > span { @apply text-ink-muted; font-size: 13px; line-height: 18px; }
+.itemsHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.itemsHeading > span { @apply text-ink-muted; flex-shrink: 0; font-size: 13px; line-height: 18px; }
+.warnings { display: flex; flex-direction: column; gap: 2px; color: #a94d42; font-size: 12px; line-height: 16px; }
+.warnings > span { display: flex; align-items: center; gap: 5px; }
 .addItem { @apply text-brand-primary-active; display: flex; align-items: center; justify-content: center; gap: 8px; height: 36px; border: 1px dashed #B5A99A; border-radius: 8px; font-size: 14px; font-weight: 500; }
 .summary { @apply bg-surface-card; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px; }
 .summary > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; line-height: 18px; }
@@ -47,3 +49,14 @@
 .lineEnd { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; font-weight: 500; }
 .lineEnd > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .lineEnd button { display: flex; align-items: center; justify-content: center; width: 28px; height: 44px; flex-shrink: 0; color: theme('colors.ink.muted'); }
+.line[data-unavailable] { position: relative; color: theme('colors.ink.muted'); }
+.line[data-unavailable]::after {
+  position: absolute;
+  inset: 50% 38px auto 0;
+  height: 1px;
+  background: currentColor;
+  opacity: .55;
+  pointer-events: none;
+  content: '';
+}
+.line[data-unavailable] .counter { opacity: .55; }

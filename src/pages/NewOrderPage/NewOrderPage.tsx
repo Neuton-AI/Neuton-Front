@@ -1,15 +1,16 @@
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
 import { FullPageLoader, InlineNotice } from '@/components/feedback';
-import { IconClose } from '@/components/icons';
+import { IconClose, IconInfo } from '@/components/icons';
 import { useNewOrderLayout } from './NewOrderPage.module';
 import { RecipePicker } from './components/RecipePicker/RecipePicker';
 import { OrderDetails } from './components/OrderDetails';
 import { OrderSummary } from './components/OrderSummary';
 import { SelectedOrderItems } from './components/SelectedOrderItems';
+import { UnavailableItemsDialog } from './components/UnavailableItemsDialog/UnavailableItemsDialog';
 import styles from './NewOrderPage.module.css';
 
 export function NewOrderPage() {
-  const { model, confirmDiscard, closeRef, contentRef,
+  const { model, confirmDiscard, closeRef, saveRef, contentRef,
     cancelDiscard, close, discard } = useNewOrderLayout();
   if (model.authLoading || model.shopsLoading || !model.activeShopId) return <FullPageLoader />;
   return <>
@@ -24,7 +25,16 @@ export function NewOrderPage() {
           <OrderDetails {...model} />
           <section className={styles.items} aria-labelledby='order-items-heading'>
             <div className={styles.itemsHeading}>
-              <h2 id='order-items-heading'>Items</h2><span>{model.selectedCount} units</span>
+              <h2 id='order-items-heading'>Items</h2>
+              <div className={styles.warnings} aria-live='polite'>
+                {model.unavailableIds.length > 0 ? (
+                  <span><IconInfo className='h-3.5 w-3.5 shrink-0' />some items are not available</span>
+                ) : null}
+                {Object.keys(model.priceDiffByRecipeId).length > 0 ? (
+                  <span><IconInfo className='h-3.5 w-3.5 shrink-0' />Some item prices have changed</span>
+                ) : null}
+              </div>
+              <span>{model.selectedCount} units</span>
             </div>
             {model.itemsError ? <InlineNotice tone='error'>{model.itemsError}</InlineNotice> : null}
             {model.lines.length > 0 ? <SelectedOrderItems {...model} /> : null}
@@ -35,7 +45,8 @@ export function NewOrderPage() {
           <OrderSummary subtotal={model.quoteSubtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
         </div>
         <footer className={styles.footer}>
-          <button type='submit' disabled={model.lines.length === 0 || model.createOrderPending}
+          <button ref={saveRef} type='submit' formNoValidate={model.availableCount === 0}
+            disabled={model.lines.length === 0 || model.createOrderPending}
             aria-busy={model.createOrderPending}>Save order</button>
         </footer>
       </form>
@@ -44,5 +55,6 @@ export function NewOrderPage() {
       description='Your unsaved order details and selected items will be lost.'
       confirmLabel='Discard order' cancelLabel='Keep editing' onCancel={cancelDiscard}
       onConfirm={discard} />
+    <UnavailableItemsDialog open={model.reviewOpen} onCancel={model.cancelReview} onConfirm={model.confirmReview} />
   </>;
 }

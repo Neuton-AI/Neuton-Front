@@ -7,9 +7,10 @@ type Props = Pick<NewOrderPageModel, 'lines' | 'currency' | 'changeQuantity' | '
 
 export function SelectedOrderItems({ lines, currency, changeQuantity, remove }: Props) {
   return <ul aria-label='Selected items' className={styles.lines}>
-    {lines.map(line => <li key={line.recipeId} className={styles.line}>
+    {lines.map(line => <li key={line.recipeId} className={styles.line} data-unavailable={!line.available || undefined}>
       <div className={styles.itemName}>
         <span title={line.name}>{line.name}</span>
+        {!line.available ? <span className='sr-only'>{line.pricingPending ? 'Pricing requires sync' : 'Unavailable'}</span> : null}
         <div className={styles.unitPrice}>
           <span title={formatMoney(line.unitPrice, currency)}>{formatMoney(line.unitPrice, currency)}</span>
           <span>/ each</span>
