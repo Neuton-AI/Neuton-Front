@@ -63,6 +63,11 @@ export const OrderSummary: React.FC<IOrderSummary> = ({
           </p>
         </div>
       </div>
+      {order.items.some(item => item.costComplete === false) ? (
+        <p className="text-label text-ink-muted">
+          Some item costs are incomplete. These items contribute no profit.
+        </p>
+      ) : null}
     </>
   );
 };
@@ -86,6 +91,9 @@ export const OrderItems: React.FC<IOrderItems> = ({ order, currency }) => {
               {formatQuantity(item.quantity)} ×{" "}
               {formatMoney(item.unitPrice, currency)}
             </span>
+            {item.costComplete === false ? (
+              <span className="text-label text-ink-muted">Partial cost</span>
+            ) : null}
           </div>
           <span className="shrink-0 text-body text-ink">
             {formatMoney(item.lineTotal, currency)}
@@ -99,17 +107,11 @@ export const OrderItems: React.FC<IOrderItems> = ({ order, currency }) => {
 interface IOrderDelivery {
   order: Order;
   currency: string;
-  distanceFee: number | string;
-  baseFee: number | string;
-  rate: number | string | null | undefined;
 }
 
 export const OrderDelivery: React.FC<IOrderDelivery> = ({
   order,
   currency,
-  distanceFee,
-  baseFee,
-  rate,
 }) => {
   return (
     <SheetSection title="Delivery">
@@ -119,24 +121,12 @@ export const OrderDelivery: React.FC<IOrderDelivery> = ({
           <span className="text-body text-ink">{order.destinationAddress}</span>
         </div>
       ) : null}
-      <div className="flex items-center justify-between gap-3 border-b border-hairline-soft py-1.5">
-        <div className="flex min-w-0 flex-col">
-          <span className="text-body text-ink">Distance fee</span>
-          <span className="text-label font-medium text-ink-muted">
-            {Number(order.deliveryDistanceKm).toFixed(1)} km ×{" "}
-            {formatMoney(rate, currency)} / km
-          </span>
+      {order.deliveryDate ? (
+        <div className="flex items-center justify-between gap-3 border-b border-hairline-soft py-1.5">
+          <span className="text-body text-ink-body">Delivery date</span>
+          <span className="text-body text-ink">{formatDate(order.deliveryDate)}</span>
         </div>
-        <span className="shrink-0 text-body text-ink">
-          {formatMoney(distanceFee, currency)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-3 border-b border-hairline-soft py-1.5">
-        <span className="text-body text-ink-body">Base fee</span>
-        <span className="text-body text-ink">
-          {formatMoney(baseFee, currency)}
-        </span>
-      </div>
+      ) : null}
       <div className="flex items-center justify-between gap-3 py-1.5">
         <span className="text-[16px] font-medium text-ink">Delivery fee</span>
         <span className="text-[16px] font-medium text-ink">
