@@ -39,6 +39,12 @@ reviewed draft and sends the unavailable recipe IDs alongside the full
 selection. Go back or Escape restores focus to Save. An order with no
 available items cannot reach the API.
 
+Save conflicts refresh the draft with the server response and request catalog
+sync. A correction survives same-version local reads and is reconciled when
+the synced catalog agrees or advances beyond the last observed version.
+Neither a correction nor sync submits another order. Any draft, fee or catalog
+change invalidates an open exclusion confirmation and returns focus to Save.
+
 Verification includes real HTTP smoke tests for ordinary order creation,
 component tests for line controls and discard behavior, initialization/refetch
 tests, and timezone-boundary tests. Chrome visual checks use the production

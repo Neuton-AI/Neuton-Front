@@ -186,3 +186,24 @@ it('blocks all-unavailable saves and restores a reactivated selection', async ()
   expect(screen.getByLabelText('Quantity of Tomato Soup')).toHaveTextContent('1');
   expect(screen.queryByText('some items are not available')).toBeNull();
 });
+
+it('invalidates an open confirmation when the reviewed catalog changes', async () => {
+  const { user, update, first, second } = await renderChangedCatalog();
+  const writes = vi.fn();
+  server.use(http.post(apiPath('/orders'), () => {
+    writes();
+    return HttpResponse.json({ order: { id: 'saved' } });
+  }));
+  await screen.findByText('some items are not available');
+  const save = screen.getByRole('button', { name: 'Save order' });
+  await user.click(save);
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  update([{ ...first, isActive: false }, { ...second, orderPricing: { unitPrice: '28.00', unitCost: '5.0000', costComplete: true } }]);
+  await screen.findByText('The order changed. Review the updated items and save again.');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(save).toHaveFocus();
+  expect(writes).not.toHaveBeenCalled();
+  await user.click(save);
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(writes).not.toHaveBeenCalled();
+});

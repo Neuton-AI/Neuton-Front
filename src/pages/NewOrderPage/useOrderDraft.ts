@@ -48,23 +48,19 @@ export function useOrderDraft(userId: UserId, shopId: ShopId) {
       const latest = reviewedCatalog(previous.catalog, previous.overlay).find(item => item.id === recipe.id);
       if (!latest) return previous;
       const selections = changeSelection(previous.selections, latest, delta);
-      const overlay = { ...previous.overlay };
-      if (!selections.some(line => line.recipeId === recipe.id)) delete overlay[recipe.id];
-      return { ...previous, selections, overlay };
+      return { ...previous, selections };
     });
   };
   const remove = (recipeId: string) => {
     setState(previous => {
       if (previous.scope !== scope) return previous;
-      const overlay = { ...previous.overlay };
-      delete overlay[recipeId];
-      return { ...previous, overlay, selections: previous.selections.filter(line => line.recipeId !== recipeId) };
+      return { ...previous, selections: previous.selections.filter(line => line.recipeId !== recipeId) };
     });
   };
   const applyReview = (details: OrderReviewDetails) => {
     setState(previous => {
       if (previous.scope !== scope) return previous;
-      const overlay = { ...previous.overlay, ...reviewOverlay(previous.selections, details) };
+      const overlay = { ...previous.overlay, ...reviewOverlay(previous.selections, details, previous.catalog) };
       return { ...previous, overlay };
     });
   };

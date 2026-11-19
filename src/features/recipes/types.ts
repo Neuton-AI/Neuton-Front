@@ -110,6 +110,8 @@ export type RecipeCosting = {
 };
 
 export type Recipe = {
+  /** Version of the server snapshot read from the local document store. */
+  localServerVersion?: number;
   /** Optional while initialized local documents migrate to the new projection. */
   orderPricing?: RecipeOrderPricing | null;
   orderPricingError?: RecipeOrderPricingError | null;

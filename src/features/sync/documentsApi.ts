@@ -71,7 +71,14 @@ export async function documentFetch<T>(
       String(b.data.createdAt).localeCompare(String(a.data.createdAt)),
     )
     .map((row) => {
-      if (kind === 'receipt' || kind === 'recipe') {
+      if (kind === 'recipe') {
+        return {
+          ...row.data,
+          localUpload: row.localOnly === true,
+          localServerVersion: row.syncStatus === 'synced' ? row.serverVersion : undefined,
+        };
+      }
+      if (kind === 'receipt') {
         return { ...row.data, localUpload: row.localOnly === true };
       }
       return row.data;

@@ -2,6 +2,11 @@ import { validateFields } from '@/components/FormFields/schema';
 import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/auth';
 import { useCreateOrder } from '@/features/orders/ordersApi';
 import { orderReviewDetails } from '@/features/orders/reviewConflict';
+import { recipesKeys } from '@/features/recipes/keys';
+import { syncDocuments } from '@/features/sync/engine';
+import { scopeFor } from '@/features/sync/types';
+import { ApiError } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { orderDateTimestamp, validOrderDate } from './orderForm';
@@ -9,24 +14,32 @@ import { useOrderDraft } from './useOrderDraft';
 import { useOrderForm } from './useOrderForm';
 
 export function useNewOrderPage() {
-  const { user, userId, loading: authLoading } = useAuth();
+  const { user, userId, sessionId, loading: authLoading } = useAuth();
   const { memberships, activeShopId, loading: shopsLoading } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
   const scope = JSON.stringify([userId, activeShopId]);
-  const activeScope = useRef(scope);
-  activeScope.current = scope;
+  const activeScope = useRef({ scope, sessionId });
+  if (activeScope.current.scope !== scope || activeScope.current.sessionId !== sessionId) {
+    activeScope.current = { scope, sessionId };
+  }
+  const scopeToken = activeScope.current;
   const draft = useOrderDraft(userId, activeShopId);
   const form = useOrderForm(scope, shop);
   const navigate = useNavigate();
   const createOrder = useCreateOrder(userId, activeShopId);
-  const submitting = useRef(false);
-  const [review, setReview] = useState<{ scope: string; revision: string } | null>(null);
-  const reviewOpen = review?.scope === scope;
+  const queryClient = useQueryClient();
+  const submitting = useRef<typeof scopeToken | null>(null);
+  const [review, setReview] = useState<{ token: typeof scopeToken; revision: string } | null>(null);
   const revision = JSON.stringify([draft.revision, form.formValues, shop?.timezone, shop?.currency]);
   const cancelReview = useCallback(() => setReview(null), []);
   const [failure, setFailure] = useState({ scope, message: '' });
   const submitError = failure.scope === scope ? failure.message : '';
   const setError = (message: string) => setFailure({ scope, message });
+  const reviewOpen = review?.token === scopeToken && review.revision === revision;
+  if (review && !reviewOpen) {
+    setReview(null);
+    if (review.token === scopeToken) setError('The order changed. Review the updated items and save again.');
+  }
   const fee = Number(form.formValues.deliveryFee);
   const safeFee = Number.isFinite(fee) && fee >= 0 ? fee : 0;
   const available = draft.lines.filter(line => line.available);
@@ -39,7 +52,7 @@ export function useNewOrderPage() {
     profitMarginPercent: draft.subtotal > 0 ? netProfitCents / draft.subtotal : 0,
   } : null;
   const save = async (confirmedUnavailableRecipeIds?: string[]) => {
-    if (!userId || !activeShopId || draft.lines.length === 0 || submitting.current) return;
+    if (!userId || !activeShopId || draft.lines.length === 0 || submitting.current === scopeToken) return;
     if (draft.availableCount === 0) { setError('No available items to save'); return; }
     const invalidField = Object.values(validateFields(form.fields, form.formValues))[0];
     if (invalidField) { setError(invalidField); return; }
@@ -52,10 +65,10 @@ export function useNewOrderPage() {
     if (draft.lines.some(line => line.pricingPending)) { setError('Recipe pricing requires a synced costing snapshot.'); return; }
     setError('');
     if (draft.unavailableIds.length > 0 && !confirmedUnavailableRecipeIds) {
-      setReview({ scope, revision });
+      setReview({ token: scopeToken, revision });
       return;
     }
-    submitting.current = true;
+    submitting.current = scopeToken;
     try {
       const values = form.formValues;
       const result = await createOrder.mutateAsync({
@@ -65,16 +78,31 @@ export function useNewOrderPage() {
         items: draft.lines.map(line => ({ recipeId: line.recipeId, quantity: line.quantity, expectedUnitPrice: line.unitPrice })),
         ...(confirmedUnavailableRecipeIds ? { confirmedUnavailableRecipeIds } : {}),
       });
-      if (activeScope.current !== scope) return;
+      if (activeScope.current !== scopeToken) return;
       draft.clear();
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
-      if (activeScope.current !== scope) return;
-      const review = orderReviewDetails(cause);
-      if (review) draft.applyReview(review);
-      setError(cause instanceof Error ? cause.message : 'Could not save the order.');
+      if (activeScope.current !== scopeToken) return;
+      const corrections = orderReviewDetails(cause);
+      if (corrections) draft.applyReview(corrections);
+      const noAvailable = cause instanceof ApiError && cause.status === 409 && cause.code === 'NO_AVAILABLE_ITEMS';
+      if (corrections || noAvailable) {
+        const partition = scopeFor(userId, activeShopId);
+        void syncDocuments(partition, { userId, shopId: activeShopId }, { force: true, queueIfRunning: true, sessionId })
+          .catch(() => undefined)
+          .then(() => {
+            if (activeScope.current === scopeToken) {
+              void queryClient.invalidateQueries({ queryKey: recipesKeys.recipes(activeShopId) });
+            }
+          });
+      }
+      if (noAvailable) {
+        setError('No available items to save');
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Could not save the order.');
+      }
     } finally {
-      submitting.current = false;
+      if (submitting.current === scopeToken) submitting.current = null;
     }
   };
   const submit = (event: FormEvent) => {
@@ -84,10 +112,6 @@ export function useNewOrderPage() {
   const confirmReview = () => {
     if (!reviewOpen) return;
     cancelReview();
-    if (review.revision !== revision) {
-      setError('The order changed. Review the updated items and save again.');
-      return;
-    }
     return save(draft.unavailableIds);
   };
   const itemsError = submitError || draft.error?.message;

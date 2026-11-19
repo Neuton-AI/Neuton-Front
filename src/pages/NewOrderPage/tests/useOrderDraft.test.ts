@@ -63,4 +63,29 @@ describe('scoped order draft', () => {
     rerender({ user: 'u', shop: 'shop-2' });
     expect(result.current.recipes).toEqual([]);
   });
+
+  it('keeps a correction across same-version reads and accepts a newer sync that skipped the corrected price', async () => {
+    const cached = { ...recipe, localServerVersion: 12 };
+    server.use(http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [cached] })));
+    const { result, queryClient } = renderHookWithProviders(() => useOrderDraft('u', 'shop-1'));
+    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
+    act(() => {
+      result.current.changeQuantity(recipe, 1);
+      result.current.applyReview({
+        reasons: ['PRICE_CHANGED'], unavailable: [],
+        priceChanges: [{ recipeId: recipe.id, name: recipe.name, expectedUnitPrice: '20.00', currentUnitPrice: '30.00' }],
+        currentItems: [{ recipeId: recipe.id, name: recipe.name, unitPrice: '30.00', costComplete: true }],
+      });
+    });
+    act(() => result.current.remove(recipe.id));
+    expect(result.current.recipes[0]?.orderPricing?.unitPrice).toBe('30.00');
+    act(() => result.current.changeQuantity(recipe, 1));
+    const key = recipesKeys.recipes('shop-1');
+    act(() => queryClient.setQueryData(key, { recipes: [{ ...cached, name: 'Same version' }] }));
+    await waitFor(() => expect(result.current.lines[0]?.unitPrice).toBe('30.00'));
+    const newer = { ...cached, localServerVersion: 14, orderPricing: { ...recipe.orderPricing!, unitPrice: '40.00' } };
+    act(() => queryClient.setQueryData(key, { recipes: [newer] }));
+    await waitFor(() => expect(result.current.subtotal).toBe(40));
+    expect(result.current.priceDiffByRecipeId[recipe.id]).toMatchObject({ old: 30, new: 40 });
+  });
 });

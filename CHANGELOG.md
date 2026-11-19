@@ -2,6 +2,7 @@
 
 ## Unreleased
 ### Added
+- New Order refreshes changed prices and availability after a save conflict and asks the user to review and save again.
 - New Order shows unavailable selections and price changes, and asks before saving with exclusions.
 - New Order has a searchable local recipe picker with previews and keyboard selection.
 - New orders use a compact details form, centered item counters, saved-draft discard confirmation, and a sticky Save order footer.
