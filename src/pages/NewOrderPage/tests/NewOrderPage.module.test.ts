@@ -172,4 +172,48 @@ describe('useNewOrderPage local integration', () => {
     expect(syncDocuments).toHaveBeenCalledOnce();
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it.each([201, 409])('ignores a late %i response after leaving and returning to the original shop', async status => {
+    let release!: () => void;
+    const responseReady = new Promise<void>(resolve => { release = resolve; });
+    const received = vi.fn();
+    server.use(http.post(apiPath('/orders'), async () => {
+      received();
+      await responseReady;
+      const body = status === 201
+        ? { order: { id: 'old-order' } }
+        : { error: { code: 'NO_AVAILABLE_ITEMS', message: 'No selected items are currently available.' } };
+      return HttpResponse.json(body, { status });
+    }));
+    const { result, rerender } = renderHookWithProviders(() => useNewOrderPage());
+    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
+    act(() => {
+      fill(result.current);
+      result.current.changeQuantity(recipe, 1);
+    });
+    let pending: Promise<void> | undefined;
+    try {
+      act(() => { pending = result.current.submit(event); });
+      await waitFor(() => expect(received).toHaveBeenCalledOnce());
+      authState.activeShopId = 'shop-2';
+      rerender();
+      expect(result.current.lines).toEqual([]);
+      authState.activeShopId = 'shop-1';
+      rerender();
+      act(() => {
+        result.current.handleFieldChange('customerName', 'New customer');
+        result.current.changeQuantity(recipe, 2);
+      });
+    } finally {
+      await act(async () => {
+        release();
+        await pending;
+      });
+    }
+    expect(result.current.formValues.customerName).toBe('New customer');
+    expect(result.current.quantityOf(recipe.id)).toBe(2);
+    expect(result.current.itemsError).toBeUndefined();
+    expect(syncDocuments).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
 });
