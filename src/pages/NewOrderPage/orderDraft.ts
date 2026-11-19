@@ -16,6 +16,7 @@ export type DraftLine = {
   unitCost: string;
   costComplete: boolean;
   available: boolean;
+  pricingPending: boolean;
   reason: string | null;
 };
 
@@ -43,10 +44,13 @@ export function projectDraft(selections: readonly Selection[], catalog: readonly
   const lines: DraftLine[] = selections.map(selection => {
     const current = byId.get(selection.recipeId);
     const recipe = current ?? selection.lastKnownRecipe;
-    const pricing = recipeOrderPricing(recipe).orderPricing;
+    const currentPricing = recipeOrderPricing(recipe).orderPricing;
+    const previousPricing = recipeOrderPricing(selection.lastKnownRecipe).orderPricing;
+    const pricing = currentPricing ?? previousPricing;
+    const pricingPending = Boolean(current && eligibleRecipe(current) && !currentPricing);
     const available = Boolean(current && eligibleRecipe(current) && pricing);
     const unitPrice = pricing?.unitPrice ?? selection.baselineUnitPrice;
-    if (available && unitPrice !== selection.baselineUnitPrice) {
+    if (available && !pricingPending && unitPrice !== selection.baselineUnitPrice) {
       priceDiffByRecipeId[selection.recipeId] = {
         name: recipe.name, old: Number(selection.baselineUnitPrice), new: Number(unitPrice),
       };
@@ -55,11 +59,11 @@ export function projectDraft(selections: readonly Selection[], catalog: readonly
     if (!current) reason = 'NOT_FOUND';
     else if (!current.isActive) reason = 'INACTIVE';
     else if (current.status !== 'verified') reason = 'UNVERIFIED';
-    else if (!pricing) reason = 'PRICING_UNAVAILABLE';
+    else if (pricingPending) reason = 'PRICING_UNAVAILABLE';
     return {
       recipeId: selection.recipeId, quantity: selection.quantity, name: recipe.name,
       imageUrl: recipe.imageUrl, unitPrice, unitCost: pricing?.unitCost ?? '0.0000',
-      costComplete: pricing?.costComplete ?? false, available, reason,
+      costComplete: pricing?.costComplete ?? false, available, pricingPending, reason,
     };
   });
   const availableLines = lines.filter(line => line.available);

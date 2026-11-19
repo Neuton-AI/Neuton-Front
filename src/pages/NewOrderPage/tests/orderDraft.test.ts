@@ -49,4 +49,13 @@ describe('local order draft', () => {
     const selected = changeSelection([], recipe('0.10'), 3);
     expect(projectDraft(selected, [recipe('0.10')]).subtotal).toBe(0.3);
   });
+  it('retains last displayed pricing during a pending costing snapshot without inferring deletion', () => {
+    const selected = changeSelection([], recipe(), 2);
+    const pending = { ...recipe(), orderPricing: null };
+    const draft = projectDraft(selected, [pending]);
+    expect(draft.lines[0]).toMatchObject({ available: true, pricingPending: true, unitPrice: '20.00' });
+    expect(draft.unavailableIds).toEqual([]);
+    expect(draft.subtotal).toBe(40);
+    expect(draft.priceDiffByRecipeId).toEqual({});
+  });
 });
