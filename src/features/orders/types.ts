@@ -82,3 +82,10 @@ export type OrderQuote = {
 };
 
 export type StatusFilter = 'all' | OrderStatus;
+
+export type OrderReviewDetails = {
+  reasons: ('PRICE_CHANGED' | 'AVAILABILITY_CHANGED')[];
+  unavailable: { recipeId: string; reason: 'NOT_FOUND' | 'INACTIVE' | 'UNVERIFIED' }[];
+  priceChanges: { recipeId: string; name: string; expectedUnitPrice: string; currentUnitPrice: string }[];
+  currentItems: { recipeId: string; name: string; unitPrice: string; costComplete: boolean }[];
+};
