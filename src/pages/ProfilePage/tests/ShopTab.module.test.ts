@@ -47,7 +47,6 @@ describe("useShopTab", () => {
       targetProfitMargin: 30,
       hourlyLaborCost: 0,
       deliveryBaseFee: 2.5,
-      deliveryRatePerKm: 0,
     });
     expect(onSaved).toHaveBeenCalledOnce();
   });
@@ -119,6 +118,16 @@ describe("useShopTab", () => {
     expect(onNotice).toHaveBeenCalledWith(
       "Target profit margin is outside the allowed range.",
     );
+  });
+  it.each(["", "-1", "100001"])("rejects invalid default fee %j before an HTTP write", async (value) => {
+    const patch = vi.fn(() => HttpResponse.json({ shop: buildShop() }));
+    server.use(http.patch(apiPath("/shop"), patch));
+    const { result } = renderHookWithProviders(() => useShopTab(props));
+    await waitFor(() => expect(result.current.shop).not.toBeNull());
+    act(() => result.current.handleFieldChange("deliveryBaseFee", value));
+    await act(() => result.current.save(event));
+    expect(onNotice).toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
   });
   it("requires the exact shop name and explains a mismatch", async () => {
     let deleted = 0;

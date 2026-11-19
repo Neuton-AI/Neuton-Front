@@ -9,6 +9,7 @@
 - Local recipe pricing supports complete and partial legacy snapshots during the synced order-pricing rollout without extra pricing requests.
 
 ### Changed
+- Shop settings use one default delivery fee, including zero and cent amounts, instead of distance-based rates.
 - Order creation sends reviewed prices, date and final fee through a typed request and does not automatically retry or resume an offline save.
 ### Fixed
 - Pending recipe cost edits invalidate old order-pricing projections until sync

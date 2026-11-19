@@ -7,7 +7,9 @@ export type Shop = {
   storeAddress: string | null;
   targetProfitMargin: string;
   hourlyLaborCost: string;
+  /** Default delivery fee for new orders; zero is valid. */
   deliveryBaseFee: string;
+  /** Legacy stored value, no longer edited in shop settings. */
   deliveryRatePerKm: string;
   createdAt: string;
   updatedAt: string;
