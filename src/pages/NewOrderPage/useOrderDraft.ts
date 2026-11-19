@@ -47,7 +47,10 @@ export function useOrderDraft(userId: UserId, shopId: ShopId) {
       if (previous.scope !== scope) return previous;
       const latest = reviewedCatalog(previous.catalog, previous.overlay).find(item => item.id === recipe.id);
       if (!latest) return previous;
-      return { ...previous, selections: changeSelection(previous.selections, latest, delta) };
+      const selections = changeSelection(previous.selections, latest, delta);
+      const overlay = { ...previous.overlay };
+      if (!selections.some(line => line.recipeId === recipe.id)) delete overlay[recipe.id];
+      return { ...previous, selections, overlay };
     });
   };
   const remove = (recipeId: string) => {
@@ -71,7 +74,7 @@ export function useOrderDraft(userId: UserId, shopId: ShopId) {
     loading: query.isLoading,
     error: query.error,
     revision: JSON.stringify([scope, current.selections, catalog]),
-    clear: () => setState(previous => previous.scope === scope ? emptyDraft(scope) : previous),
+    clear: () => setState(previous => previous.scope === scope ? { ...previous, selections: [], overlay: {} } : previous),
     quantityOf: (id: string) => current.selections.find(line => line.recipeId === id)?.quantity ?? 0,
   };
 }

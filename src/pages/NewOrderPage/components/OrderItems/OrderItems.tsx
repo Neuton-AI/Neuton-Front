@@ -1,7 +1,6 @@
 import type React from "react";
 import { EmptyState, InlineNotice, Skeleton } from "@/components/feedback";
 import { formatMoney, formatQuantity } from "@/lib/format";
-import { Link } from "react-router-dom";
 import type { NewOrderPageModel } from "../../NewOrderPage.module";
 interface IOrderItems extends Pick<
   NewOrderPageModel,
@@ -55,16 +54,14 @@ export const OrderItems: React.FC<IOrderItems> = ({
           {recipes.map((recipe) => {
             const quantity = quantityOf(recipe.id);
             const incomplete = recipe.costComplete === false;
+            const unpriced = recipe.pricingPending;
+            let rowClass = 'border-hairline bg-surface-card';
+            if (quantity > 0) rowClass = 'border-brand-primary bg-surface-card';
+            if (unpriced) rowClass = 'border-hairline bg-surface-cream-strong';
             return (
               <li
                 key={recipe.id}
-                className={`flex items-center gap-3 rounded-card border p-3 transition-colors duration-200 ${
-                  incomplete
-                    ? "border-hairline bg-surface-cream-strong"
-                    : quantity > 0
-                      ? "border-brand-primary bg-surface-card"
-                      : "border-hairline bg-surface-card"
-                }`}
+                className={`flex items-center gap-3 rounded-card border p-3 transition-colors duration-200 ${rowClass}`}
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <p
@@ -74,8 +71,8 @@ export const OrderItems: React.FC<IOrderItems> = ({
                   </p>
                   <p className="text-label text-ink-muted">
                     {formatQuantity(recipe.yieldQuantity, recipe.yieldUnit)} ·{" "}
-                    {incomplete
-                      ? "Costs incomplete"
+                    {unpriced
+                      ? "Pricing requires sync"
                       : formatMoney(recipe.retailPrice, currency)}
                   </p>
                   {incomplete ? (
@@ -85,20 +82,11 @@ export const OrderItems: React.FC<IOrderItems> = ({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  {incomplete ? (
-                    <Link
-                      to={`/catalog/recipes/${recipe.id}/edit`}
-                      state={{ recipeReturnTo: "/orders/new" }}
-                      className="pressable rounded-pill border border-hairline bg-surface-card px-3 py-2 text-label font-semibold text-brand-primary"
-                    >
-                      Complete
-                    </Link>
-                  ) : null}
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       aria-label={`Remove one ${recipe.name}`}
-                      disabled={incomplete || quantity === 0}
+                      disabled={unpriced || quantity === 0}
                       onClick={() => changeQuantity(recipe, -1)}
                       className="pressable h-8 w-8 rounded-pill border border-hairline text-body text-ink disabled:opacity-30"
                     >
@@ -110,7 +98,7 @@ export const OrderItems: React.FC<IOrderItems> = ({
                     <button
                       type="button"
                       aria-label={`Add one ${recipe.name}`}
-                      disabled={incomplete}
+                      disabled={unpriced}
                       onClick={() => changeQuantity(recipe, 1)}
                       className="pressable h-8 w-8 rounded-pill border border-hairline text-body text-ink disabled:opacity-30"
                     >

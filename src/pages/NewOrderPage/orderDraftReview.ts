@@ -17,8 +17,14 @@ export function reviewOverlay(selections: readonly Selection[], details: OrderRe
         orderPricingError: null,
         orderPricing: { unitPrice: correction.unitPrice, unitCost, costComplete: correction.costComplete },
       };
-    } else if (details.unavailable.some(item => item.recipeId === selection.recipeId)) {
-      overlay[selection.recipeId] = null;
+    } else {
+      const unavailable = details.unavailable.find(item => item.recipeId === selection.recipeId);
+      if (unavailable?.reason === 'NOT_FOUND') overlay[selection.recipeId] = null;
+      else if (unavailable?.reason === 'INACTIVE') {
+        overlay[selection.recipeId] = { ...selection.lastKnownRecipe, isActive: false };
+      } else if (unavailable?.reason === 'UNVERIFIED') {
+        overlay[selection.recipeId] = { ...selection.lastKnownRecipe, status: 'unverified' };
+      }
     }
   }
   return overlay;
@@ -30,6 +36,10 @@ export function reconcileOverlay(overlay: ReviewOverlay, catalog: readonly Recip
     const local = catalog.find(recipe => recipe.id === id);
     if (correction === null) {
       if (local && eligibleRecipe(local)) retained[id] = null;
+      continue;
+    }
+    if (!eligibleRecipe(correction)) {
+      if (!local || local.isActive !== correction.isActive || local.status !== correction.status) retained[id] = correction;
       continue;
     }
     const localPrice = local && recipeOrderPricing(local).orderPricing;
