@@ -11,6 +11,7 @@
  */
 
 import { faro } from '@grafana/faro-web-sdk';
+import { boundedErrorDetails } from './apiErrorDetails';
 
 const API_BASE_URL = '/api/v1';
 let csrf: Promise<string> | undefined;
@@ -65,6 +66,7 @@ export class ApiError extends Error {
     readonly code?: string,
     readonly retryAfterMs?: number,
     readonly traceId?: string,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -91,26 +93,27 @@ type RequestOptions = {
 function readError(
   payload: unknown,
   status: number,
-): { message: string; code?: string } {
+): { message: string; code?: string; details?: unknown } {
   const fallback = `Request failed (${status})`;
   if (typeof payload !== 'object' || payload === null)
     return { message: fallback };
 
-  const top = payload as { message?: unknown; error?: unknown; code?: unknown };
+  const top = payload as { message?: unknown; error?: unknown; code?: unknown; details?: unknown };
   const topCode = typeof top.code === 'string' ? top.code : undefined;
 
   if (typeof top.message === 'string' && top.message.length > 0) {
-    return { message: top.message, code: topCode };
+    return { message: top.message, code: topCode, details: boundedErrorDetails(top.details) };
   }
   if (typeof top.error === 'string' && top.error.length > 0) {
     return { message: top.error, code: topCode };
   }
   if (typeof top.error === 'object' && top.error !== null) {
-    const nested = top.error as { message?: unknown; code?: unknown };
+    const nested = top.error as { message?: unknown; code?: unknown; details?: unknown };
     if (typeof nested.message === 'string' && nested.message.length > 0) {
       return {
         message: nested.message,
         code: typeof nested.code === 'string' ? nested.code : topCode,
+        details: boundedErrorDetails(nested.details),
       };
     }
   }
@@ -194,7 +197,7 @@ async function send<T>(path: string, { method = 'GET', body, userId: owner, sess
   }
 
   if (!response.ok) {
-    const { message, code } = readError(payload, response.status);
+    const { message, code, details } = readError(payload, response.status);
     const retryAfter = response.headers.get('Retry-After');
     const seconds = retryAfter === null ? NaN : Number(retryAfter);
     const retryAfterMs =
@@ -209,6 +212,7 @@ async function send<T>(path: string, { method = 'GET', body, userId: owner, sess
       code,
       Number.isFinite(retryAfterMs) ? retryAfterMs : undefined,
       response.headers.get('x-trace-id') ?? traceId,
+      details,
     );
   }
 
