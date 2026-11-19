@@ -24,7 +24,7 @@ it('prices locally and saves required fields through real HTTP', async () => {
   renderPage();
   expect(screen.getByRole('button', { name: 'Save order' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: 'Add item' }));
-  await user.click(await screen.findByRole('button', { name: 'Add one Tomato Soup' }));
+  await user.click(await screen.findByRole('option', { name: 'Tomato Soup' }));
   await user.type(screen.getByLabelText('Customer name'), 'Ada');
   await user.type(screen.getByLabelText('Delivery address'), '12 Main St');
   expect(screen.queryByLabelText('Distance')).toBeNull();
@@ -39,12 +39,10 @@ it.each(['0.00', '4.00'])('lets users select partial recipes with known unit pri
   const user = userEvent.setup();
   renderPage();
   await user.click(screen.getByRole('button', { name: 'Add item' }));
-  const row = (await screen.findByText('Brownies')).closest('li')!;
-  expect(within(row).getByText('Incomplete')).toBeInTheDocument();
-  const add = within(row).getByRole('button', { name: 'Add one Brownies' });
-  expect(add).toBeEnabled();
-  expect(within(row).queryByRole('link', { name: 'Complete' })).toBeNull();
-  await user.click(add);
+  const option = await screen.findByRole('option', { name: 'Brownies' });
+  expect(option).not.toHaveAttribute('aria-disabled', 'true');
+  await user.click(option);
+  expect(screen.queryByRole('combobox')).toBeNull();
   expect(screen.getByRole('button', { name: 'Save order' })).toBeEnabled();
 });
 
@@ -78,9 +76,34 @@ it('confirms leaving selected items even when no form field was edited', async (
   const user = userEvent.setup();
   renderPage();
   await user.click(screen.getByRole('button', { name: 'Add item' }));
-  await user.click(await screen.findByRole('button', { name: 'Add one Tomato Soup' }));
+  await user.click(await screen.findByRole('option', { name: 'Tomato Soup' }));
   await user.click(screen.getByRole('button', { name: 'Close new order' }));
   expect(screen.getByRole('dialog', { name: 'Discard this order?' })).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));
   expect(screen.getByLabelText('Quantity of Tomato Soup')).toHaveTextContent('1');
+});
+
+it('filters locally, adds a result by keyboard and increments the same line when picked again', async () => {
+  const catalog = [
+    buildRecipe({ status: 'verified' }),
+    buildRecipe({ id: 'cake', name: 'Honey Cake', status: 'verified' }),
+    buildRecipe({ id: 'inactive', name: 'Inactive Cake', status: 'verified', isActive: false }),
+  ];
+  server.use(http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: catalog })));
+  const user = userEvent.setup();
+  renderPage();
+  const trigger = screen.getByRole('button', { name: 'Add item' });
+  await user.click(trigger);
+  expect(await screen.findAllByRole('option')).toHaveLength(2);
+  const search = screen.getByRole('combobox', { name: 'Search recipes' });
+  expect(search).toHaveFocus();
+  await user.type(search, 'cAkE');
+  expect(screen.getAllByRole('option')).toHaveLength(1);
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(trigger).toHaveFocus();
+  expect(screen.getByLabelText('Quantity of Honey Cake')).toHaveTextContent('1');
+  await user.click(trigger);
+  await user.click(screen.getByRole('option', { name: 'Honey Cake' }));
+  expect(screen.getAllByLabelText('Quantity of Honey Cake')).toHaveLength(1);
+  expect(screen.getByLabelText('Quantity of Honey Cake')).toHaveTextContent('2');
 });

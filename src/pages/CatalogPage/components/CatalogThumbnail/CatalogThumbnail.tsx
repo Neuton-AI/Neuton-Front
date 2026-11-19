@@ -3,19 +3,23 @@ import { useState } from "react";
 export function CatalogThumbnail({
   imageUrl,
   receipt = false,
+  compact = false,
 }: {
   imageUrl?: string | null;
   receipt?: boolean;
+  compact?: boolean;
 }) {
-  return <Thumbnail key={imageUrl} imageUrl={imageUrl} receipt={receipt} />;
+  return <Thumbnail key={imageUrl} imageUrl={imageUrl} receipt={receipt} compact={compact} />;
 }
 
 function Thumbnail({
   imageUrl,
   receipt,
+  compact,
 }: {
   imageUrl?: string | null;
   receipt: boolean;
+  compact: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const placeholder = receipt ? (
@@ -50,7 +54,7 @@ function Thumbnail({
   );
   return (
     <div
-      className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-input bg-surface-cream-strong text-ink-muted-soft"
+      className={`flex shrink-0 items-center justify-center overflow-hidden bg-surface-cream-strong text-ink-muted-soft ${compact ? 'h-9 w-9 rounded-[6px]' : 'h-20 w-20 rounded-input'}`}
       aria-hidden="true"
     >
       {imageUrl && !failed ? (

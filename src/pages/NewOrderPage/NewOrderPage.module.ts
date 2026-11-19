@@ -2,15 +2,11 @@ import { validateFields } from '@/components/FormFields/schema';
 import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/auth';
 import { useCreateOrder } from '@/features/orders/ordersApi';
 import { orderReviewDetails } from '@/features/orders/reviewConflict';
-import { recipeOrderPricing } from '@/features/recipes/selectors';
-import type { Recipe } from '@/features/recipes/types';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { orderDateTimestamp, validOrderDate } from './orderForm';
 import { useOrderDraft } from './useOrderDraft';
 import { useOrderForm } from './useOrderForm';
-
-export type NewOrderRecipe = Recipe & { retailPrice: number | null; unitCost: number | null; costComplete: boolean; pricingPending: boolean };
 
 export function useNewOrderPage() {
   const { user, userId, loading: authLoading } = useAuth();
@@ -38,12 +34,6 @@ export function useNewOrderPage() {
     deliveryFee: safeFee, totalCost, netProfit: netProfitCents / 100,
     profitMarginPercent: draft.subtotal > 0 ? netProfitCents / draft.subtotal : 0,
   } : null;
-  const recipes: NewOrderRecipe[] = draft.recipes.map(recipe => {
-    const pricing = recipeOrderPricing(recipe).orderPricing;
-    return { ...recipe, retailPrice: pricing ? Number(pricing.unitPrice) : null,
-      unitCost: pricing ? Number(pricing.unitCost) : null,
-      costComplete: pricing?.costComplete ?? false, pricingPending: !pricing };
-  });
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!userId || !activeShopId || draft.lines.length === 0 || submitting.current) return;
@@ -82,10 +72,9 @@ export function useNewOrderPage() {
   };
   const itemsError = draft.error?.message ?? submitError;
   return {
-    ...form, ...draft, recipes, authLoading, shopsLoading, activeShopId, draftScope: scope,
+    ...form, ...draft, authLoading, shopsLoading, activeShopId, draftScope: scope,
     currency: shop?.currency ?? 'USD', itemsError, quote,
-    quoteSubtotal: draft.subtotal, draftDeliveryFee: safeFee, quoteError: null, quoting: false,
-    itemFields: [{ kind: 'custom' as const, name: 'items' }], submit,
+    quoteSubtotal: draft.subtotal, draftDeliveryFee: safeFee, submit,
     createOrderPending: createOrder.isPending, handleBack: () => navigate('/orders'),
   };
 }
@@ -93,7 +82,6 @@ export type NewOrderPageModel = ReturnType<typeof useNewOrderPage>;
 
 export function useNewOrderLayout() {
   const model = useNewOrderPage();
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [discardScope, setDiscardScope] = useState<string | null>(null);
   const confirmDiscard = discardScope !== null && discardScope === model.draftScope;
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -118,6 +106,6 @@ export function useNewOrderLayout() {
     model.clear();
     model.handleBack();
   };
-  return { model, pickerOpen, togglePicker: () => setPickerOpen(!pickerOpen), confirmDiscard,
+  return { model, confirmDiscard,
     closeRef, contentRef, cancelDiscard, close, discard };
 }

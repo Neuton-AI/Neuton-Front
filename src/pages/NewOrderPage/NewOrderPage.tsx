@@ -1,15 +1,15 @@
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
 import { FullPageLoader, InlineNotice } from '@/components/feedback';
-import { IconClose, IconPlus } from '@/components/icons';
+import { IconClose } from '@/components/icons';
 import { useNewOrderLayout } from './NewOrderPage.module';
-import { OrderItems } from './components/OrderItems/OrderItems';
+import { RecipePicker } from './components/RecipePicker/RecipePicker';
 import { OrderDetails } from './components/OrderDetails';
 import { OrderSummary } from './components/OrderSummary';
 import { SelectedOrderItems } from './components/SelectedOrderItems';
 import styles from './NewOrderPage.module.css';
 
 export function NewOrderPage() {
-  const { model, pickerOpen, togglePicker, confirmDiscard, closeRef, contentRef,
+  const { model, confirmDiscard, closeRef, contentRef,
     cancelDiscard, close, discard } = useNewOrderLayout();
   if (model.authLoading || model.shopsLoading || !model.activeShopId) return <FullPageLoader />;
   return <>
@@ -28,13 +28,9 @@ export function NewOrderPage() {
             </div>
             {model.itemsError ? <InlineNotice tone='error'>{model.itemsError}</InlineNotice> : null}
             {model.lines.length > 0 ? <SelectedOrderItems {...model} /> : null}
-            <button type='button' className={styles.addItem} aria-expanded={pickerOpen}
-              aria-controls='order-recipe-choices' onClick={togglePicker}>
-              <IconPlus className='h-4 w-4' /> Add item
-            </button>
-            {pickerOpen ? <div id='order-recipe-choices'>
-              <OrderItems {...model} itemsError='' />
-            </div> : null}
+            <RecipePicker key={model.draftScope} recipes={model.recipes} loading={model.loading}
+              error={Boolean(model.error)} disabled={model.createOrderPending}
+              onAdd={recipe => model.changeQuantity(recipe, 1)} />
           </section>
           <OrderSummary subtotal={model.quoteSubtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
         </div>

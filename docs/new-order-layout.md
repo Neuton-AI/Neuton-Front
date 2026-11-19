@@ -24,11 +24,12 @@ X; confirmation clears selections and returns to Orders. The background is
 inert while the confirmation owns focus. The confirmation belongs to its account
 and shop scope. Refresh starts a fresh in-memory draft.
 
-This is the T10 base checkpoint. Add item currently discloses the existing local
-catalog controls, preserving selection while T11 implements the approved
-searchable overlay. Unavailable/price warnings and exclusion consent belong to
-T12; final save review belongs to T13. The draft branch is not ready for rollout
-until those dependent tasks and the coordinated T15 verification are complete.
+Add item opens the searchable overlay from Paper's `4PU-0` artboard. It
+filters the current shop's eligible local catalog by name and reuses the catalog
+preview and fallback. Selecting adds one unit and returns focus to Add item.
+Use the arrow keys to highlight a recipe, Enter to add it, or Escape to dismiss.
+The list scrolls within the visual viewport and opens above the button when
+there is more room there. Zero and partial prices remain selectable.
 
 Verification includes real HTTP smoke tests for ordinary order creation,
 component tests for line controls and discard behavior, initialization/refetch
