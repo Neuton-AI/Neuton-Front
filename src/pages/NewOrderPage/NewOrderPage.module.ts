@@ -4,7 +4,7 @@ import { useCreateOrder } from '@/features/orders/ordersApi';
 import { orderReviewDetails } from '@/features/orders/reviewConflict';
 import { recipeOrderPricing } from '@/features/recipes/selectors';
 import type { Recipe } from '@/features/recipes/types';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { orderDateTimestamp, validOrderDate } from './orderForm';
 import { useOrderDraft } from './useOrderDraft';
@@ -82,11 +82,42 @@ export function useNewOrderPage() {
   };
   const itemsError = draft.error?.message ?? submitError;
   return {
-    ...form, ...draft, recipes, authLoading, shopsLoading, activeShopId,
+    ...form, ...draft, recipes, authLoading, shopsLoading, activeShopId, draftScope: scope,
     currency: shop?.currency ?? 'USD', itemsError, quote,
-    quoteSubtotal: draft.subtotal, quoteError: null, quoting: false,
+    quoteSubtotal: draft.subtotal, draftDeliveryFee: safeFee, quoteError: null, quoting: false,
     itemFields: [{ kind: 'custom' as const, name: 'items' }], submit,
     createOrderPending: createOrder.isPending, handleBack: () => navigate('/orders'),
   };
 }
 export type NewOrderPageModel = ReturnType<typeof useNewOrderPage>;
+
+export function useNewOrderLayout() {
+  const model = useNewOrderPage();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [discardScope, setDiscardScope] = useState<string | null>(null);
+  const confirmDiscard = discardScope !== null && discardScope === model.draftScope;
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.inert = confirmDiscard;
+  }, [confirmDiscard]);
+  const cancelDiscard = () => {
+    setDiscardScope(null);
+    if (contentRef.current) contentRef.current.inert = false;
+    closeRef.current?.focus();
+  };
+  const close = () => {
+    if (model.createOrderPending) return;
+    if (model.formDirty || model.lines.length > 0) {
+      setDiscardScope(model.draftScope);
+      return;
+    }
+    model.handleBack();
+  };
+  const discard = () => {
+    model.clear();
+    model.handleBack();
+  };
+  return { model, pickerOpen, togglePicker: () => setPickerOpen(!pickerOpen), confirmDiscard,
+    closeRef, contentRef, cancelDiscard, close, discard };
+}

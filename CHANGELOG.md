@@ -2,6 +2,7 @@
 
 ## Unreleased
 ### Added
+- New orders use a compact details form, centered item counters, saved-draft discard confirmation, and a sticky Save order footer.
 - Saved order details show known delivery dates and partial-cost provenance, using the saved fee and server profit without reconstructing distance charges.
 - New orders derive prices and totals from the synced catalog, retain selections through recipe changes, and preserve server review corrections while local data catches up.
 - Order forms accept required customer/address, independent delivery dates and final delivery fees, including zero.

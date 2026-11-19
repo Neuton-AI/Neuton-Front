@@ -1,5 +1,5 @@
-.lines { margin: 0; padding: 0; list-style: none; }
-.page { padding-top: max(12px, var(--safe-top)); }
+.lines { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.page { padding-top: var(--safe-top); }
 .header { display: flex; align-items: center; gap: 12px; height: 52px; flex-shrink: 0; padding: 0 16px 14px; }
 .header > button { @apply bg-surface-card; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
 .header h1 { @apply font-display; font-size: 30px; font-weight: 400; line-height: 36px; }
@@ -33,12 +33,13 @@
 .footer > button { @apply bg-brand-primary text-ink-on-primary; width: 100%; height: 48px; border-radius: 8px; font-size: 14px; font-weight: 500; line-height: 18px; }
 .footer > button:disabled { @apply bg-brand-primary-disabled text-ink-muted; }
 .page button:focus-visible, .feeInput:focus-within { outline: 2px solid theme('colors.brand.primary-active'); outline-offset: 2px; }
-.page input { scroll-margin-block: 16px 112px; }
+.page input, .page button { scroll-margin-block: 16px 112px; }
 .line { display: grid; grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 62px; border-bottom: 1px solid theme('colors.hairline.DEFAULT'); }
 .itemName { display: flex; min-width: 0; flex-direction: column; gap: 4px; font-size: 15px; font-weight: 500; line-height: 20px; }
 .itemName > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.unitPrice { color: theme('colors.ink.muted'); font-size: 13px; font-weight: 400; line-height: 18px; white-space: nowrap; }
-.unitPrice > span { border-bottom: 1px dashed theme('colors.ink.muted'); }
+.unitPrice { display: flex; gap: 5px; color: theme('colors.ink.muted'); font-size: 13px; font-weight: 400; line-height: 18px; white-space: nowrap; }
+.unitPrice > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px dashed theme('colors.ink.muted'); }
+.unitPrice > span:last-child { flex-shrink: 0; }
 .counter { display: flex; align-items: center; justify-content: space-between; height: 44px; border: 1px solid theme('colors.hairline.DEFAULT'); border-radius: 8px; background: theme('colors.surface.soft'); font-size: 15px; }
 .counter button { flex: 1; height: 42px; color: theme('colors.ink.muted'); }
 .counter button:disabled { opacity: .4; }

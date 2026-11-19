@@ -11,7 +11,8 @@ export function SelectedOrderItems({ lines, currency, changeQuantity, remove }: 
       <div className={styles.itemName}>
         <span title={line.name}>{line.name}</span>
         <div className={styles.unitPrice}>
-          <span>{formatMoney(line.unitPrice, currency)}</span> / each
+          <span title={formatMoney(line.unitPrice, currency)}>{formatMoney(line.unitPrice, currency)}</span>
+          <span>/ each</span>
         </div>
       </div>
       <div className={styles.counter}>

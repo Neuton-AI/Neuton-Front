@@ -41,6 +41,6 @@ export const orderFields: readonly FormField<OrderForm>[] = [
     { kind: 'input', name: 'orderDate', id: 'order-date', label: 'Order date', type: 'date', required: true },
     { kind: 'input', name: 'deliveryDate', id: 'delivery-date', label: 'Delivery date', type: 'date', required: true },
   ] },
-  { kind: 'textarea', name: 'destinationAddress', id: 'address', label: 'Delivery address', rows: 2, required: true, maxLength: 300, autoComplete: 'street-address' },
+  { kind: 'input', name: 'destinationAddress', id: 'address', label: 'Delivery address', type: 'text', required: true, maxLength: 300, autoComplete: 'street-address' },
   { kind: 'input', name: 'deliveryFee', id: 'delivery-fee', label: 'Delivery fee', type: 'number', inputMode: 'decimal', required: true, min: 0, max: 99999999.99, step: 0.01 },
 ];
