@@ -35,7 +35,7 @@
 .footer > button { @apply bg-brand-primary text-ink-on-primary; width: 100%; height: 48px; border-radius: 8px; font-size: 14px; font-weight: 500; line-height: 18px; }
 .footer > button:disabled { @apply bg-brand-primary-disabled text-ink-muted; }
 .page button:focus-visible, .feeInput:focus-within { outline: 2px solid theme('colors.brand.primary-active'); outline-offset: 2px; }
-.page input, .page button { scroll-margin-block: 16px 112px; }
+.page input, .page button { scroll-margin-block: 16px calc(77px + max(28px, var(--safe-bottom))); }
 .line { display: grid; grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 62px; border-bottom: 1px solid theme('colors.hairline.DEFAULT'); }
 .itemName { display: flex; min-width: 0; flex-direction: column; gap: 4px; font-size: 15px; font-weight: 500; line-height: 20px; }
 .itemName > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -47,7 +47,7 @@
 .counter button:disabled { opacity: .4; }
 .counter output { text-align: center; font-variant-numeric: tabular-nums; }
 .lineEnd { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; font-weight: 500; }
-.lineEnd > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.lineEnd > span { flex: 1; min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .lineEnd button { display: flex; align-items: center; justify-content: center; width: 28px; height: 44px; flex-shrink: 0; color: theme('colors.ink.muted'); }
 .line[data-unavailable] { position: relative; color: theme('colors.ink.muted'); }
 .line[data-unavailable]::after {
@@ -60,3 +60,8 @@
   content: '';
 }
 .line[data-unavailable] .counter { opacity: .55; }
+
+@media (max-width: 360px) {
+  .line, .lineEnd { gap: 6px; }
+  .line[data-unavailable]::after { right: 34px; }
+}

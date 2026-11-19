@@ -10,6 +10,7 @@ export function useRecipePicker(recipes: readonly Recipe[], onAdd: (recipe: Reci
   const panel = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
+  const revealAfterSelection = useRef(false);
   const updatePosition = useRef<() => void>(undefined);
   const panelId = useId();
   const listId = useId();
@@ -73,6 +74,13 @@ export function useRecipePicker(recipes: readonly Recipe[], onAdd: (recipe: Reci
     updatePosition.current?.();
   });
 
+  useLayoutEffect(() => {
+    if (open || !revealAfterSelection.current) return;
+    revealAfterSelection.current = false;
+    trigger.current?.focus({ preventScroll: true });
+    trigger.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [open]);
+
   function dismiss() {
     setOpen(false);
     trigger.current?.focus({ preventScroll: true });
@@ -80,8 +88,9 @@ export function useRecipePicker(recipes: readonly Recipe[], onAdd: (recipe: Reci
 
   function choose(recipe: Recipe) {
     if (!selectable.includes(recipe)) return;
+    revealAfterSelection.current = true;
     onAdd(recipe);
-    dismiss();
+    setOpen(false);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {

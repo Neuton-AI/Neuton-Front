@@ -46,3 +46,17 @@ it('shows loading, error, empty and no-match states and reuses the preview fallb
   expect(screen.getByText('No matching recipes.')).toBeInTheDocument();
   expect(screen.getByText('0 recipes')).toBeInTheDocument();
 });
+
+it('reveals and focuses Add item after closing the picker on selection', async () => {
+  const user = userEvent.setup();
+  const onAdd = vi.fn();
+  const reveal = vi.fn(() => expect(screen.queryByRole('listbox')).toBeNull());
+  render(<RecipePicker {...defaults} onAdd={onAdd} />);
+  const trigger = screen.getByRole('button', { name: 'Add item' });
+  Object.defineProperty(trigger, 'scrollIntoView', { value: reveal });
+  await user.click(trigger);
+  await user.click(screen.getByRole('option', { name: 'Honey Cake' }));
+  expect(onAdd).toHaveBeenCalledWith(cake);
+  expect(reveal).toHaveBeenCalledWith({ block: 'nearest' });
+  expect(trigger).toHaveFocus();
+});

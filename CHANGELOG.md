@@ -16,5 +16,6 @@
 - Shop settings use one default delivery fee, including zero and cent amounts, instead of distance-based rates.
 - Order creation sends reviewed prices, date and final fee through a typed request and does not automatically retry or resume an offline save.
 ### Fixed
+- New Order keeps Add item above the sticky footer after selection and shows full line totals on narrow screens.
 - Pending recipe cost edits invalidate old order-pricing projections until sync
   supplies current costs.
