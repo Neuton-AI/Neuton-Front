@@ -16,6 +16,7 @@
 - Shop settings use one default delivery fee, including zero and cent amounts, instead of distance-based rates.
 - Order creation sends reviewed prices, date and final fee through a typed request and does not automatically retry or resume an offline save.
 ### Fixed
+- New Order prevents saving a delivery date earlier than the order date and shows how to correct it.
 - New Order keeps Add item, the price summary and Save order visible while order details and items scroll. Line totals stay readable on narrow screens.
 - Pending recipe cost edits invalidate old order-pricing projections until sync
   supplies current costs.

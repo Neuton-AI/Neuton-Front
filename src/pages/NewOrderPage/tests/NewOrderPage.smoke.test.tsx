@@ -1,6 +1,6 @@
 import { resetAuth } from '@/test/auth';
 import { createTestQueryClient, renderWithRouter } from '@/test/render';
-import { act, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { recipesKeys } from '@/features/recipes/keys';
 import { http, HttpResponse } from 'msw';
 import { apiPath } from '@/test/mocks/handlers/context';
@@ -50,6 +50,39 @@ it('prices locally and saves required fields through real HTTP', async () => {
   expect(screen.getByLabelText('Delivery date')).toHaveValue(screen.getByLabelText('Order date').getAttribute('value'));
   await user.click(screen.getByRole('button', { name: 'Save order' }));
   expect(await screen.findByRole('heading', { name: 'Saved order' })).toBeInTheDocument();
+});
+
+it('blocks delivery before the order date and saves after correcting it to the same day', async () => {
+  const user = userEvent.setup();
+  const writes = vi.fn();
+  server.use(
+    http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [buildRecipe({ status: 'verified' })] })),
+    http.post(apiPath('/orders'), () => {
+      writes();
+      return HttpResponse.json({ order: { id: 'saved' }, totals: { netProfit: 0 } }, { status: 201 });
+    }),
+  );
+  renderPage();
+  await user.click(screen.getByRole('button', { name: 'Add item' }));
+  await user.click(await screen.findByRole('option', { name: 'Tomato Soup' }));
+  await user.type(screen.getByLabelText('Customer name'), 'Ada');
+  await user.type(screen.getByLabelText('Delivery address'), '12 Main St');
+  const orderDate = screen.getByLabelText('Order date');
+  const deliveryDate = screen.getByLabelText('Delivery date');
+  fireEvent.change(deliveryDate, { target: { value: '2026-11-19' } });
+  fireEvent.change(orderDate, { target: { value: '2026-11-20' } });
+  expect(deliveryDate).toHaveAttribute('min', '2026-11-20');
+  expect(deliveryDate).toHaveValue('2026-11-19');
+  expect(screen.getByText('Delivery date must be on or after the order date.')).toBeVisible();
+  const save = screen.getByRole('button', { name: 'Save order' });
+  fireEvent.submit(save.closest('form')!);
+  expect(writes).not.toHaveBeenCalled();
+
+  fireEvent.change(deliveryDate, { target: { value: '2026-11-20' } });
+  expect(screen.queryByText('Delivery date must be on or after the order date.')).toBeNull();
+  await user.click(save);
+  expect(await screen.findByRole('heading', { name: 'Saved order' })).toBeInTheDocument();
+  expect(writes).toHaveBeenCalledTimes(1);
 });
 
 it.each(['0.00', '4.00'])('lets users select partial recipes with known unit price %s', async unitPrice => {

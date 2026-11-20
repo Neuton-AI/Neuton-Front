@@ -16,7 +16,7 @@ export function useOrderForm(scope: string, shop: Shop | null) {
   if (state.key !== key) setState(initialize());
   const current = state.key === key ? state : initialize();
   return {
-    fields: orderFields,
+    fields: orderFields(current.values.orderDate),
     formValues: current.values,
     formDirty: JSON.stringify(current.values) !== JSON.stringify(current.initial),
     handleFieldChange: (name: keyof OrderForm, value: string) => setState(previous => {

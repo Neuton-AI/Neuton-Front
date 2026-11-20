@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { orderDateTimestamp, validOrderDate } from './orderForm';
+import { earlyDeliveryDateMessage, orderDateTimestamp, validOrderDate } from './orderForm';
 import { useOrderDraft } from './useOrderDraft';
 import { useOrderForm } from './useOrderForm';
 
@@ -42,6 +42,9 @@ export function useNewOrderPage() {
   }
   const fee = Number(form.formValues.deliveryFee);
   const safeFee = Number.isFinite(fee) && fee >= 0 ? fee : 0;
+  const { orderDate, deliveryDate } = form.formValues;
+  const datesAreValid = validOrderDate(orderDate) && validOrderDate(deliveryDate);
+  const deliveryDateError = datesAreValid && deliveryDate < orderDate ? earlyDeliveryDateMessage : '';
   const save = async (confirmedUnavailableRecipeIds?: string[]) => {
     if (!userId || !activeShopId || draft.lines.length === 0 || submitting.current === scopeToken) return;
     if (draft.availableCount === 0) { setError('No available items to save'); return; }
@@ -50,8 +53,13 @@ export function useNewOrderPage() {
     if (!/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/.test(form.formValues.deliveryFee)) {
       setError('Enter a valid delivery fee with at most two decimal places.'); return;
     }
-    if (!validOrderDate(form.formValues.orderDate) || !validOrderDate(form.formValues.deliveryDate)) {
-      setError('Enter valid order and delivery dates.'); return;
+    if (!datesAreValid) {
+      setError('Enter valid order and delivery dates.');
+      return;
+    }
+    if (deliveryDateError) {
+      setError('');
+      return;
     }
     if (draft.lines.some(line => line.pricingPending)) { setError('Recipe pricing requires a synced costing snapshot.'); return; }
     setError('');
@@ -108,7 +116,7 @@ export function useNewOrderPage() {
   const itemsError = submitError || draft.error?.message;
   return {
     ...form, ...draft, authLoading, shopsLoading, activeShopId, draftScope: scope,
-    currency: shop?.currency ?? 'USD', itemsError,
+    currency: shop?.currency ?? 'USD', itemsError, deliveryDateError,
     draftDeliveryFee: safeFee, submit, reviewOpen, cancelReview, confirmReview,
     createOrderPending: createOrder.isPending, handleBack: () => navigate('/orders'),
   };
