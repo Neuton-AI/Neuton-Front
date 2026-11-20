@@ -4,7 +4,6 @@ import type {
   ManualProductInput,
   ManualProductUsage,
 } from './types';
-import { type OrderableRecipe } from '@/features/orders/types';
 import { recipesKeys } from '@/features/recipes/keys';
 import {
   type BarcodePrice,
@@ -53,22 +52,6 @@ export function useRecipe(
   });
 }
 
-export function useOrderableRecipes(
-  userId: UserId,
-  shopId: ShopId,
-): UseQueryResult<{ recipes: OrderableRecipe[] }> {
-  return useQuery({
-    queryKey: recipesKeys.orderableRecipes(shopId),
-    queryFn: ({ signal }) =>
-      apiFetch<{ recipes: OrderableRecipe[] }>('/recipes/orderable', {
-        userId,
-        shopId,
-        signal,
-      }),
-    enabled: enabled(userId, shopId),
-  });
-}
-
 export function useVerifyRecipe(
   userId: UserId,
   shopId: ShopId,
@@ -100,9 +83,6 @@ export function useVerifyRecipe(
       void queryClient.invalidateQueries({
         queryKey: recipesKeys.recipes(shopId),
       });
-      void queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes(shopId),
-      });
     },
   });
 }
@@ -123,9 +103,6 @@ export function useDeleteRecipe(
       queryClient.removeQueries({ queryKey: recipesKeys.recipe(shopId, id) });
       void queryClient.invalidateQueries({
         queryKey: recipesKeys.recipes(shopId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes(shopId),
       });
       void queryClient.invalidateQueries({
         queryKey: analyticsKeys.dashboardRoot,
@@ -152,9 +129,6 @@ export function useUpdateRecipe(userId: UserId, shopId: ShopId) {
       });
       void queryClient.invalidateQueries({
         queryKey: recipesKeys.recipes(shopId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes(shopId),
       });
       void queryClient.invalidateQueries({
         queryKey: analyticsKeys.dashboardRoot,

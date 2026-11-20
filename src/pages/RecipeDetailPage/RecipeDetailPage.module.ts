@@ -77,8 +77,7 @@ export function useRecipeDetailPage() {
 
   /**
    * Publishing an extracted recipe: the server flips `unverified → verified`,
-   * which is what makes it orderable (GET /recipes/orderable only returns
-   * verified recipes). Ingredients are sent as an empty object because the
+   * which makes it eligible in New Order. Ingredients are sent as an empty object because the
    * endpoint's body is an object even though every field is optional.
    */
   const verify = async () => {

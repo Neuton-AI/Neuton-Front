@@ -15,9 +15,6 @@ describe('recipes API contracts', () => {
     const recipe = buildRecipe();
     client.setQueryData(recipesKeys.recipe('shop-1', 'rp-1'), { recipe });
     client.setQueryData(recipesKeys.recipes('shop-1'), { recipes: [recipe] });
-    client.setQueryData(recipesKeys.orderableRecipes('shop-1'), {
-      recipes: [],
-    });
     client.setQueryData(analyticsKeys.dashboardRoot, {});
     let submitted: unknown;
     server.use(
@@ -43,7 +40,7 @@ describe('recipes API contracts', () => {
     expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
       recipe,
     });
-    for (const key of [recipesKeys.recipe('shop-1', 'rp-1'), recipesKeys.recipes('shop-1'), recipesKeys.orderableRecipes('shop-1'), analyticsKeys.dashboardRoot]) {
+    for (const key of [recipesKeys.recipe('shop-1', 'rp-1'), recipesKeys.recipes('shop-1'), analyticsKeys.dashboardRoot]) {
       expect(client.getQueryState(key)?.isInvalidated).toBe(true);
     }
   });
@@ -141,7 +138,7 @@ describe('recipes API contracts', () => {
     await act(() => vi.advanceTimersByTimeAsync(6000));
     expect(calls).toBe(2);
   });
-  it('sends an empty verification object, preserves detail data and invalidates orderable recipes', async () => {
+  it('sends an empty verification object, preserves detail data and invalidates the synced catalog', async () => {
     let body: unknown;
     server.use(
       http.post(apiPath('/recipes/rp-1/verify'), async ({ request }) => {
@@ -158,9 +155,6 @@ describe('recipes API contracts', () => {
       recipe: buildRecipe(),
     });
     client.setQueryData(recipesKeys.recipes('shop-1'), { recipes: [] });
-    client.setQueryData(recipesKeys.orderableRecipes('shop-1'), {
-      recipes: [],
-    });
     const { result } = renderHookWithProviders(() => useVerifyRecipe('userId-1', 'shop-1'), {
       queryClient: client,
     });
@@ -169,10 +163,6 @@ describe('recipes API contracts', () => {
     expect(client.getQueryData(recipesKeys.recipe('shop-1', 'rp-1'))).toEqual({
       recipe: buildRecipe({ status: 'verified' }),
     });
-    expect(
-      client.getQueryState(recipesKeys.orderableRecipes('shop-1'))
-        ?.isInvalidated,
-    ).toBe(true);
     expect(
       client.getQueryState(recipesKeys.recipes('shop-1'))?.isInvalidated,
     ).toBe(true);

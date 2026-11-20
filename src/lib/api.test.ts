@@ -212,3 +212,49 @@ describe('ALLOWED_CONTENT_TYPES', () => {
     ]);
   });
 });
+
+describe('bounded error details', () => {
+  it('preserves nested review data with status, code and trace metadata', async () => {
+    const { apiFetch } = await loadApi();
+    const details = { reasons: ['PRICE_CHANGED'], unavailable: [], priceChanges: [], currentItems: [] };
+    mockFetch(new Response(JSON.stringify({ error: { code: 'ORDER_REVIEW_REQUIRED', message: 'Review the updated order.', details } }),
+      { status: 409, headers: { 'x-trace-id': 'review-trace' } }));
+    await expect(apiFetch('/orders', { method: 'POST', body: {} })).rejects.toMatchObject({
+      status: 409, code: 'ORDER_REVIEW_REQUIRED', message: 'Review the updated order.', traceId: 'review-trace', details,
+    });
+  });
+  it.each([
+    { items: Array.from({ length: 101 }, () => 'x') },
+    { text: 'x'.repeat(513) },
+    { a: { b: { c: { d: { e: { f: 'too deep' } } } } } },
+    Object.fromEntries(Array.from({ length: 21 }, (_, index) => [`field-${index}`, index])),
+  ])('drops oversized details without losing ordinary error diagnostics', async (details) => {
+    const { apiFetch } = await loadApi();
+    mockFetch(json({ error: { code: 'BAD_REQUEST', message: 'Invalid request', details } }, 400));
+    const error = await apiFetch('/orders').catch(value => value);
+    const { ApiError } = await loadApi();
+    if (!(error instanceof ApiError)) {
+      throw new Error('Expected an API error');
+    }
+    expect(error).toMatchObject({ status: 400, code: 'BAD_REQUEST', message: 'Invalid request' });
+    expect(error.details).toBeUndefined();
+  });
+  it('preserves bounded ordinary validation details', async () => {
+    const { apiFetch } = await loadApi();
+    const details = [{ path: ['customerName'], message: 'Required' }];
+    mockFetch(json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid request', details } }, 400));
+    await expect(apiFetch('/orders')).rejects.toMatchObject({ details });
+  });
+});
+
+it('keeps the no-available-items conflict as a typed API error without fabricated details', async () => {
+  const { apiFetch } = await loadApi();
+  mockFetch(json({ error: { code: 'NO_AVAILABLE_ITEMS', message: 'No selected items are available.' } }, 409));
+  const error = await apiFetch('/orders', { method: 'POST', body: {} }).catch(value => value);
+  const { ApiError } = await loadApi();
+  if (!(error instanceof ApiError)) {
+    throw new Error('Expected an API error');
+  }
+  expect(error).toMatchObject({ status: 409, code: 'NO_AVAILABLE_ITEMS' });
+  expect(error.details).toBeUndefined();
+});

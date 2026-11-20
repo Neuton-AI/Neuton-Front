@@ -1,278 +1,164 @@
-import type { FormField } from "@/components/FormFields/schema";
-import { validateFields } from "@/components/FormFields/schema";
-import {
-  useAuth,
-  useCurrentShop,
-  useShopMemberships,
-} from "@/features/auth/auth";
-import { useCreateOrder, useOrderQuote } from "@/features/orders/ordersApi";
-import type { OrderableRecipe } from "@/features/orders/types";
-import { useOrderableRecipes, useRecipes } from "@/features/recipes/recipesApi";
-import { ingredientLinkSummary } from "@/features/recipes/selectors";
-import { toNumber } from "@/lib/format";
-import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-type DraftLine = { recipe: OrderableRecipe; quantity: number };
-export type NewOrderRecipe = Omit<
-  OrderableRecipe,
-  "unitCost" | "retailPrice"
-> & {
-  unitCost: number | null;
-  retailPrice: number | null;
-  costComplete?: boolean;
-};
+import { validateFields } from '@/components/FormFields/schema';
+import { useAuth, useCurrentShop, useShopMemberships } from '@/features/auth/auth';
+import { useCreateOrder } from '@/features/orders/ordersApi';
+import { orderReviewDetails } from '@/features/orders/reviewConflict';
+import { recipesKeys } from '@/features/recipes/keys';
+import { syncDocuments } from '@/features/sync/engine';
+import { scopeFor } from '@/features/sync/types';
+import { ApiError } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { earlyDeliveryDateMessage, orderDateTimestamp, validOrderDate } from './orderForm';
+import { useOrderDraft } from './useOrderDraft';
+import { useOrderForm } from './useOrderForm';
 
-const today = () => new Date().toISOString().slice(0, 10);
 export function useNewOrderPage() {
-  const { user, userId, loading: authLoading } = useAuth();
-
-  const {
-    memberships,
-    activeShopId,
-    loading: shopsLoading,
-  } = useShopMemberships(user?.id);
-
+  const { user, userId, sessionId, loading: authLoading } = useAuth();
+  const { memberships, activeShopId, loading: shopsLoading } = useShopMemberships(user?.id);
   const shop = useCurrentShop(memberships, activeShopId);
-
+  const scope = JSON.stringify([userId, activeShopId]);
+  const activeScope = useRef({ scope, sessionId });
+  if (activeScope.current.scope !== scope || activeScope.current.sessionId !== sessionId) {
+    activeScope.current = { scope, sessionId };
+  }
+  const scopeToken = activeScope.current;
+  const draft = useOrderDraft(userId, activeShopId);
+  const form = useOrderForm(scope, shop);
   const navigate = useNavigate();
-
-  const [draftLines, setLines] = useState<DraftLine[]>([]);
-
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const [customerName, setCustomerName] = useState("");
-
-  const [orderDate, setOrderDate] = useState(today);
-
-  const [destinationAddress, setDestinationAddress] = useState("");
-
-  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState("0");
-
-  const currency = shop?.currency ?? "USD";
-
-  const recipesQuery = useOrderableRecipes(userId, activeShopId);
-  const catalogQuery = useRecipes(userId, activeShopId);
-
-  const orderable = recipesQuery.data?.recipes ?? [];
-  const incompleteRecipes = (catalogQuery.data?.recipes ?? []).filter(
-    (recipe) =>
-      recipe.isActive &&
-      recipe.status === "verified" &&
-      ingredientLinkSummary(recipe.costing).incomplete,
-  );
-  const incompleteIds = new Set(incompleteRecipes.map((recipe) => recipe.id));
-  const eligibleRecipes = orderable.filter(
-    (recipe) => !incompleteIds.has(recipe.id),
-  );
-  const lines = draftLines.filter((line) =>
-    eligibleRecipes.some((recipe) => recipe.id === line.recipe.id),
-  );
-  const recipes: NewOrderRecipe[] = [
-    ...eligibleRecipes,
-    ...incompleteRecipes.map((recipe) => ({
-      id: recipe.id,
-      name: recipe.name,
-      imageUrl: recipe.imageUrl,
-      yieldQuantity: recipe.yieldQuantity,
-      yieldUnit: recipe.yieldUnit,
-      unitCost: null,
-      retailPrice: null,
-      costComplete: false,
-    })),
-  ];
-
-  const loading = recipesQuery.isLoading || catalogQuery.isLoading;
-
-  const recipeError = recipesQuery.error ?? catalogQuery.error;
-  const itemsError = recipeError
-    ? recipeError instanceof Error
-      ? recipeError.message
-      : "Could not load recipes."
-    : submitError;
-
-  const items = lines.map((line) => ({
-    recipeId: line.recipe.id,
-    quantity: line.quantity,
-  }));
-
-  const itemsKey = JSON.stringify(items);
-
-  /**
-   * Pricing comes from POST /orders/quote rather than being recomputed here, so
-   * the running total always reflects live stock cost and the shop's margin.
-   * The inputs are debounced so a burst of +/− clicks or a typed distance fires
-   * one request, and the query key changes only once the debounce settles.
-   */
-  const debouncedItemsKey = useDebouncedValue(itemsKey, 250);
-
-  const debouncedDistanceKm = useDebouncedValue(deliveryDistanceKm, 250);
-
-  const quoteQuery = useOrderQuote(userId, activeShopId, {
-    items: JSON.parse(debouncedItemsKey) as {
-      recipeId: string;
-      quantity: number;
-    }[],
-    distanceKm: toNumber(debouncedDistanceKm),
-    enabled: items.length > 0 && debouncedItemsKey === itemsKey,
-  });
-
-  const quote =
-    items.length > 0 && debouncedItemsKey === itemsKey
-      ? (quoteQuery.data ?? null)
-      : null;
-
-  const quoteError =
-    items.length === 0
-      ? null
-      : quoteQuery.error
-        ? quoteQuery.error instanceof Error
-          ? quoteQuery.error.message
-          : "Could not price this order."
-        : null;
-
-  const quoting = quoteQuery.isFetching;
-
   const createOrder = useCreateOrder(userId, activeShopId);
-
-  const quantityOf = (recipeId: string) =>
-    lines.find((line) => line.recipe.id === recipeId)?.quantity ?? 0;
-
-  const changeQuantity = (recipe: NewOrderRecipe, delta: number) => {
-    if (recipe.costComplete === false || incompleteIds.has(recipe.id)) return;
-    const eligible = eligibleRecipes.find((item) => item.id === recipe.id);
-    if (!eligible) return;
-    setLines((current) => {
-      const existing = current.find((line) => line.recipe.id === recipe.id);
-      const next = Math.max(0, (existing?.quantity ?? 0) + delta);
-
-      if (next === 0)
-        return current.filter((line) => line.recipe.id !== recipe.id);
-      if (existing) {
-        return current.map((line) =>
-          line.recipe.id === recipe.id ? { ...line, quantity: next } : line,
-        );
-      }
-      return [...current, { recipe: eligible, quantity: next }];
-    });
-  };
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!userId || !activeShopId || items.length === 0 || createOrder.isPending)
-      return;
-
-    const validationError = Object.values(
-      validateFields(fields, formValues),
-    )[0];
-    if (validationError) {
-      setSubmitError(String(validationError));
+  const queryClient = useQueryClient();
+  const submitting = useRef<typeof scopeToken | null>(null);
+  const [review, setReview] = useState<{ token: typeof scopeToken; revision: string } | null>(null);
+  const revision = JSON.stringify([draft.revision, form.formValues, shop?.timezone, shop?.currency]);
+  const cancelReview = useCallback(() => setReview(null), []);
+  const [failure, setFailure] = useState({ scope, message: '' });
+  const submitError = failure.scope === scope ? failure.message : '';
+  const setError = (message: string) => setFailure({ scope, message });
+  const reviewOpen = review?.token === scopeToken && review.revision === revision;
+  if (review && !reviewOpen) {
+    setReview(null);
+    if (review.token === scopeToken) setError('The order changed. Review the updated items and save again.');
+  }
+  const fee = Number(form.formValues.deliveryFee);
+  const safeFee = Number.isFinite(fee) && fee >= 0 ? fee : 0;
+  const { orderDate, deliveryDate } = form.formValues;
+  const datesAreValid = validOrderDate(orderDate) && validOrderDate(deliveryDate);
+  const deliveryDateError = datesAreValid && deliveryDate < orderDate ? earlyDeliveryDateMessage : '';
+  const save = async (confirmedUnavailableRecipeIds?: string[]) => {
+    if (!userId || !activeShopId || draft.lines.length === 0 || submitting.current === scopeToken) return;
+    if (draft.availableCount === 0) { setError('No available items to save'); return; }
+    const invalidField = Object.values(validateFields(form.fields, form.formValues))[0];
+    if (invalidField) { setError(invalidField); return; }
+    if (!/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/.test(form.formValues.deliveryFee)) {
+      setError('Enter a valid delivery fee with at most two decimal places.'); return;
+    }
+    if (!datesAreValid) {
+      setError('Enter valid order and delivery dates.');
       return;
     }
-    setSubmitError(null);
+    if (deliveryDateError) {
+      setError('');
+      return;
+    }
+    if (draft.lines.some(line => line.pricingPending)) { setError('Recipe pricing requires a synced costing snapshot.'); return; }
+    setError('');
+    if (draft.unavailableIds.length > 0 && !confirmedUnavailableRecipeIds) {
+      setReview({ token: scopeToken, revision });
+      return;
+    }
+    submitting.current = scopeToken;
     try {
+      const values = form.formValues;
       const result = await createOrder.mutateAsync({
-        customerName: customerName.trim() || null,
-        orderDate: new Date(`${orderDate}T12:00:00`).toISOString(),
-        destinationAddress: destinationAddress.trim() || null,
-        deliveryDistanceKm: toNumber(deliveryDistanceKm),
-        items,
+        customerName: values.customerName.trim(), destinationAddress: values.destinationAddress.trim(),
+        orderDate: orderDateTimestamp(values.orderDate, shop?.timezone ?? 'UTC'),
+        deliveryDate: values.deliveryDate, deliveryFee: values.deliveryFee,
+        items: draft.lines.map(line => ({ recipeId: line.recipeId, quantity: line.quantity, expectedUnitPrice: line.unitPrice })),
+        ...(confirmedUnavailableRecipeIds ? { confirmedUnavailableRecipeIds } : {}),
       });
+      if (activeScope.current !== scopeToken) return;
+      draft.clear();
       navigate(`/orders/${result.order.id}`, { state: { fresh: true } });
     } catch (cause) {
-      setSubmitError(
-        cause instanceof Error ? cause.message : "Could not save the order.",
-      );
+      if (activeScope.current !== scopeToken) return;
+      const corrections = orderReviewDetails(cause);
+      if (corrections) draft.applyReview(corrections);
+      const noAvailable = cause instanceof ApiError && cause.status === 409 && cause.code === 'NO_AVAILABLE_ITEMS';
+      if (corrections || noAvailable) {
+        const partition = scopeFor(userId, activeShopId);
+        void syncDocuments(partition, { userId, shopId: activeShopId }, { force: true, queueIfRunning: true, sessionId })
+          .catch(() => undefined)
+          .then(() => {
+            if (activeScope.current === scopeToken) {
+              void queryClient.invalidateQueries({ queryKey: recipesKeys.recipes(activeShopId) });
+            }
+          });
+      }
+      if (noAvailable) {
+        setError('No available items to save');
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Could not save the order.');
+      }
+    } finally {
+      if (submitting.current === scopeToken) submitting.current = null;
     }
   };
-  const createOrderPending = createOrder.isPending;
-  const handleBack = () => navigate("/orders");
-
-  const formValues = {
-    customerName,
-    orderDate,
-    destinationAddress,
-    deliveryDistanceKm,
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!reviewOpen) return save();
   };
-  const fields: readonly FormField<typeof formValues>[] = [
-    {
-      kind: "input",
-      name: "customerName",
-      id: "customer",
-      label: "Name",
-      placeholder: "Optional",
-      autoComplete: "name",
-    },
-    {
-      kind: "group",
-      name: "dateDistance",
-      className: "grid grid-cols-2 gap-3",
-      fields: [
-        {
-          kind: "input",
-          name: "orderDate",
-          id: "order-date",
-          label: "Date",
-          type: "date",
-          required: true,
-        },
-        {
-          kind: "input",
-          name: "deliveryDistanceKm",
-          id: "distance",
-          label: "Distance",
-          type: "number",
-          inputMode: "decimal",
-          min: 0,
-          step: 0.1,
-        },
-      ],
-    },
-    {
-      kind: "textarea",
-      name: "destinationAddress",
-      id: "address",
-      label: "Address",
-      rows: 2,
-      placeholder: "Optional",
-      autoComplete: "street-address",
-    },
-  ];
-  const handleFieldChange = (name: keyof typeof formValues, value: string) => {
-    const setters = {
-      customerName: setCustomerName,
-      orderDate: setOrderDate,
-      destinationAddress: setDestinationAddress,
-      deliveryDistanceKm: setDeliveryDistanceKm,
-    };
-    setters[name](value);
+  const confirmReview = () => {
+    if (!reviewOpen) return;
+    cancelReview();
+    return save(draft.unavailableIds);
   };
-  const itemFields: readonly FormField<typeof formValues>[] = [
-    { kind: "custom", name: "items" },
-  ];
-  const quoteSubtotal = quote ? quote.totalAmount - quote.deliveryFee : 0;
+  const itemsError = submitError || draft.error?.message;
   return {
-    quoteSubtotal,
-    itemFields,
-    fields,
-    formValues,
-    handleFieldChange,
-    authLoading,
-    activeShopId,
-    shopsLoading,
-    lines,
-    currency,
-    recipes,
-    loading,
-    itemsError,
-    quote,
-    quoteError,
-    quoting,
-    quantityOf,
-    changeQuantity,
-    submit,
-    createOrderPending,
-    handleBack,
+    ...form, ...draft, authLoading, shopsLoading, activeShopId, draftScope: scope,
+    currency: shop?.currency ?? 'USD', itemsError, deliveryDateError,
+    draftDeliveryFee: safeFee, submit, reviewOpen, cancelReview, confirmReview,
+    createOrderPending: createOrder.isPending, handleBack: () => navigate('/orders'),
   };
 }
 export type NewOrderPageModel = ReturnType<typeof useNewOrderPage>;
+
+export function useNewOrderLayout() {
+  const model = useNewOrderPage();
+  const [discardScope, setDiscardScope] = useState<string | null>(null);
+  const confirmDiscard = discardScope !== null && discardScope === model.draftScope;
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const restoreSaveFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.inert = confirmDiscard || model.reviewOpen;
+    if (model.reviewOpen) restoreSaveFocus.current = true;
+    if (!confirmDiscard && !model.reviewOpen && !model.createOrderPending && restoreSaveFocus.current) {
+      restoreSaveFocus.current = false;
+      saveRef.current?.focus({ preventScroll: true });
+    }
+  }, [confirmDiscard, model.reviewOpen, model.createOrderPending]);
+  useEffect(() => {
+    restoreSaveFocus.current = false;
+  }, [model.draftScope]);
+  const cancelDiscard = () => {
+    setDiscardScope(null);
+    if (contentRef.current) contentRef.current.inert = false;
+    closeRef.current?.focus();
+  };
+  const close = () => {
+    if (model.createOrderPending) return;
+    if (model.formDirty || model.lines.length > 0) {
+      setDiscardScope(model.draftScope);
+      return;
+    }
+    model.handleBack();
+  };
+  const discard = () => {
+    model.clear();
+    model.handleBack();
+  };
+  return { model, confirmDiscard,
+    closeRef, saveRef, contentRef, cancelDiscard, close, discard };
+}

@@ -116,15 +116,11 @@ export function useOrderDetailPage() {
       ? (order.netProfit / toNumber(order.totalAmount)) * 100
       : 0;
 
-  const baseFee = toNumber(shop?.deliveryBaseFee);
   const markOrderPending = markOrder.isPending;
   const deleteOrderPending = deleteOrder.isPending;
-  const distanceFee =
-    toNumber(order?.deliveryDistanceKm) * toNumber(shop?.deliveryRatePerKm);
   return {
     userId,
     activeShopId,
-    distanceFee,
     shop,
     order,
     markError,
@@ -139,7 +135,6 @@ export function useOrderDetailPage() {
     remove,
     markDelivered,
     marginPercent,
-    baseFee,
     markOrderPending,
     deleteOrderPending,
   };

@@ -30,10 +30,17 @@ export function optimisticRecipe(
     (update.prepTimeMinutes !== undefined &&
       update.prepTimeMinutes !== recipe.prepTimeMinutes) ||
     (update.yieldQuantity !== undefined &&
-      update.yieldQuantity !== Number(recipe.yieldQuantity));
+      update.yieldQuantity !== Number(recipe.yieldQuantity)) ||
+    (body.targetMarginPct !== undefined &&
+      String(body.targetMarginPct) !== String(recipe.targetMarginPct));
   if (!costChanged) return next;
   return {
     ...next,
+    orderPricing: null,
+    orderPricingError: {
+      code: 'ORDER_PRICING_UNAVAILABLE',
+      message: 'Recipe pricing requires a synced costing snapshot',
+    },
     costing: {
       ...recipe.costing,
       costComplete: false,

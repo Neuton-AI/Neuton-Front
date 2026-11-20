@@ -305,6 +305,15 @@ export const IconTrash: React.FC<IIconTrash> = ({ className, strokeWidth }) => {
   );
 };
 
+export function IconInfo({ className }: { className?: string }) {
+  return (
+    <svg {...base(className, 1.6)}>
+      <circle cx='10' cy='10' r='8' />
+      <path d='M10 9v5m0-8h.01' />
+    </svg>
+  );
+}
+
 interface IIconWarning {
   className?: string;
   strokeWidth?: number;

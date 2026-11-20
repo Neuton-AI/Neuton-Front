@@ -2,6 +2,22 @@ import type { DocumentSource } from '@/features/uploads/types';
 
 export type RecipeStatus = 'pending' | 'processing' | 'unverified' | 'verified' | 'failed';
 
+export type RecipeOrderPricing = {
+  unitPrice: string;
+  unitCost: string;
+  costComplete: boolean;
+};
+
+export type RecipeOrderPricingError = {
+  code: 'INVALID_RECIPE_YIELD' | 'ORDER_PRICING_UNAVAILABLE';
+  message: string;
+};
+
+export type RecipeOrderPricingResult = {
+  orderPricing: RecipeOrderPricing | null;
+  orderPricingError: RecipeOrderPricingError | null;
+};
+
 export type RecipeIngredient = {
   id?: string;
   name: string;
@@ -94,6 +110,11 @@ export type RecipeCosting = {
 };
 
 export type Recipe = {
+  /** Version of the server snapshot read from the local document store. */
+  localServerVersion?: number;
+  /** Optional while initialized local documents migrate to the new projection. */
+  orderPricing?: RecipeOrderPricing | null;
+  orderPricingError?: RecipeOrderPricingError | null;
   /** Presentation metadata from the local document envelope, never sent to the API. */
   localUpload?: boolean;
   sources?: DocumentSource[];

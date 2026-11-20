@@ -41,14 +41,11 @@ export const OrderDetailPage: React.FC = () => {
             <OrderDelivery
               order={order}
               currency={currency}
-              distanceFee={model.distanceFee}
-              baseFee={model.baseFee}
-              rate={model.shop?.deliveryRatePerKm}
             />
             <SheetSection title="Cost">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-label text-ink-muted">
-                  Production cost
+                  {order.items.some(item => item.costComplete === false) ? 'Known production cost' : 'Production cost'}
                 </span>
                 <span className="text-body text-ink">
                   {formatMoney(order.totalCost, currency)}
