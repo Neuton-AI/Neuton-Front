@@ -19,6 +19,24 @@ const renderPage = (queryClient = createTestQueryClient()) => renderWithRouter(<
   <Route path='/orders' element={<h1>Orders</h1>} />
 </Routes>, { route: '/orders/new', queryClient });
 
+it('keeps the add, totals and save controls together outside the scrollable order details and items', async () => {
+  const user = userEvent.setup();
+  server.use(http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [buildRecipe({ status: 'verified' })] })));
+  renderPage();
+  const scrollArea = screen.getByRole('region', { name: 'Order details and items' });
+  const add = screen.getByRole('button', { name: 'Add item' });
+  const save = screen.getByRole('button', { name: 'Save order' });
+  const footer = save.closest('footer');
+  expect(footer).toContainElement(add);
+  expect(footer).toContainElement(screen.getByRole('region', { name: 'Order breakdown' }));
+  expect(scrollArea).toContainElement(screen.getByLabelText('Customer name'));
+  expect(scrollArea).not.toContainElement(footer);
+  await user.click(add);
+  await user.click(await screen.findByRole('option', { name: 'Tomato Soup' }));
+  expect(scrollArea).toContainElement(screen.getByRole('list', { name: 'Selected items' }));
+  expect(add).toHaveFocus();
+});
+
 it('prices locally and saves required fields through real HTTP', async () => {
   server.use(http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [buildRecipe({ status: 'verified' })] })));
   const user = userEvent.setup();

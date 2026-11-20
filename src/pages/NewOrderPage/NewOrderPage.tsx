@@ -21,7 +21,7 @@ export function NewOrderPage() {
         <h1>New order</h1>
       </header>
       <form onSubmit={model.submit} className={styles.form}>
-        <div className={styles.content}>
+        <div className={styles.content} role='region' aria-label='Order details and items' tabIndex={0}>
           <OrderDetails {...model} />
           <section className={styles.items} aria-labelledby='order-items-heading'>
             <div className={styles.itemsHeading}>
@@ -38,14 +38,14 @@ export function NewOrderPage() {
             </div>
             {model.itemsError ? <InlineNotice tone='error'>{model.itemsError}</InlineNotice> : null}
             {model.lines.length > 0 ? <SelectedOrderItems {...model} /> : null}
-            <RecipePicker key={model.draftScope} recipes={model.recipes} loading={model.loading}
-              error={Boolean(model.error)} disabled={model.createOrderPending}
-              onAdd={recipe => model.changeQuantity(recipe, 1)} />
           </section>
-          <OrderSummary subtotal={model.subtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
         </div>
         <footer className={styles.footer}>
-          <button ref={saveRef} type='submit' formNoValidate={model.availableCount === 0}
+          <RecipePicker key={model.draftScope} recipes={model.recipes} loading={model.loading}
+            error={Boolean(model.error)} disabled={model.createOrderPending}
+            onAdd={recipe => model.changeQuantity(recipe, 1)} />
+          <OrderSummary subtotal={model.subtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
+          <button ref={saveRef} type='submit' className={styles.saveButton} formNoValidate={model.availableCount === 0}
             disabled={model.lines.length === 0 || model.createOrderPending}
             aria-busy={model.createOrderPending}>Save order</button>
         </footer>
