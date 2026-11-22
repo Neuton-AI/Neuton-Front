@@ -11,6 +11,9 @@ import { useUpdateRecipe } from '@/features/recipes/recipesApi';
 import { renderHookWithProviders } from '@/test/render';
 import { act, waitFor } from '@testing-library/react';
 import { onlineManager } from '@tanstack/react-query';
+import { buildRecipe } from '@/test/factories/recipes.factory';
+import { recipeOrderPricing } from '@/features/recipes/selectors';
+import type { Recipe } from '@/features/recipes/types';
 
 vi.unmock('./documentsApi');
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
@@ -123,6 +126,74 @@ const online = () =>
     value: true,
     configurable: true,
   });
+
+it('keeps initialized legacy pricing usable without an extra download or pricing request', async () => {
+  const recipe = { ...buildRecipe(), id };
+  await store.transaction(['documents', 'settings'], (tx) => {
+    tx.objectStore('documents').put({ ...original, data: recipe });
+    tx.objectStore('settings').put({ key: scope.key, scope: scope.key, initialized: true });
+  });
+  online();
+  api.fetch.mockResolvedValue({ toPush: [], toPull: [] });
+  await syncDocuments(scope, context);
+  const local = await documentFetch<{ recipe: Recipe }>(`/recipes/${id}`, context);
+  expect(recipeOrderPricing(local.recipe).orderPricing?.unitPrice).toBe('10.50');
+  expect(local.recipe).not.toHaveProperty('orderPricing');
+  expect(api.fetch.mock.calls.every(([path]) => path === '/sync/check')).toBe(true);
+});
+
+it('replaces an initialized legacy snapshot with the rolled-out pricing through normal sync', async () => {
+  const recipe = { ...buildRecipe(), id };
+  await store.transaction(['documents', 'settings'], (tx) => {
+    tx.objectStore('documents').put({ ...original, data: recipe });
+    tx.objectStore('settings').put({ key: scope.key, scope: scope.key, initialized: true });
+  });
+  const pricing = { unitPrice: '3.33', unitCost: '3.3333', costComplete: false };
+  api.fetch.mockImplementation(async (path: string) => {
+    if (path === '/sync/check') {
+      return { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 200 }] };
+    }
+    expect(path).toBe(`/recipes/${id}`);
+    return { recipe: { ...recipe, orderPricing: pricing, orderPricingError: null }, syncVersion: 201 };
+  });
+  online();
+  await syncDocuments(scope, context);
+  const saved = await store.get<LocalDocument>('documents', key);
+  expect(saved?.updatedAt).toBe(201);
+  expect(saved?.data.orderPricing).toEqual(pricing);
+  const local = await documentFetch<{ recipe: Recipe }>(`/recipes/${id}`, context);
+  expect(recipeOrderPricing(local.recipe).orderPricing).toEqual(pricing);
+  expect(api.fetch.mock.calls.filter(([path]) => path === `/recipes/${id}`)).toHaveLength(1);
+});
+
+it('keeps legacy partial prices readable when a rollout download fails', async () => {
+  const recipe = { ...buildRecipe({ yieldQuantity: '3' }), id };
+  Object.assign(recipe.costing, { costComplete: false, unitCost: null, retailPrice: null, ingredientsCost: 1, laborCost: 9 });
+  await store.transaction(['documents'], (tx) => tx.objectStore('documents').put({ ...original, data: recipe }));
+  api.fetch.mockImplementation(async (path: string) => {
+    if (path === '/sync/check') return { toPush: [], toPull: [{ kind: 'recipe', id, updatedAt: 200 }] };
+    throw new ApiError('Download failed', 0);
+  });
+  online();
+  await expect(syncDocuments(scope, context)).rejects.toThrow('Download failed');
+  const local = await documentFetch<{ recipe: Recipe }>(`/recipes/${id}`, context);
+  expect(recipeOrderPricing(local.recipe).orderPricing?.unitPrice).toBe('3.33');
+  expect((await store.get<LocalDocument>('documents', key))?.deleted).toBe(false);
+});
+
+it.each([{ yieldQuantity: 2 }, { prepTimeMinutes: 30 }, { targetMarginPct: 35 }, { ingredients: [] }])(
+  'invalidates pricing for local cost edit %j, while preserving it for a rename', async (costEdit) => {
+    const recipe = { ...buildRecipe(), id, orderPricing: { unitPrice: '10.50', unitCost: '2.1000', costComplete: true } };
+    await store.transaction(['documents'], (tx) => tx.objectStore('documents').put({ ...original, data: recipe }));
+    await documentFetch(`/recipes/${id}`, { ...context, method: 'PATCH', body: { name: 'Renamed' } });
+    let local = await documentFetch<{ recipe: Recipe }>(`/recipes/${id}`, context);
+    expect(recipeOrderPricing(local.recipe).orderPricing?.unitPrice).toBe('10.50');
+    await documentFetch(`/recipes/${id}`, { ...context, method: 'PATCH', body: costEdit });
+    local = await documentFetch<{ recipe: Recipe }>(`/recipes/${id}`, context);
+    expect(recipeOrderPricing(local.recipe).orderPricing).toBeNull();
+    expect(recipeOrderPricing(local.recipe).orderPricingError?.code).toBe('ORDER_PRICING_UNAVAILABLE');
+  },
+);
 
 it('projects local upload state without changing stored statuses or receipt item arrays', async () => {
   const receiptId = 'receipt-count';

@@ -1,190 +1,219 @@
-import { authState, resetAuth } from "@/test/auth";
-import { apiPath } from "@/test/mocks/handlers/context";
-import {
-  buildOrderableRecipe,
-  buildQuote,
-} from "@/test/mocks/handlers/orders.handlers";
-import { server } from "@/test/mocks/server";
-import { renderHookWithProviders } from "@/test/render";
-import { act, waitFor } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
-import type { FormEvent } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useNewOrderPage } from "../NewOrderPage.module";
-import { buildRecipe } from "@/test/factories/recipes.factory";
-import { recipesKeys } from "@/features/recipes/keys";
+import { authState, resetAuth } from '@/test/auth';
+import { apiPath } from '@/test/mocks/handlers/context';
+import { buildRecipe } from '@/test/factories/recipes.factory';
+import { server } from '@/test/mocks/server';
+import { renderHookWithProviders } from '@/test/render';
+import { act, waitFor } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import type { FormEvent } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useNewOrderPage } from '../NewOrderPage.module';
 
 const navigate = vi.hoisted(() => vi.fn());
-vi.mock(
-  "@/features/auth/auth",
-  async () => (await import("@/test/auth")).authMock,
-);
-vi.mock("@/features/sync/documentsApi", async () => ({
-  documentFetch: (await import("@/lib/api")).apiFetch,
-}));
-vi.mock("react-router-dom", async (original) => ({
-  ...(await original<typeof import("react-router-dom")>()),
-  useNavigate: () => navigate,
-}));
+const syncDocuments = vi.hoisted(() => vi.fn());
+vi.mock('@/features/sync/engine', () => ({ syncDocuments }));
+vi.mock('@/features/auth/auth', async () => (await import('@/test/auth')).authMock);
+vi.mock('@/features/sync/documentsApi', async () => ({ documentFetch: (await import('@/lib/api')).apiFetch }));
+vi.mock('react-router-dom', async original => ({ ...(await original<typeof import('react-router-dom')>()), useNavigate: () => navigate }));
 const event = { preventDefault: vi.fn() } as unknown as FormEvent;
+const recipe = buildRecipe({ status: 'verified', orderPricing: { unitPrice: '20.00', unitCost: '5.0000', costComplete: true } });
 beforeEach(() => {
   resetAuth();
   navigate.mockReset();
+  syncDocuments.mockReset().mockRejectedValue(new Error('Sync delayed'));
+  server.use(http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [recipe] })));
 });
-
-describe("useNewOrderPage", () => {
-  it("blocks incomplete selections and refreshes eligibility after completion", async () => {
-    let complete = false;
-    let quotes = 0;
-    const recipe = buildRecipe({ status: "verified" });
+const fill = (model: ReturnType<typeof useNewOrderPage>) => {
+  model.handleFieldChange('customerName', '  Ada  ');
+  model.handleFieldChange('destinationAddress', '  12 Main St  ');
+};
+describe('useNewOrderPage local integration', () => {
+  it('uses only the local catalog and prices partial zero selections immediately', async () => {
+    let forbidden = 0;
     server.use(
-      http.get(apiPath("/recipes"), () =>
-        HttpResponse.json({
-          recipes: [
-            {
-              ...recipe,
-              costing: {
-                ...recipe.costing,
-                costComplete: complete,
-                linkedCount: complete ? 1 : 0,
-                totalCount: 1,
-              },
-            },
-          ],
-        }),
-      ),
-      http.get(apiPath("/recipes/orderable"), () =>
-        HttpResponse.json({
-          recipes: complete ? [buildOrderableRecipe()] : [],
-        }),
-      ),
-      http.post(apiPath("/orders/quote"), () => {
-        quotes++;
-        return HttpResponse.json(buildQuote());
-      }),
-    );
-    const { result, queryClient } = renderHookWithProviders(() =>
-      useNewOrderPage(),
-    );
-    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
-    act(() => result.current.changeQuantity(result.current.recipes[0]!, 1));
-    expect(result.current.lines).toEqual([]);
-    expect(quotes).toBe(0);
-    complete = true;
-    await act(async () => {
-      await queryClient.invalidateQueries({
-        queryKey: recipesKeys.recipes("shop-1"),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: recipesKeys.orderableRecipes("shop-1"),
-      });
-    });
-    await waitFor(() =>
-      expect(result.current.recipes[0]?.costComplete).not.toBe(false),
-    );
-    act(() => result.current.changeQuantity(result.current.recipes[0]!, 1));
-    await waitFor(() => expect(result.current.quote).not.toBeNull());
-    expect(quotes).toBe(1);
-  });
-  it("loads recipes, clamps quantities at zero, and removes the last line", async () => {
-    const { result } = renderHookWithProviders(() => useNewOrderPage());
-    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
-    expect(result.current.lines).toEqual([]);
-    act(() => result.current.changeQuantity(buildOrderableRecipe(), -1));
-    expect(result.current.quantityOf("rp-1")).toBe(0);
-    act(() => result.current.changeQuantity(buildOrderableRecipe(), 2));
-    expect(result.current.quantityOf("rp-1")).toBe(2);
-    act(() => result.current.changeQuantity(buildOrderableRecipe(), -2));
-    expect(result.current.lines).toEqual([]);
-    expect(result.current.quote).toBeNull();
-  });
-  it("debounces quantity and distance changes into one quote request", async () => {
-    const requests: unknown[] = [];
-    server.use(
-      http.post(apiPath("/orders/quote"), async ({ request }) => {
-        requests.push(await request.json());
-        return HttpResponse.json(buildQuote());
-      }),
+      http.get(apiPath('/recipes/orderable'), () => { forbidden++; return HttpResponse.json({ recipes: [] }); }),
+      http.post(apiPath('/orders/quote'), () => { forbidden++; return HttpResponse.json({}); }),
+      http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [{ ...recipe, orderPricing: { unitPrice: '0.00', unitCost: '0.0000', costComplete: false } }] })),
     );
     const { result } = renderHookWithProviders(() => useNewOrderPage());
     await waitFor(() => expect(result.current.recipes).toHaveLength(1));
-    act(() => {
-      result.current.changeQuantity(buildOrderableRecipe(), 1);
-      result.current.handleFieldChange("deliveryDistanceKm", "3");
-    });
-    act(() => result.current.changeQuantity(buildOrderableRecipe(), 1));
-    expect(requests).toEqual([]);
-    await waitFor(() => expect(result.current.quote).not.toBeNull());
-    expect(requests).toEqual([
-      { items: [{ recipeId: "rp-1", quantity: 2 }], deliveryDistanceKm: 3 },
-    ]);
+    act(() => result.current.changeQuantity(result.current.recipes[0]!, 2));
+    expect(result.current.quantityOf(recipe.id)).toBe(2);
+    expect(result.current.subtotal).toBe(0);
+    expect(forbidden).toBe(0);
   });
-  it("normalizes order fields and navigates to the saved order", async () => {
+  it('sends final zero fee, separate delivery date and reviewed prices without distance/overrides', async () => {
     let body: unknown;
-    server.use(
-      http.post(apiPath("/orders"), async ({ request }) => {
-        body = await request.json();
-        return HttpResponse.json({
-          order: { id: "saved" },
-          totals: { netProfit: 1 },
-        });
-      }),
-    );
+    server.use(http.post(apiPath('/orders'), async ({ request }) => {
+      body = await request.json(); return HttpResponse.json({ order: { id: 'saved' }, totals: { netProfit: 1 } });
+    }));
     const { result } = renderHookWithProviders(() => useNewOrderPage());
     await waitFor(() => expect(result.current.recipes).toHaveLength(1));
     act(() => {
-      result.current.changeQuantity(buildOrderableRecipe(), 1);
-      result.current.handleFieldChange("customerName", "  Ada  ");
-      result.current.handleFieldChange("destinationAddress", "  ");
-      result.current.handleFieldChange("orderDate", "2026-10-16");
+      result.current.changeQuantity(result.current.recipes[0]!, 1);
+      fill(result.current);
+      result.current.handleFieldChange('orderDate', '2026-11-19');
+      result.current.handleFieldChange('deliveryDate', '2026-11-22');
+      result.current.handleFieldChange('deliveryFee', '0');
     });
     await act(() => result.current.submit(event));
-    expect(body).toMatchObject({
-      customerName: "Ada",
-      destinationAddress: null,
-      items: [{ recipeId: "rp-1", quantity: 1 }],
-      deliveryDistanceKm: 0,
-    });
-    expect(navigate).toHaveBeenCalledWith("/orders/saved", {
-      state: { fresh: true },
-    });
+    expect(body).toEqual({ customerName: 'Ada', destinationAddress: '12 Main St', orderDate: '2026-11-19T12:00:00.000Z', deliveryDate: '2026-11-22', deliveryFee: '0', items: [{ recipeId: recipe.id, quantity: 1, expectedUnitPrice: '20.00' }] });
+    expect(navigate).toHaveBeenCalledWith('/orders/saved', { state: { fresh: true } });
   });
-  it("surfaces recipe, quote, and save failures without losing the draft", async () => {
-    server.use(
-      http.post(apiPath("/orders"), () =>
-        HttpResponse.json(
-          { error: { message: "Cannot save" } },
-          { status: 500 },
-        ),
-      ),
-      http.post(apiPath("/orders/quote"), () =>
-        HttpResponse.json(
-          { error: { message: "Cannot quote" } },
-          { status: 422 },
-        ),
-      ),
-    );
+  it('retains the selected draft and form edits after a failed save and submits once', async () => {
+    let writes = 0;
+    server.use(http.post(apiPath('/orders'), () => { writes++; return HttpResponse.json({ error: { message: 'Cannot save' } }, { status: 503 }); }));
     const { result } = renderHookWithProviders(() => useNewOrderPage());
     await waitFor(() => expect(result.current.recipes).toHaveLength(1));
-    act(() => result.current.changeQuantity(buildOrderableRecipe(), 1));
-    await waitFor(() => expect(result.current.quoteError).toBe("Cannot quote"));
+    act(() => { result.current.changeQuantity(result.current.recipes[0]!, 1); fill(result.current); });
     await act(() => result.current.submit(event));
-    expect(result.current.itemsError).toBe("Cannot save");
-    expect(result.current.lines).toHaveLength(1);
+    expect(result.current.itemsError).toBe('Cannot save');
+    expect(result.current.quantityOf(recipe.id)).toBe(1);
+    expect(result.current.formValues.customerName).toBe('  Ada  ');
+    expect(writes).toBe(1);
     expect(navigate).not.toHaveBeenCalled();
   });
-  it("rejects empty, anonymous, and invalid-distance submissions", async () => {
-    const { result } = renderHookWithProviders(() => useNewOrderPage());
+  it('rejects empty, anonymous, blank-required, invalid fee and invalid-date submissions', async () => {
+    const { result, rerender } = renderHookWithProviders(() => useNewOrderPage());
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(() => result.current.submit(event));
-    act(() => {
-      result.current.changeQuantity(buildOrderableRecipe(), 1);
-      result.current.handleFieldChange("deliveryDistanceKm", "-1");
-    });
+    act(() => result.current.changeQuantity(result.current.recipes[0]!, 1));
     await act(() => result.current.submit(event));
-    expect(result.current.itemsError).toMatch(/outside the allowed range/);
+    expect(result.current.itemsError).toMatch(/required/);
+    act(() => { fill(result.current); result.current.handleFieldChange('deliveryFee', '0.001'); });
+    await act(() => result.current.submit(event));
+    expect(result.current.itemsError).toMatch(/delivery fee/i);
+    act(() => { result.current.handleFieldChange('deliveryFee', '0'); result.current.handleFieldChange('deliveryDate', '2026-02-29'); });
+    await act(() => result.current.submit(event));
+    expect(result.current.itemsError).toMatch(/date/i);
     authState.userId = null;
+    rerender();
     await act(() => result.current.submit(event));
+    expect(result.current.lines).toEqual([]);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it.each(['price', 'availability', 'both'] as const)(
+    'reconciles a %s conflict and waits for an explicit retry',
+    async kind => {
+      const first = { ...recipe, id: '00000000-0000-4000-8000-000000000001' };
+      const second = { ...recipe, id: '00000000-0000-4000-8000-000000000002', name: 'Cake' };
+      const lostItem = kind !== 'price';
+      const changedPrice = kind !== 'availability';
+      const currentPrice = changedPrice ? '30.00' : '20.00';
+      const writes = vi.fn();
+      server.use(
+        http.get(apiPath('/recipes'), () => HttpResponse.json({ recipes: [first, second] })),
+        http.post(apiPath('/orders'), async ({ request }) => {
+          writes(await request.json());
+          if (writes.mock.calls.length > 1) return HttpResponse.json({ order: { id: 'saved' } });
+          return HttpResponse.json({ error: { code: 'ORDER_REVIEW_REQUIRED', message: 'Review the updated order before saving.',
+            details: {
+              reasons: [...(changedPrice ? ['PRICE_CHANGED'] : []), ...(lostItem ? ['AVAILABILITY_CHANGED'] : [])],
+              unavailable: lostItem ? [{ recipeId: second.id, reason: 'INACTIVE' }] : [],
+              priceChanges: changedPrice ? [{ recipeId: first.id, name: first.name, expectedUnitPrice: '20.00', currentUnitPrice: currentPrice }] : [],
+              currentItems: [
+                { recipeId: first.id, name: first.name, unitPrice: currentPrice, costComplete: true },
+                ...(lostItem ? [] : [{ recipeId: second.id, name: second.name, unitPrice: '20.00', costComplete: true }]),
+              ],
+            },
+          } }, { status: 409 });
+        }),
+      );
+      const { result } = renderHookWithProviders(() => useNewOrderPage());
+      await waitFor(() => expect(result.current.recipes).toHaveLength(2));
+      act(() => {
+        fill(result.current);
+        result.current.changeQuantity(first, 1);
+        result.current.changeQuantity(second, 1);
+      });
+      await act(() => result.current.submit(event));
+      expect(syncDocuments).toHaveBeenCalledOnce();
+      expect(writes).toHaveBeenCalledOnce();
+      expect(navigate).not.toHaveBeenCalled();
+      expect(result.current.formValues.customerName).toBe('  Ada  ');
+      expect(result.current.lines[0]?.unitPrice).toBe(currentPrice);
+      expect(result.current.unavailableIds).toEqual(lostItem ? [second.id] : []);
+      expect(result.current.reviewOpen).toBe(false);
+      await act(() => result.current.submit(event));
+      if (lostItem) {
+        expect(writes).toHaveBeenCalledOnce();
+        expect(result.current.reviewOpen).toBe(true);
+        await act(() => result.current.confirmReview());
+      }
+      expect(writes).toHaveBeenCalledTimes(2);
+      expect(writes.mock.calls[1]![0].items[0]).toEqual({ recipeId: first.id, quantity: 1, expectedUnitPrice: currentPrice });
+      expect(writes.mock.calls[1]![0].confirmedUnavailableRecipeIds).toEqual(lostItem ? [second.id] : undefined);
+      expect(navigate).toHaveBeenCalledWith('/orders/saved', { state: { fresh: true } });
+    },
+  );
+
+  it('blocks duplicate pending writes and refreshes a server-only all-unavailable result', async () => {
+    const writes = vi.fn();
+    server.use(http.post(apiPath('/orders'), async () => {
+      writes();
+      await delay(30);
+      return HttpResponse.json({
+        error: { code: 'NO_AVAILABLE_ITEMS', message: 'No selected items are currently available.' },
+      }, { status: 409 });
+    }));
+    const { result } = renderHookWithProviders(() => useNewOrderPage());
+    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
+    act(() => {
+      fill(result.current);
+      result.current.changeQuantity(recipe, 1);
+    });
+    await act(async () => {
+      await Promise.all([result.current.submit(event), result.current.submit(event)]);
+    });
+    expect(writes).toHaveBeenCalledOnce();
+    expect(result.current.itemsError).toBe('No available items to save');
+    expect(result.current.quantityOf(recipe.id)).toBe(1);
+    expect(syncDocuments).toHaveBeenCalledOnce();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it.each([201, 409])('ignores a late %i response after leaving and returning to the original shop', async status => {
+    let release!: () => void;
+    const responseReady = new Promise<void>(resolve => { release = resolve; });
+    const received = vi.fn();
+    server.use(http.post(apiPath('/orders'), async () => {
+      received();
+      await responseReady;
+      const body = status === 201
+        ? { order: { id: 'old-order' } }
+        : { error: { code: 'NO_AVAILABLE_ITEMS', message: 'No selected items are currently available.' } };
+      return HttpResponse.json(body, { status });
+    }));
+    const { result, rerender } = renderHookWithProviders(() => useNewOrderPage());
+    await waitFor(() => expect(result.current.recipes).toHaveLength(1));
+    act(() => {
+      fill(result.current);
+      result.current.changeQuantity(recipe, 1);
+    });
+    let pending: Promise<void> | undefined;
+    try {
+      act(() => { pending = result.current.submit(event); });
+      await waitFor(() => expect(received).toHaveBeenCalledOnce());
+      authState.activeShopId = 'shop-2';
+      rerender();
+      expect(result.current.lines).toEqual([]);
+      authState.activeShopId = 'shop-1';
+      rerender();
+      act(() => {
+        result.current.handleFieldChange('customerName', 'New customer');
+        result.current.changeQuantity(recipe, 2);
+      });
+    } finally {
+      await act(async () => {
+        release();
+        await pending;
+      });
+    }
+    expect(result.current.formValues.customerName).toBe('New customer');
+    expect(result.current.quantityOf(recipe.id)).toBe(2);
+    expect(result.current.itemsError).toBeUndefined();
+    expect(syncDocuments).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });
 });

@@ -36,7 +36,6 @@ export function useShopTab({
     targetProfitMargin: "",
     hourlyLaborCost: "",
     deliveryBaseFee: "",
-    deliveryRatePerKm: "",
   });
 
   const canEdit = role === "owner" || role === "admin";
@@ -51,7 +50,6 @@ export function useShopTab({
       targetProfitMargin: toNumber(shop.targetProfitMargin).toString(),
       hourlyLaborCost: toNumber(shop.hourlyLaborCost).toFixed(2),
       deliveryBaseFee: toNumber(shop.deliveryBaseFee).toFixed(2),
-      deliveryRatePerKm: toNumber(shop.deliveryRatePerKm).toFixed(2),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shop?.id]);
@@ -73,7 +71,6 @@ export function useShopTab({
         targetProfitMargin: Number(form.targetProfitMargin),
         hourlyLaborCost: Number(form.hourlyLaborCost),
         deliveryBaseFee: Number(form.deliveryBaseFee),
-        deliveryRatePerKm: Number(form.deliveryRatePerKm),
       });
       onSaved();
     } catch (cause) {
@@ -104,7 +101,6 @@ export function useShopTab({
       name: "storeAddress",
       id: "shop-address",
       label: "Store address",
-      hint: "Origin point for delivery distance calculations.",
       dense: true,
       placeholder: "18 Market Street, Riverside",
       maxLength: 300,
@@ -135,43 +131,18 @@ export function useShopTab({
       step: 0.25,
     },
     {
-      kind: "group",
-      name: "delivery",
-      className: "flex flex-col gap-1.5",
-      legend: "Delivery rate engine",
-      fields: [
-        {
-          kind: "group",
-          name: "rates",
-          className: "flex gap-3",
-          fields: [
-            {
-              kind: "input",
-              name: "deliveryBaseFee",
-              id: "shop-base-fee",
-              label: "Base fee",
-              className: "flex-1",
-              dense: true,
-              type: "number",
-              inputMode: "decimal",
-              min: 0,
-              step: 0.25,
-            },
-            {
-              kind: "input",
-              name: "deliveryRatePerKm",
-              id: "shop-rate-km",
-              label: "Per km",
-              className: "flex-1",
-              dense: true,
-              type: "number",
-              inputMode: "decimal",
-              min: 0,
-              step: 0.25,
-            },
-          ],
-        },
-      ],
+      kind: "input",
+      name: "deliveryBaseFee",
+      id: "shop-base-fee",
+      label: "Default delivery fee",
+      hint: "Starting delivery fee for new orders. You can change it per order.",
+      dense: true,
+      type: "number",
+      inputMode: "decimal",
+      required: true,
+      min: 0,
+      max: 100_000,
+      step: 0.01,
     },
   ];
   const handleFieldChange = (name: keyof typeof formValues, value: string) =>
