@@ -82,7 +82,7 @@ export const OrderDetailPage: React.FC = () => {
           <Skeleton className="shrink-0 h-[88px]" />
         ) : null}
       </div>
-      {order?.status === "processing" ? <OrderActions model={model} /> : null}
+      <OrderActions model={model} />
       <ConfirmDialog
         open={model.confirmingDelete}
         title="Cancel this order?"

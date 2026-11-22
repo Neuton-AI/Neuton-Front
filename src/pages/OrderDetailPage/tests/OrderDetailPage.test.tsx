@@ -156,15 +156,15 @@ describe("OrderDetailPage delivery", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides the action once the order is delivered", async () => {
+  it("shows only a disabled Delete button once the order is delivered", async () => {
     const current = mockApi();
     current.status = "delivered";
     renderDetail();
 
-    await screen.findByText("Delivered");
-    expect(
-      screen.queryByRole("group", { name: "Order actions" }),
-    ).not.toBeInTheDocument();
+    const button = await screen.findByRole("button", { name: "Delete" });
+    const footer = screen.getByRole("group", { name: "Order actions" });
+    expect(within(footer).getAllByRole("button")).toEqual([button]);
+    expect(button).toBeDisabled();
   });
 
   it("sends the delivered transition and flips the sheet to delivered", async () => {
@@ -319,6 +319,7 @@ describe("OrderDetailPage cancellation", () => {
       screen.queryByRole("button", { name: "Deliver" }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 });
 
