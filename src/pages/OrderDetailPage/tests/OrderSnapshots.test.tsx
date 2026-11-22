@@ -52,14 +52,14 @@ it('keeps saved names, selling amounts, fee and server profit when current shop/
   expect(await screen.findByText('Original recipe name')).toBeInTheDocument();
   expect(screen.getByText('Partial cost')).toBeInTheDocument();
   expect(screen.getByText('Known production cost')).toBeInTheDocument();
-  expect(screen.getByText('Profit $0.00')).toBeInTheDocument();
+  expect(within(screen.getByText('Profit').parentElement!).getByText('$0.00')).toBeInTheDocument();
   expect(screen.getByText(/These items contribute no profit/)).toBeInTheDocument();
   authState.shop = { ...authState.shop, deliveryBaseFee: '999.00', deliveryRatePerKm: '99.00' };
   await act(() => queryClient.invalidateQueries({ queryKey: ordersKeys.order('shop-1', 'saved') }));
   await waitFor(() => expect(requests).toHaveLength(2));
   expect(screen.getByText('Original recipe name')).toBeInTheDocument();
   expect(screen.getByText('1 × $20.00')).toBeInTheDocument();
-  expect(screen.getByText('Profit $0.00')).toBeInTheDocument();
+  expect(within(screen.getByText('Profit').parentElement!).getByText('$0.00')).toBeInTheDocument();
   expect(screen.queryByText('$999.00')).toBeNull();
 });
 

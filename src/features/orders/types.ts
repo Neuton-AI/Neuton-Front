@@ -72,3 +72,13 @@ export type ReviewedCreateOrderBody = {
   items: { recipeId: string; quantity: number; expectedUnitPrice: string; unitPrice?: never }[];
   confirmedUnavailableRecipeIds?: string[];
 };
+
+export type UpdateOrderBody = Partial<Pick<ReviewedCreateOrderBody,
+  'customerName' | 'destinationAddress' | 'orderDate'>> & {
+  deliveryDate?: string | null;
+  deliveryFee: string;
+  items: ({ lineId: string; quantity: number } | ReviewedCreateOrderBody['items'][number])[];
+  confirmedUnavailableRecipeIds?: string[];
+};
+
+export type OrderEditSnapshot = { order: OrderDetail; syncVersion: number };

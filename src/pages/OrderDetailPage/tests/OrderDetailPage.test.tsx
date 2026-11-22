@@ -108,6 +108,7 @@ function renderDetail() {
   return renderWithRouter(
     <Routes>
       <Route path="/orders/:id" element={<OrderDetailPage />} />
+      <Route path="/orders/:id/edit" element={<h1>Edit order</h1>} />
       <Route path="/orders" element={null} />
     </Routes>,
     { route: "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" },
@@ -115,21 +116,34 @@ function renderDetail() {
 }
 
 describe("OrderDetailPage delivery", () => {
-  it("shows the status badge in the header", async () => {
+  it("shows the order number, customer, date, and profit metrics", async () => {
     mockApi();
     renderDetail();
 
     expect(await screen.findByText("Processing")).toBeInTheDocument();
-    expect(screen.getByText("Maya C.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Maya C." })).toBeInTheDocument();
+    expect(screen.getByText("Order #42")).toBeInTheDocument();
+    const profit = screen.getByText("Profit").parentElement!;
+    expect(within(profit).getByText("$22.12")).toBeInTheDocument();
+    expect(within(profit).getByText("36% margin")).toBeInTheDocument();
+    expect(screen.queryByText("Distance fee")).not.toBeInTheDocument();
   });
 
-  it("offers the mark-delivered action on a processing order", async () => {
+  it("shows the three footer actions in order for a processing order", async () => {
+    const user = userEvent.setup();
     mockApi();
     renderDetail();
 
-    expect(
-      await screen.findByRole("button", { name: "Mark as delivered" }),
-    ).toBeInTheDocument();
+    await screen.findByRole("button", { name: "Deliver" });
+    const footer = screen.getByRole("group", { name: "Order actions" });
+    const buttons = within(footer).getAllByRole("button");
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      "Cancel",
+      "Edit",
+      "Deliver",
+    ]);
+    await user.click(within(footer).getByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("heading", { name: "Edit order" })).toBeInTheDocument();
   });
 
   it("offers the action to members too, not just owners", async () => {
@@ -138,7 +152,7 @@ describe("OrderDetailPage delivery", () => {
     renderDetail();
 
     expect(
-      await screen.findByRole("button", { name: "Mark as delivered" }),
+      await screen.findByRole("button", { name: "Deliver" }),
     ).toBeInTheDocument();
   });
 
@@ -149,8 +163,8 @@ describe("OrderDetailPage delivery", () => {
 
     await screen.findByText("Delivered");
     expect(
-      screen.queryByRole("button", { name: "Mark as delivered" }),
-    ).toBeNull();
+      screen.queryByRole("group", { name: "Order actions" }),
+    ).not.toBeInTheDocument();
   });
 
   it("sends the delivered transition and flips the sheet to delivered", async () => {
@@ -159,7 +173,7 @@ describe("OrderDetailPage delivery", () => {
     renderDetail();
 
     await user.click(
-      await screen.findByRole("button", { name: "Mark as delivered" }),
+      await screen.findByRole("button", { name: "Deliver" }),
     );
 
     await waitFor(() =>
@@ -175,7 +189,7 @@ describe("OrderDetailPage delivery", () => {
     // action gone, so the order cannot be delivered twice.
     expect(await screen.findByText("Delivered")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Mark as delivered" }),
+      screen.queryByRole("button", { name: "Deliver" }),
     ).toBeNull();
     // The transition response carries no items, so the lines stay from state.
     expect(screen.getByText("Focaccia")).toBeInTheDocument();
@@ -192,14 +206,14 @@ describe("OrderDetailPage delivery", () => {
     renderDetail();
 
     await user.click(
-      await screen.findByRole("button", { name: "Mark as delivered" }),
+      await screen.findByRole("button", { name: "Deliver" }),
     );
 
     expect(
       await screen.findByText("Order is already delivered"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Mark as delivered" }),
+      screen.getByRole("button", { name: "Deliver" }),
     ).toBeInTheDocument();
   });
 });
@@ -209,7 +223,7 @@ describe("OrderDetailPage cancellation", () => {
     api.apiFetch.mockResolvedValue({ order: makeOrderDetail("processing") });
     renderDetail();
 
-    expect(await screen.findByText(/· #42/)).toBeInTheDocument();
+    expect(await screen.findByText("Order #42")).toBeInTheDocument();
   });
 
   it("asks for confirmation in an app dialog before deleting", async () => {
@@ -218,11 +232,11 @@ describe("OrderDetailPage cancellation", () => {
     renderDetail();
 
     await user.click(
-      await screen.findByRole("button", { name: "Delete order" }),
+      await screen.findByRole("button", { name: "Cancel" }),
     );
 
     const dialog = await screen.findByRole("dialog", {
-      name: "Delete this order?",
+      name: "Cancel this order?",
     });
     expect(
       within(dialog).getByText(
@@ -236,7 +250,7 @@ describe("OrderDetailPage cancellation", () => {
     );
 
     await user.click(
-      within(dialog).getByRole("button", { name: "Delete order" }),
+      within(dialog).getByRole("button", { name: "Cancel order" }),
     );
 
     await waitFor(() =>
@@ -253,16 +267,16 @@ describe("OrderDetailPage cancellation", () => {
     renderDetail();
 
     await user.click(
-      await screen.findByRole("button", { name: "Delete order" }),
+      await screen.findByRole("button", { name: "Cancel" }),
     );
     const dialog = await screen.findByRole("dialog", {
-      name: "Delete this order?",
+      name: "Cancel this order?",
     });
 
-    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await user.click(within(dialog).getByRole("button", { name: "Keep order" }));
 
     expect(
-      screen.queryByRole("dialog", { name: "Delete this order?" }),
+      screen.queryByRole("dialog", { name: "Cancel this order?" }),
     ).toBeNull();
     expect(api.apiFetch).not.toHaveBeenCalledWith(
       "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -276,14 +290,14 @@ describe("OrderDetailPage cancellation", () => {
     renderDetail();
 
     await user.click(
-      await screen.findByRole("button", { name: "Delete order" }),
+      await screen.findByRole("button", { name: "Cancel" }),
     );
-    await screen.findByRole("dialog", { name: "Delete this order?" });
+    await screen.findByRole("dialog", { name: "Cancel this order?" });
 
     await user.keyboard("{Escape}");
 
     expect(
-      screen.queryByRole("dialog", { name: "Delete this order?" }),
+      screen.queryByRole("dialog", { name: "Cancel this order?" }),
     ).toBeNull();
     // The Sheet behind it must not also answer the same Escape.
     expect(
@@ -302,9 +316,9 @@ describe("OrderDetailPage cancellation", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Mark as delivered" }),
+      screen.queryByRole("button", { name: "Deliver" }),
     ).toBeNull();
-    expect(screen.queryByRole("button", { name: "Delete order" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });
 });
 

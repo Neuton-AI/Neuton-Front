@@ -9,6 +9,7 @@ export type ReviewOverlay = Record<string, Correction>;
 export function reviewOverlay(selections: readonly Selection[], details: OrderReviewDetails, catalog: readonly Recipe[]): ReviewOverlay {
   const overlay: ReviewOverlay = {};
   for (const selection of selections) {
+    if ('savedLine' in selection) continue;
     const basedOnVersion = catalog.find(recipe => recipe.id === selection.recipeId)?.localServerVersion;
     const correction = details.currentItems.find(item => item.recipeId === selection.recipeId);
     if (correction) {

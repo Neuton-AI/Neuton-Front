@@ -3,27 +3,27 @@ import { ConfirmDialog } from "@/components/ConfirmDialog/ConfirmDialog";
 import { DocumentSources } from "@/components/DocumentSources/DocumentSources";
 import { Sheet, SheetSection } from "@/components/Sheet/Sheet";
 import { ErrorState, InlineNotice, Skeleton } from "@/components/feedback";
-import { Button } from "@/components/ui";
 import { formatMoney } from "@/lib/format";
 import {
   OrderDelivery,
   OrderItems,
   OrderSummary,
 } from "./components/OrderSummary/OrderSummary";
+import { OrderActions } from "./components/OrderActions/OrderActions";
 import { useOrderDetailPage } from "./OrderDetailPage.module";
 
 export const OrderDetailPage: React.FC = () => {
   const model = useOrderDetailPage();
   const { order, loading, error, currency } = model;
   return (
-    <Sheet open onClose={model.close} label="Order details">
-      <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
+    <Sheet open fillHeight onClose={model.close} label="Order details">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pb-3">
         {error ? <ErrorState message={error} onRetry={model.retry} /> : null}
         {loading && !order ? (
           <>
-            <Skeleton className="h-[88px]" />
-            <Skeleton className="h-[113px]" />
-            <Skeleton className="h-40" />
+            <Skeleton className="shrink-0 h-[88px]" />
+            <Skeleton className="shrink-0 h-[113px]" />
+            <Skeleton className="shrink-0 h-40" />
           </>
         ) : order ? (
           <>
@@ -71,51 +71,24 @@ export const OrderDetailPage: React.FC = () => {
                 View attached document
               </a>
             ) : null}
-            {order.status === "processing" ? (
-              <div className="flex flex-col gap-2.5">
-                <InlineNotice>
-                  Still being prepared. Mark it delivered once the customer has
-                  it.
-                </InlineNotice>
-                {model.markError ? (
-                  <InlineNotice tone="error">{model.markError}</InlineNotice>
-                ) : null}
-                <Button
-                  size="md"
-                  block
-                  loading={model.markOrderPending}
-                  onClick={model.markDelivered}
-                >
-                  Mark as delivered
-                </Button>
-              </div>
-            ) : order.status === "cancelled" ? (
+            {order.status === "cancelled" ? (
               <InlineNotice tone="error">
                 This order was deleted. It stays on your records so its number
                 is never reused.
               </InlineNotice>
             ) : null}
-            {order.status !== "cancelled" ? (
-              <Button
-                variant="danger"
-                size="md"
-                block
-                loading={model.deleteOrderPending}
-                onClick={() => model.setConfirmingDelete(true)}
-              >
-                Delete order
-              </Button>
-            ) : null}
           </>
         ) : !error ? (
-          <Skeleton className="h-[88px]" />
+          <Skeleton className="shrink-0 h-[88px]" />
         ) : null}
       </div>
+      {order?.status === "processing" ? <OrderActions model={model} /> : null}
       <ConfirmDialog
         open={model.confirmingDelete}
-        title="Delete this order?"
+        title="Cancel this order?"
         description="It stays on your records so its number is never reused."
-        confirmLabel="Delete order"
+        confirmLabel="Cancel order"
+        cancelLabel="Keep order"
         onConfirm={model.remove}
         onCancel={() => model.setConfirmingDelete(false)}
       />

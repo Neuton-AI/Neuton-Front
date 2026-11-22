@@ -1,7 +1,11 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
-import type { ReviewedCreateOrderBody, StatusFilter } from '@/features/orders/types';
+import type { OrderEditSnapshot, ReviewedCreateOrderBody, StatusFilter, UpdateOrderBody } from '@/features/orders/types';
 import { type Order, type OrderDetail } from '@/features/orders/types';
+import { apiFetch as onlineFetch, requestScopeSignal } from '@/lib/api';
+import { changed, result, transaction } from '@/features/sync/store';
+import { syncDocuments } from '@/features/sync/engine';
+import { documentKey, scopeFor, type LocalDocument } from '@/features/sync/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
@@ -57,6 +61,74 @@ export function useCreateOrder(
         shopId,
         body,
       }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
+      void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });
+    },
+  });
+}
+
+export function useOrderForEdit(userId: UserId, shopId: ShopId, id: string, canEdit: boolean) {
+  return useQuery({
+    queryKey: ['order-for-edit', userId, shopId, id],
+    queryFn: ({ signal }) => onlineFetch<OrderEditSnapshot>(`/orders/${id}`, {
+      userId, shopId, signal, syncSnapshot: true,
+    }),
+    enabled: canEdit && enabled(userId, shopId) && Boolean(id),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    networkMode: 'always',
+    retry: false,
+    refetchOnMount: 'always',
+  });
+}
+
+export function useUpdateOrder(userId: UserId, shopId: ShopId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    retry: false,
+    networkMode: 'always',
+    mutationFn: async ({ id, baseVersion, body, mutationId, version }: {
+      id: string; baseVersion: number; body: UpdateOrderBody; mutationId: string; version: number;
+    }) => {
+      const scope = scopeFor(userId, shopId);
+      const signal = requestScopeSignal(userId, shopId);
+      const snapshot = await onlineFetch<OrderEditSnapshot>(`/orders/${id}`, {
+        method: 'PATCH', userId, shopId, signal, body,
+        sync: { id: mutationId, updatedAt: version, baseVersion },
+      });
+      const key = documentKey(scope, 'order', id);
+      try {
+        const accepted = await transaction(['documents'], async tx => {
+          const docs = tx.objectStore('documents');
+          const current = await result<LocalDocument | undefined>(docs.get(key));
+          signal?.throwIfAborted();
+          if (current && (current.syncStatus === 'pending-push' || current.updatedAt > snapshot.syncVersion)) {
+            return false;
+          }
+          docs.put({
+            key, scope: scope.key, kind: 'order', id, deleted: false,
+            updatedAt: snapshot.syncVersion, serverVersion: snapshot.syncVersion,
+            serverData: snapshot.order, data: snapshot.order, syncStatus: 'synced',
+            lastSyncedAt: Date.now(),
+          } satisfies LocalDocument);
+          return true;
+        });
+        signal?.throwIfAborted();
+        if (accepted) {
+          queryClient.setQueryData(ordersKeys.order(shopId, id), { order: snapshot.order });
+          changed();
+        }
+      } catch {
+        if (!signal?.aborted) {
+          queryClient.setQueryData(ordersKeys.order(shopId, id), { order: snapshot.order });
+          void syncDocuments(scope, { userId, shopId }, { force: true, queueIfRunning: true }).catch(() => undefined);
+        }
+      }
+      return snapshot;
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
       void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });

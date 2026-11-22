@@ -2,23 +2,28 @@ import { useEffect, useState } from 'react';
 import { useRecipes } from '@/features/recipes/recipesApi';
 import { recipeOrderPricing } from '@/features/recipes/selectors';
 import type { Recipe } from '@/features/recipes/types';
-import type { OrderReviewDetails } from '@/features/orders/types';
+import type { OrderDetail, OrderReviewDetails } from '@/features/orders/types';
 import type { ShopId, UserId } from '@/lib/queryTypes';
-import { changeSelection, eligibleRecipe, projectDraft, type Selection } from './orderDraft';
+import { changeSavedSelection, changeSelection, eligibleRecipe, projectDraft, selectionKey, type Selection } from './orderDraft';
 import { reconcileOverlay, reviewOverlay, reviewedCatalog, type ReviewOverlay } from './orderDraftReview';
 
 type DraftState = { scope: string; catalog: Recipe[]; selections: Selection[]; overlay: ReviewOverlay };
-const emptyDraft = (scope: string): DraftState => ({ scope, catalog: [], selections: [], overlay: {} });
+const initialDraft = (scope: string, order?: OrderDetail): DraftState => ({
+  scope, catalog: [], overlay: {},
+  selections: order?.items.map(savedLine => ({
+    savedLine, recipeId: savedLine.recipeId, quantity: Number(savedLine.quantity),
+  })) ?? [],
+});
 
 /** In-memory selections survive failed local reads; only successful catalogs establish absence. */
-export function useOrderDraft(userId: UserId, shopId: ShopId) {
-  const scope = JSON.stringify([userId, shopId]);
+export function useOrderDraft(userId: UserId, shopId: ShopId, order?: OrderDetail) {
+  const scope = JSON.stringify([userId, shopId, order?.id]);
   const query = useRecipes(userId, shopId);
-  const [state, setState] = useState(() => emptyDraft(scope));
+  const [state, setState] = useState(() => initialDraft(scope, order));
   if (state.scope !== scope) {
-    setState(emptyDraft(scope));
+    setState(initialDraft(scope, order));
   }
-  const current = state.scope === scope ? state : emptyDraft(scope);
+  const current = state.scope === scope ? state : initialDraft(scope, order);
   const data = query.data;
   const success = query.isSuccess;
   useEffect(() => {
@@ -29,6 +34,7 @@ export function useOrderDraft(userId: UserId, shopId: ShopId) {
       const overlay = reconcileOverlay(previous.overlay, catalog);
       const effective = reviewedCatalog(catalog, overlay);
       const selections = previous.selections.map(selection => {
+        if ('savedLine' in selection) return selection;
         const recipe = effective.find(item => item.id === selection.recipeId);
         if (!recipe) return selection;
         if (!recipeOrderPricing(recipe).orderPricing) {
@@ -45,16 +51,19 @@ export function useOrderDraft(userId: UserId, shopId: ShopId) {
   const changeQuantity = (recipe: Pick<Recipe, 'id'>, delta: number) => {
     setState(previous => {
       if (previous.scope !== scope) return previous;
+      if (previous.selections.some(line => 'savedLine' in line && line.savedLine.id === recipe.id)) {
+        return { ...previous, selections: changeSavedSelection(previous.selections, recipe.id, delta) };
+      }
       const latest = reviewedCatalog(previous.catalog, previous.overlay).find(item => item.id === recipe.id);
       if (!latest) return previous;
       const selections = changeSelection(previous.selections, latest, delta);
       return { ...previous, selections };
     });
   };
-  const remove = (recipeId: string) => {
+  const remove = (id: string) => {
     setState(previous => {
       if (previous.scope !== scope) return previous;
-      return { ...previous, selections: previous.selections.filter(line => line.recipeId !== recipeId) };
+      return { ...previous, selections: previous.selections.filter(line => selectionKey(line) !== id) };
     });
   };
   const applyReview = (details: OrderReviewDetails) => {
@@ -66,6 +75,8 @@ export function useOrderDraft(userId: UserId, shopId: ShopId) {
   };
   return {
     ...draft, changeQuantity, remove, applyReview,
+    itemsDirty: order ? JSON.stringify(draft.lines.map(line => [line.lineId, line.quantity])) !==
+      JSON.stringify(order.items.map(line => [line.id, Number(line.quantity)])) : draft.lines.length > 0,
     recipes: catalog.filter(eligibleRecipe),
     loading: query.isLoading,
     error: query.error,

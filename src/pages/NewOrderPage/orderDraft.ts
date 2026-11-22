@@ -1,14 +1,22 @@
 import { recipeOrderPricing } from '@/features/recipes/selectors';
 import type { Recipe } from '@/features/recipes/types';
+import type { OrderDetailItem } from '@/features/orders/types';
 
-export type Selection = {
+export type NewSelection = {
   recipeId: string;
   quantity: number;
   baselineUnitPrice: string;
   lastKnownRecipe: Recipe;
 };
+type SavedSelection = {
+  recipeId: string;
+  quantity: number;
+  savedLine: OrderDetailItem;
+};
+export type Selection = NewSelection | SavedSelection;
 export type DraftLine = {
   recipeId: string;
+  lineId?: string;
   quantity: number;
   name: string;
   imageUrl: string | null;
@@ -20,12 +28,17 @@ export type DraftLine = {
   reason: string | null;
 };
 
+export const selectionKey = (line: Selection) => 'savedLine' in line ? line.savedLine.id : line.recipeId;
+
 export function eligibleRecipe(recipe: Recipe): boolean {
   return recipe.isActive && recipe.status === 'verified';
 }
 
 export function changeSelection(selections: readonly Selection[], recipe: Recipe, delta: number): Selection[] {
   const existing = selections.find(line => line.recipeId === recipe.id);
+  if (existing && 'savedLine' in existing) {
+    return changeSavedSelection(selections, existing.savedLine.id, delta);
+  }
   const quantity = Math.max(0, (existing?.quantity ?? 0) + delta);
   if (!Number.isInteger(quantity) || quantity > 100000) return [...selections];
   if (quantity === 0) return selections.filter(line => line.recipeId !== recipe.id);
@@ -38,11 +51,30 @@ export function changeSelection(selections: readonly Selection[], recipe: Recipe
   return [...selections, { recipeId: recipe.id, quantity, baselineUnitPrice: pricing.unitPrice, lastKnownRecipe: recipe }];
 }
 
+export function changeSavedSelection(selections: readonly Selection[], id: string, delta: number): Selection[] {
+  return selections.flatMap(line => {
+    if (!('savedLine' in line) || line.savedLine.id !== id) return [line];
+    const quantity = Math.round((line.quantity + delta) * 1000) / 1000;
+    if (quantity <= 0) return [];
+    if (delta > 0 && quantity > 100000) return [line];
+    return [{ ...line, quantity }];
+  });
+}
+
 export function projectDraft(selections: readonly Selection[], catalog: readonly Recipe[]) {
   const byId = new Map(catalog.map(recipe => [recipe.id, recipe]));
   const priceDiffByRecipeId: Record<string, { name: string; old: number; new: number }> = {};
   const lines: DraftLine[] = selections.map(selection => {
     const current = byId.get(selection.recipeId);
+    if ('savedLine' in selection) {
+      const { savedLine } = selection;
+      return {
+        lineId: savedLine.id, recipeId: selection.recipeId, quantity: selection.quantity,
+        name: savedLine.name, imageUrl: current?.imageUrl ?? null, unitPrice: savedLine.unitPrice,
+        unitCost: savedLine.unitCost, costComplete: savedLine.costComplete !== false,
+        available: true, pricingPending: false, reason: null,
+      };
+    }
     const recipe = current ?? selection.lastKnownRecipe;
     const currentPricing = recipeOrderPricing(recipe).orderPricing;
     const previousPricing = recipeOrderPricing(selection.lastKnownRecipe).orderPricing;

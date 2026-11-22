@@ -25,22 +25,26 @@ export const OrderSummary: React.FC<IOrderSummary> = ({
     <>
       <div className="flex flex-col gap-1">
         <p className="text-eyebrow font-medium uppercase text-ink-muted">
-          Order
+          Order #{order.orderNumber}
         </p>
         <h1 className="font-display text-card-value text-ink">
           {order.customerName ?? "Unnamed customer"}
         </h1>
         <p className="text-label font-medium text-ink-muted">
-          {formatDate(order.orderDate)} · #{order.orderNumber}
+          {formatDate(order.orderDate)}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <SheetBadge tone={getOrderStatusTone(order.status)}>
-            {getOrderStatusLabel(order.status)}
-          </SheetBadge>
+        <div role="status" className={order.status === "cancelled" ? "mt-1" : "sr-only"}>
+          {order.status === "cancelled" ? (
+            <SheetBadge tone={getOrderStatusTone(order.status)}>
+              {getOrderStatusLabel(order.status)}
+            </SheetBadge>
+          ) : (
+            getOrderStatusLabel(order.status)
+          )}
         </div>
       </div>
       <div className="flex gap-3">
-        <div className="flex flex-1 flex-col gap-1.5 rounded-card bg-brand-primary p-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 break-words rounded-card bg-brand-primary p-4">
           <p className="text-eyebrow font-medium uppercase text-ink-on-primary">
             Total
           </p>
@@ -51,15 +55,15 @@ export const OrderSummary: React.FC<IOrderSummary> = ({
             Incl. {formatMoney(order.deliveryFee, currency)} delivery
           </p>
         </div>
-        <div className="flex flex-1 flex-col gap-1.5 rounded-card bg-surface-dark p-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 break-words rounded-card bg-surface-dark p-4">
           <p className="text-eyebrow font-medium uppercase text-ink-on-dark-soft">
-            Profit margin
+            Profit
           </p>
           <p className="font-display text-card-value text-ink-on-dark">
-            {marginPercent.toFixed(0)}%
+            {formatMoney(order.netProfit, currency)}
           </p>
           <p className="text-label font-medium text-ink-on-dark-soft">
-            Profit {formatMoney(order.netProfit, currency)}
+            {marginPercent.toFixed(0)}% margin
           </p>
         </div>
       </div>
@@ -83,10 +87,10 @@ export const OrderItems: React.FC<IOrderItems> = ({ order, currency }) => {
       {order.items.map((item) => (
         <div
           key={item.id}
-          className="flex items-center justify-between gap-3 border-b border-hairline-soft py-1.5 last:border-b-0"
+          className="flex items-center justify-between gap-3 border-b border-hairline-soft py-[7px] last:border-b-0"
         >
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-body text-ink">{item.name}</span>
+            <span className="break-words text-[14px] leading-[22px] text-ink">{item.name}</span>
             <span className="text-label font-medium text-ink-muted">
               {formatQuantity(item.quantity)} ×{" "}
               {formatMoney(item.unitPrice, currency)}
@@ -95,7 +99,7 @@ export const OrderItems: React.FC<IOrderItems> = ({ order, currency }) => {
               <span className="text-label text-ink-muted">Partial cost</span>
             ) : null}
           </div>
-          <span className="shrink-0 text-body text-ink">
+          <span className="shrink-0 text-[14px] leading-[22px] text-ink">
             {formatMoney(item.lineTotal, currency)}
           </span>
         </div>
@@ -118,7 +122,7 @@ export const OrderDelivery: React.FC<IOrderDelivery> = ({
       {order.destinationAddress ? (
         <div className="flex items-start gap-2 py-1">
           <IconPin className="mt-0.5 h-[18px] w-[18px] shrink-0 text-ink-muted" />
-          <span className="text-body text-ink">{order.destinationAddress}</span>
+          <span className="text-[14px] leading-[22px] text-ink">{order.destinationAddress}</span>
         </div>
       ) : null}
       {order.deliveryDate ? (

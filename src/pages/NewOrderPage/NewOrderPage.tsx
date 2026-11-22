@@ -1,8 +1,10 @@
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
-import { FullPageLoader, InlineNotice } from '@/components/feedback';
+import { ErrorState, FullPageLoader, InlineNotice } from '@/components/feedback';
 import { IconClose, IconInfo } from '@/components/icons';
-import { useRef } from 'react';
-import { useNewOrderLayout } from './NewOrderPage.module';
+import type { OrderEditSnapshot } from '@/features/orders/types';
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useEditOrderEntry, useNewOrderLayout } from './NewOrderPage.module';
 import { RecipePicker } from './components/RecipePicker/RecipePicker';
 import { OrderDetails } from './components/OrderDetails';
 import { OrderSummary } from './components/OrderSummary';
@@ -11,17 +13,35 @@ import { UnavailableItemsDialog } from './components/UnavailableItemsDialog/Unav
 import styles from './NewOrderPage.module.css';
 
 export function NewOrderPage() {
+  return <OrderEditor />;
+}
+
+export function EditOrderPage() {
+  const { loading, snapshot, editorKey, message, retry, detailPath } = useEditOrderEntry();
+  if (loading) return <FullPageLoader />;
+  if (snapshot) return <OrderEditor key={editorKey} snapshot={snapshot} />;
+  return (
+    <div className="shell flex flex-col gap-4 p-5">
+      <h1 className="font-display text-title">Edit order</h1>
+      <ErrorState message={message} onRetry={retry} />
+      <Link className="text-body underline" to={detailPath} replace>Back to order</Link>
+    </div>
+  );
+}
+
+function OrderEditor({ snapshot }: { snapshot?: OrderEditSnapshot }) {
+  const [edit] = useState(snapshot);
   const { model, confirmDiscard, closeRef, saveRef, contentRef,
-    cancelDiscard, close, discard } = useNewOrderLayout();
+    cancelDiscard, close, discard } = useNewOrderLayout(edit);
   const scrollArea = useRef<HTMLDivElement>(null);
   const itemsSection = useRef<HTMLElement>(null);
   if (model.authLoading || model.shopsLoading || !model.activeShopId) return <FullPageLoader />;
   return <>
     <div ref={contentRef} className={`shell ${styles.page}`}>
       <header className={styles.header}>
-        <button ref={closeRef} type='button' aria-label='Close new order' onClick={close}
+        <button ref={closeRef} type='button' aria-label={edit ? 'Close edit order' : 'Close new order'} onClick={close}
           disabled={model.createOrderPending}><IconClose className='h-[18px] w-[18px]' /></button>
-        <h1>New order</h1>
+        <h1>{edit ? 'Edit order' : 'New order'}</h1>
       </header>
       <form onSubmit={model.submit} className={styles.form}>
         <div ref={scrollArea} className={styles.content} role='region' aria-label='Order details and items' tabIndex={0}>
@@ -51,13 +71,13 @@ export function NewOrderPage() {
           <OrderSummary subtotal={model.subtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
           <button ref={saveRef} type='submit' className={styles.saveButton} formNoValidate={model.availableCount === 0}
             disabled={model.lines.length === 0 || model.createOrderPending}
-            aria-busy={model.createOrderPending}>Save order</button>
+            aria-busy={model.createOrderPending}>{edit ? 'Save changes' : 'Save order'}</button>
         </footer>
       </form>
     </div>
-    <ConfirmDialog open={confirmDiscard} title='Discard this order?'
+    <ConfirmDialog open={confirmDiscard} title={edit ? 'Discard changes?' : 'Discard this order?'}
       description='Your unsaved order details and selected items will be lost.'
-      confirmLabel='Discard order' cancelLabel='Keep editing' onCancel={cancelDiscard}
+      confirmLabel={edit ? 'Discard changes' : 'Discard order'} cancelLabel='Keep editing' onCancel={cancelDiscard}
       onConfirm={discard} />
     <UnavailableItemsDialog open={model.reviewOpen} onCancel={model.cancelReview} onConfirm={model.confirmReview} />
   </>;

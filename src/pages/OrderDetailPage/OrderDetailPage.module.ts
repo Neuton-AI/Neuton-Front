@@ -23,6 +23,8 @@ export function useOrderDetailPage() {
   const { user, userId } = useAuth();
 
   const { memberships, activeShopId } = useShopMemberships(user?.id);
+  const role = memberships.find(membership => membership.shopId === activeShopId)?.role;
+  const canEdit = role === "owner" || role === "admin";
 
   const shop = useCurrentShop(memberships, activeShopId);
 
@@ -134,6 +136,8 @@ export function useOrderDetailPage() {
     justSaved,
     remove,
     markDelivered,
+    canEdit,
+    edit: () => navigate(`/orders/${id}/edit`, { state: { fromOrderDetail: true } }),
     marginPercent,
     markOrderPending,
     deleteOrderPending,

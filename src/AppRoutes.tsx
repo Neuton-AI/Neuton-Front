@@ -24,6 +24,11 @@ const NewOrderPage = lazy(() =>
     default: m.NewOrderPage,
   })),
 );
+const EditOrderPage = lazy(() =>
+  import("@/pages/NewOrderPage/NewOrderPage").then((m) => ({
+    default: m.EditOrderPage,
+  })),
+);
 const NotFoundPage = lazy(() =>
   import("@/pages/NotFoundPage/NotFoundPage").then((m) => ({
     default: m.NotFoundPage,
@@ -69,6 +74,7 @@ export const AuthenticatedRoutes: React.FC = () => {
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/new" element={<NewOrderPage />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />
+        <Route path="orders/:id/edit" element={<EditOrderPage />} />
         <Route path="catalog/recipes/:id" element={<RecipeDetailPage />} />
         <Route path="catalog/recipes/:id/edit" element={<RecipeEditPage />} />
         <Route path="catalog/receipts/:id" element={<ReceiptDetailPage />} />

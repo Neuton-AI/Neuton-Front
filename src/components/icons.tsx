@@ -337,10 +337,13 @@ interface IIconEdit {
   strokeWidth?: number;
 }
 
-export const IconEdit: React.FC<IIconEdit> = ({ className, strokeWidth }) => {
+export const IconEdit: React.FC<IIconEdit> = ({
+  className,
+  strokeWidth = 1.5,
+}) => {
   return (
-    <svg {...base(className, strokeWidth)}>
-      <path d="M13.33 3.33 16.67 6.67 7 16.34H3.66v-3.34l9.67-9.67Z" />
+    <svg {...base(className, strokeWidth)} viewBox="0 0 18 18">
+      <path d="M10.9 4.1L13.9 7.1M3.5 14.5L4.1 11.6L11.7 4C12.1 3.6 12.8 3.6 13.2 4L14 4.8C14.4 5.2 14.4 5.9 14 6.3L6.4 13.9L3.5 14.5Z" />
     </svg>
   );
 };

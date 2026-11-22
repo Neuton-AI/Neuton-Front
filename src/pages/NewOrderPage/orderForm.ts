@@ -37,13 +37,13 @@ export function orderDateTimestamp(date: string, timeZone: string): string {
 
 export const earlyDeliveryDateMessage = 'Delivery date must be on or after the order date.';
 
-export const orderFields = (orderDate: string): readonly FormField<OrderForm>[] => [
-  { kind: 'input', name: 'customerName', id: 'customer', label: 'Customer name', required: true, maxLength: 160, autoComplete: 'name' },
+export const orderFields = (orderDate: string, allowEmpty?: { customerName: boolean; destinationAddress: boolean; deliveryDate: boolean }): readonly FormField<OrderForm>[] => [
+  { kind: 'input', name: 'customerName', id: 'customer', label: 'Customer name', required: !allowEmpty?.customerName, maxLength: 160, autoComplete: 'name' },
   { kind: 'group', name: 'dates', className: 'grid grid-cols-2 gap-3', fields: [
     { kind: 'input', name: 'orderDate', id: 'order-date', label: 'Order date', type: 'date', required: true },
-    { kind: 'input', name: 'deliveryDate', id: 'delivery-date', label: 'Delivery date', type: 'date', min: orderDate, required: true },
+    { kind: 'input', name: 'deliveryDate', id: 'delivery-date', label: 'Delivery date', type: 'date', min: orderDate, required: !allowEmpty?.deliveryDate },
     { kind: 'custom', name: 'deliveryDateError' },
   ] },
-  { kind: 'input', name: 'destinationAddress', id: 'address', label: 'Delivery address', type: 'text', required: true, maxLength: 300, autoComplete: 'street-address' },
+  { kind: 'input', name: 'destinationAddress', id: 'address', label: 'Delivery address', type: 'text', required: !allowEmpty?.destinationAddress, maxLength: 300, autoComplete: 'street-address' },
   { kind: 'input', name: 'deliveryFee', id: 'delivery-fee', label: 'Delivery fee', type: 'number', inputMode: 'decimal', required: true, min: 0, max: 99999999.99, step: 0.01 },
 ];
