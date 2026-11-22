@@ -1,6 +1,7 @@
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
 import { FullPageLoader, InlineNotice } from '@/components/feedback';
 import { IconClose, IconInfo } from '@/components/icons';
+import { useRef } from 'react';
 import { useNewOrderLayout } from './NewOrderPage.module';
 import { RecipePicker } from './components/RecipePicker/RecipePicker';
 import { OrderDetails } from './components/OrderDetails';
@@ -12,6 +13,8 @@ import styles from './NewOrderPage.module.css';
 export function NewOrderPage() {
   const { model, confirmDiscard, closeRef, saveRef, contentRef,
     cancelDiscard, close, discard } = useNewOrderLayout();
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const itemsSection = useRef<HTMLElement>(null);
   if (model.authLoading || model.shopsLoading || !model.activeShopId) return <FullPageLoader />;
   return <>
     <div ref={contentRef} className={`shell ${styles.page}`}>
@@ -21,9 +24,9 @@ export function NewOrderPage() {
         <h1>New order</h1>
       </header>
       <form onSubmit={model.submit} className={styles.form}>
-        <div className={styles.content} role='region' aria-label='Order details and items' tabIndex={0}>
+        <div ref={scrollArea} className={styles.content} role='region' aria-label='Order details and items' tabIndex={0}>
           <OrderDetails {...model} />
-          <section className={styles.items} aria-labelledby='order-items-heading'>
+          <section ref={itemsSection} className={styles.items} aria-labelledby='order-items-heading'>
             <div className={styles.itemsHeading}>
               <h2 id='order-items-heading'>Items</h2>
               <div className={styles.warnings} aria-live='polite'>
@@ -43,6 +46,7 @@ export function NewOrderPage() {
         <footer className={styles.footer}>
           <RecipePicker key={model.draftScope} recipes={model.recipes} loading={model.loading}
             error={Boolean(model.error)} disabled={model.createOrderPending}
+            scrollArea={scrollArea} itemsSection={itemsSection}
             onAdd={recipe => model.changeQuantity(recipe, 1)} />
           <OrderSummary subtotal={model.subtotal} deliveryFee={model.draftDeliveryFee} currency={model.currency} />
           <button ref={saveRef} type='submit' className={styles.saveButton} formNoValidate={model.availableCount === 0}

@@ -1,16 +1,26 @@
 import { buildRecipe } from '@/test/factories/recipes.factory';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useRef, type ComponentProps } from 'react';
 import { expect, it, vi } from 'vitest';
 import { RecipePicker } from './RecipePicker';
 
 const cake = buildRecipe({ name: 'Honey Cake', imageUrl: '/cake.webp' });
 const defaults = { recipes: [cake], loading: false, error: false, disabled: false, onAdd: vi.fn() };
 
+function PickerWithItems(props: Omit<ComponentProps<typeof RecipePicker>, 'scrollArea' | 'itemsSection'>) {
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const itemsSection = useRef<HTMLElement>(null);
+  return <>
+    <div ref={scrollArea}><section ref={itemsSection}>Items</section></div>
+    <RecipePicker {...props} scrollArea={scrollArea} itemsSection={itemsSection} />
+  </>;
+}
+
 it('dismisses on Escape and outside clicks, and leaves keyboard tab order intact', async () => {
   const user = userEvent.setup();
   const onAdd = vi.fn();
-  render(<><p>Outside</p><RecipePicker {...defaults} onAdd={onAdd} /><button>Next</button></>);
+  render(<><p>Outside</p><PickerWithItems {...defaults} onAdd={onAdd} /><button>Next</button></>);
   const trigger = screen.getByRole('button', { name: 'Add item' });
   await user.click(trigger);
   await user.keyboard('{Escape}');
@@ -28,14 +38,14 @@ it('dismisses on Escape and outside clicks, and leaves keyboard tab order intact
 
 it('shows loading, error, empty and no-match states and reuses the preview fallback', async () => {
   const user = userEvent.setup();
-  const { rerender } = render(<RecipePicker {...defaults} loading recipes={[]} />);
+  const { rerender } = render(<PickerWithItems {...defaults} loading recipes={[]} />);
   await user.click(screen.getByRole('button', { name: 'Add item' }));
   expect(screen.getByText('Loading shop recipes…')).toBeInTheDocument();
-  rerender(<RecipePicker {...defaults} error recipes={[]} />);
+  rerender(<PickerWithItems {...defaults} error recipes={[]} />);
   expect(screen.getByText('Could not load shop recipes.')).toBeInTheDocument();
-  rerender(<RecipePicker {...defaults} recipes={[]} />);
+  rerender(<PickerWithItems {...defaults} recipes={[]} />);
   expect(screen.getByText('No active, verified recipes yet.')).toBeInTheDocument();
-  rerender(<RecipePicker {...defaults} />);
+  rerender(<PickerWithItems {...defaults} />);
   const option = screen.getByRole('option', { name: 'Honey Cake' });
   const image = option.querySelector('img')!;
   expect(image).toHaveAttribute('src', '/cake.webp');
@@ -51,7 +61,7 @@ it('restores focus to Add item without scrolling after a selection', async () =>
   const user = userEvent.setup();
   const onAdd = vi.fn();
   const reveal = vi.fn();
-  render(<RecipePicker {...defaults} onAdd={onAdd} />);
+  render(<PickerWithItems {...defaults} onAdd={onAdd} />);
   const trigger = screen.getByRole('button', { name: 'Add item' });
   Object.defineProperty(trigger, 'scrollIntoView', { value: reveal });
   await user.click(trigger);

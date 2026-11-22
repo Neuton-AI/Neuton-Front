@@ -1,6 +1,8 @@
 import { IconPlus, IconSearch } from '@/components/icons';
 import type { Recipe } from '@/features/recipes/types';
 import { CatalogThumbnail } from '@/pages/CatalogPage/components/CatalogThumbnail/CatalogThumbnail';
+import type { RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import layout from '../../NewOrderPage.module.css';
 import { useRecipePicker } from './RecipePicker.module';
 import styles from './RecipePicker.module.css';
@@ -10,11 +12,13 @@ type RecipePickerProps = {
   loading: boolean;
   error: boolean;
   disabled: boolean;
+  scrollArea: RefObject<HTMLDivElement | null>;
+  itemsSection: RefObject<HTMLElement | null>;
   onAdd: (recipe: Recipe) => void;
 };
 
-export function RecipePicker({ recipes, loading, error, disabled, onAdd }: RecipePickerProps) {
-  const picker = useRecipePicker(recipes, onAdd);
+export function RecipePicker({ recipes, loading, error, disabled, scrollArea, itemsSection, onAdd }: RecipePickerProps) {
+  const picker = useRecipePicker(recipes, onAdd, scrollArea, itemsSection);
   const count = picker.matches.length;
   let status = '';
   if (loading) {
@@ -33,7 +37,7 @@ export function RecipePicker({ recipes, loading, error, disabled, onAdd }: Recip
       disabled={disabled} onClick={picker.toggle}>
       <IconPlus className='h-4 w-4' /> Add item
     </button>
-    {picker.open ? (
+    {picker.open && scrollArea.current ? createPortal(
       <div ref={picker.panel} id={picker.panelId} className={styles.panel}>
         <div className={styles.search}>
           <IconSearch className='h-[18px] w-[18px] shrink-0' />
@@ -63,7 +67,8 @@ export function RecipePicker({ recipes, loading, error, disabled, onAdd }: Recip
             );
           })}
         </ul>
-      </div>
+      </div>,
+      scrollArea.current,
     ) : null}
   </>;
 }

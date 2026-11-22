@@ -32,6 +32,8 @@ it('keeps the add, totals and save controls together outside the scrollable orde
   expect(scrollArea).toContainElement(screen.getByLabelText('Customer name'));
   expect(scrollArea).not.toContainElement(footer);
   await user.click(add);
+  expect(scrollArea).toContainElement(screen.getByRole('listbox', { name: 'Shop recipes' }));
+  expect(footer).not.toContainElement(screen.getByRole('listbox', { name: 'Shop recipes' }));
   await user.click(await screen.findByRole('option', { name: 'Tomato Soup' }));
   expect(scrollArea).toContainElement(screen.getByRole('list', { name: 'Selected items' }));
   expect(add).toHaveFocus();
