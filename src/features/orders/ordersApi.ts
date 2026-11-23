@@ -97,6 +97,10 @@ export function useRecordOrderPayment(userId: UserId, shopId: ShopId) {
   return useOrderSnapshotMutation<RecordPaymentBody>(userId, shopId, 'POST', '/payments');
 }
 
+export function useRecordOrderRefund(userId: UserId, shopId: ShopId) {
+  return useOrderSnapshotMutation<{ occurredAt: string }>(userId, shopId, 'POST', '/refund');
+}
+
 export function useCancelOrder(userId: UserId, shopId: ShopId) {
   return useOrderSnapshotMutation<CancelOrderBody, CancelOrderResult>(userId, shopId, 'POST', '/cancel');
 }

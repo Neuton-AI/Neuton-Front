@@ -192,6 +192,75 @@ describe("OrderDetailPage payments", () => {
   });
 });
 
+describe("OrderDetailPage refunds", () => {
+  function mockRefund() {
+    const order = makeOrderDetail("cancelled");
+    const summary = { status: "pending_refund" as const, totalReceived: "20.00", balanceDue: "0.00",
+      refundDue: "20.00", depositAmount: "20.00", depositDate: "2026-09-28T10:00:00.000Z" };
+    const deposit = { id: "deposit-1", kind: "deposit" as const, amount: "20.00",
+      occurredAt: "2026-09-28T10:00:00.000Z", recordedAt: "2026-09-28T10:00:00.000Z", recordedByUserId: "u1" };
+    let snapshot: { order: OrderDetail; syncVersion: number } = {
+      order: { ...order, paymentSummary: summary, paymentHistory: [deposit] }, syncVersion: 100,
+    };
+    const submissions: Array<{ body: { occurredAt: string }; sync: { id: string; baseVersion: number } }> = [];
+    api.apiFetch.mockImplementation(async (path: string, options) => {
+      if (path.endsWith("/refund")) {
+        submissions.push(options);
+        if (submissions.length === 1) throw new ApiError("Connection lost", 503);
+        snapshot = { order: { ...order, paymentSummary: { ...summary, status: "refunded", refundDue: "0.00" },
+          paymentHistory: [deposit, { ...deposit, id: "refund-1", kind: "refund", occurredAt: options.body.occurredAt }] },
+          syncVersion: options.sync.updatedAt };
+        return snapshot;
+      }
+      return options?.syncSnapshot ? snapshot : { order: snapshot.order };
+    });
+    return submissions;
+  }
+
+  it("requires confirmation, preserves a failed refund, and retries the same mutation", async () => {
+    const user = userEvent.setup();
+    const submissions = mockRefund();
+    renderDetail();
+    const payments = await screen.findByRole("region", { name: "Payments" });
+    const action = await within(payments).findByRole("button", { name: "Record refund" });
+    await user.click(action);
+    let dialog = within(await screen.findByRole("dialog", { name: "Record refund" }));
+    expect(await dialog.findByText("Refund due · $20.00")).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: "Record refund" })).toBeDisabled();
+    await user.click(dialog.getByRole("button", { name: "Back" }));
+    expect(action).toHaveFocus();
+    expect(submissions).toHaveLength(0);
+
+    await user.click(action);
+    dialog = within(await screen.findByRole("dialog", { name: "Record refund" }));
+    const date = dialog.getByLabelText("Refunded on");
+    await user.clear(date);
+    await user.type(date, "2026-09-29");
+    await user.click(dialog.getByRole("checkbox", { name: /already returned/ }));
+    await user.click(dialog.getByRole("button", { name: "Record refund" }));
+    expect(await dialog.findByText("Connection lost")).toBeInTheDocument();
+    expect(within(payments).getByText("Pending refund")).toBeInTheDocument();
+    expect(date).toHaveValue("2026-09-29");
+    await user.click(dialog.getByRole("button", { name: "Record refund" }));
+    expect(await within(payments).findAllByText("Refunded")).toHaveLength(2);
+    const history = within(payments).getByRole("list", { name: "Payment history" });
+    expect(within(history).getByText("-$20.00")).toBeInTheDocument();
+    expect(within(history).getByText(/Sep 29, 2026/)).toBeInTheDocument();
+    expect(submissions).toHaveLength(2);
+    expect(submissions[1].sync).toEqual(submissions[0].sync);
+    expect(submissions[0].sync.baseVersion).toBe(100);
+    expect(submissions[0].body).toEqual({ occurredAt: new Date("2026-09-29T00:00").toISOString() });
+  });
+
+  it("shows refund information to members without offering the action", async () => {
+    state.role = "member";
+    mockRefund();
+    renderDetail();
+    expect(await screen.findByText("Pending refund")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record refund" })).not.toBeInTheDocument();
+  });
+});
+
 describe("OrderDetailPage delivery", () => {
   it("shows the order number, customer, date, and profit metrics", async () => {
     mockApi();

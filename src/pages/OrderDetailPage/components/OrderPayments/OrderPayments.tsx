@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/format';
 import type { ShopId, UserId } from '@/lib/queryTypes';
 import type React from 'react';
 import { useOrderPayments } from './OrderPayments.module';
+import { OrderRefund } from './OrderRefund';
 
 interface IOrderPayments {
   order: OrderDetail;
@@ -21,27 +22,35 @@ const kindLabels = { deposit: 'Deposit', payment: 'Payment', refund: 'Refund' };
 export const OrderPayments: React.FC<IOrderPayments> = ({ order, currency, canEdit, userId, shopId }) => {
   const model = useOrderPayments(order, currency, canEdit, userId, shopId);
   const { summary, renderMoney } = model;
+  const refund = order.paymentHistory?.find(payment => payment.kind === 'refund');
   return (
     <section aria-labelledby="order-payments-heading" className="flex flex-col gap-2 rounded-card border border-hairline bg-surface-card p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="order-payments-heading" className="text-[18px] font-medium text-ink">Payments</h2>
-        {model.status && <SheetBadge tone="teal">{model.status}</SheetBadge>}
+        {model.status && <SheetBadge tone={summary?.status === 'pending_refund' ? 'card' : 'teal'}>{model.status}</SheetBadge>}
       </div>
       {summary && <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 text-label tabular-nums">
         <dt className="text-ink-muted">Received</dt><dd>{renderMoney(summary.totalReceived)}</dd>
-        <dt className="text-ink-muted">Balance due</dt><dd>{renderMoney(summary.balanceDue)}</dd>
+        {order.status !== 'cancelled' && <>
+          <dt className="text-ink-muted">Balance due</dt><dd>{renderMoney(summary.balanceDue)}</dd>
+        </>}
         {summary.status === 'pending_refund' && <>
-          <dt className="text-ink-muted">Refund due</dt><dd>{renderMoney(summary.refundDue)}</dd>
+          <dt className="text-ink-muted">Refund due</dt><dd className="font-semibold">{renderMoney(summary.refundDue)}</dd>
+        </>}
+        {summary.status === 'refunded' && refund && <>
+          <dt className="text-ink-muted">Refunded</dt><dd className="font-semibold">{renderMoney(refund.amount)}</dd>
         </>}
       </dl>}
       {!!order.paymentHistory?.length && <ul aria-label="Payment history" className="divide-y divide-hairline">
         {order.paymentHistory.map(payment => <li key={payment.id} className="flex justify-between gap-2 py-2 text-label">
           <span>{kindLabels[payment.kind]} <time dateTime={payment.occurredAt} className="block text-ink-muted">{formatDate(payment.occurredAt)}</time></span>
-          <span className="tabular-nums">{renderMoney(payment.amount)}</span>
+          <span className="tabular-nums">{renderMoney(payment.kind === 'refund' ? `-${payment.amount}` : payment.amount)}</span>
         </li>)}
       </ul>}
       {model.canRecord && <button type="button" className="pressable min-h-11 rounded-[10px] border border-hairline bg-surface-canvas text-label font-semibold text-ink"
         onClick={model.openForm}>Record payment</button>}
+      {canEdit && order.status === 'cancelled' &&
+        <OrderRefund order={order} renderMoney={renderMoney} userId={userId} shopId={shopId} />}
       <ConfirmDialog open={model.open} variant="standard" title="Record payment" cancelLabel="Back"
         description={`Order #${order.orderNumber}${order.customerName ? ` · ${order.customerName}` : ''}`}
         confirmLabel={model.pending ? 'Recording…' : 'Record payment'} onCancel={model.closeForm} onConfirm={model.confirm}
