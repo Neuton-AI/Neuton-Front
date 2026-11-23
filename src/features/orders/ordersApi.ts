@@ -86,17 +86,25 @@ export function useOrderForEdit(userId: UserId, shopId: ShopId, id: string, canE
 }
 
 export function useUpdateOrder(userId: UserId, shopId: ShopId) {
+  return useOrderSnapshotMutation<UpdateOrderBody>(userId, shopId, 'PATCH', '');
+}
+
+export function useUndoOrderDelivery(userId: UserId, shopId: ShopId) {
+  return useOrderSnapshotMutation<{ confirmedMarkedByMistake: true }>(userId, shopId, 'POST', '/undo-delivery');
+}
+
+function useOrderSnapshotMutation<Body>(userId: UserId, shopId: ShopId, method: 'PATCH' | 'POST', action: string) {
   const queryClient = useQueryClient();
   return useMutation({
     retry: false,
     networkMode: 'always',
     mutationFn: async ({ id, baseVersion, body, mutationId, version }: {
-      id: string; baseVersion: number; body: UpdateOrderBody; mutationId: string; version: number;
+      id: string; baseVersion: number; body: Body; mutationId: string; version: number;
     }) => {
       const scope = scopeFor(userId, shopId);
       const signal = requestScopeSignal(userId, shopId);
-      const snapshot = await onlineFetch<OrderEditSnapshot>(`/orders/${id}`, {
-        method: 'PATCH', userId, shopId, signal, body,
+      const snapshot = await onlineFetch<OrderEditSnapshot>(`/orders/${id}${action}`, {
+        method, userId, shopId, signal, body,
         sync: { id: mutationId, updatedAt: version, baseVersion },
       });
       const key = documentKey(scope, 'order', id);

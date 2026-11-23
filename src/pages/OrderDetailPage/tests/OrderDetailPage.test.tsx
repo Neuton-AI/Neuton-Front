@@ -81,10 +81,16 @@ function makeOrderDetail(status: OrderStatus): OrderDetail {
 }
 
 /** Answers GET /orders/:id from a status the transition mock can move forward. */
-function mockApi() {
+function mockApi(beforeUndo?: () => void) {
   const current = { status: "processing" as OrderStatus };
 
-  api.apiFetch.mockImplementation(async (path: string) => {
+  api.apiFetch.mockImplementation(async (path: string, options?: { syncSnapshot?: boolean }) => {
+    if (path.endsWith("/undo-delivery")) {
+      beforeUndo?.();
+      current.status = "processing";
+      return { order: makeOrderDetail(current.status), syncVersion: 101 };
+    }
+    if (options?.syncSnapshot) return { order: makeOrderDetail(current.status), syncVersion: 100 };
     if (path.endsWith("/verify")) {
       current.status = "delivered";
       // Like the real PATCH response, the transition carries the order row
@@ -156,15 +162,57 @@ describe("OrderDetailPage delivery", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows only a disabled Delete button once the order is delivered", async () => {
+  it("lets an owner dismiss or confirm undo delivery while keeping the order open", async () => {
+    const user = userEvent.setup();
     const current = mockApi();
     current.status = "delivered";
     renderDetail();
 
-    const button = await screen.findByRole("button", { name: "Delete" });
-    const footer = screen.getByRole("group", { name: "Order actions" });
-    expect(within(footer).getAllByRole("button")).toEqual([button]);
-    expect(button).toBeDisabled();
+    const action = await screen.findByRole("button", { name: "Undo delivery" });
+    await user.click(action);
+    let dialog = screen.getByRole("dialog", { name: "Undo delivery?" });
+    expect(within(dialog).getByText("Only undo delivery if the order was marked Delivered by mistake.")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Keep delivered" }));
+    expect(current.status).toBe("delivered");
+    expect(action).toHaveFocus();
+    await user.click(action);
+    dialog = screen.getByRole("dialog", { name: "Undo delivery?" });
+    const confirm = within(dialog).getByRole("button", { name: "Undo delivery" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    expect(await screen.findByText("Processing")).toBeInTheDocument();
+    expect(screen.getByText("Focaccia")).toBeInTheDocument();
+    expect(api.apiFetch).toHaveBeenCalledWith(expect.stringMatching(/\/undo-delivery$/), expect.objectContaining({
+      method: "POST", body: { confirmedMarkedByMistake: true },
+      sync: expect.objectContaining({ baseVersion: 100 }),
+    }));
+  });
+
+  it("hides undo delivery from members", async () => {
+    state.role = "member";
+    mockApi().status = "delivered";
+    renderDetail();
+    expect(await screen.findByText("Delivered")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo delivery" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a retryable error in the dialog and reuses the sync request", async () => {
+    const user = userEvent.setup();
+    const beforeUndo = vi.fn().mockImplementationOnce(() => { throw new Error("Connection lost"); });
+    mockApi(beforeUndo).status = "delivered";
+    renderDetail();
+
+    await user.click(await screen.findByRole("button", { name: "Undo delivery" }));
+    const dialog = screen.getByRole("dialog", { name: "Undo delivery?" });
+    const confirm = within(dialog).getByRole("button", { name: "Undo delivery" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    expect(await within(dialog).findByText("Connection lost")).toBeInTheDocument();
+    await user.click(confirm);
+    expect(await screen.findByText("Processing")).toBeInTheDocument();
+    const attempts = api.apiFetch.mock.calls.filter(([path]) => path.endsWith("/undo-delivery"));
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]?.[1].sync).toEqual(attempts[0]?.[1].sync);
   });
 
   it("sends the delivered transition and flips the sheet to delivered", async () => {

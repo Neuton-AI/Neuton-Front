@@ -84,6 +84,22 @@ export const OrderDetailPage: React.FC = () => {
       </div>
       <OrderActions model={model} />
       <ConfirmDialog
+        open={model.confirmingUndo}
+        variant="standard"
+        title="Undo delivery?"
+        description={<>
+          <strong className="block text-ink">Only undo delivery if the order was marked Delivered by mistake.</strong>
+          <span className="mt-2 block">The order will return to Processing. Payments stay as recorded.</span>
+        </>}
+        confirmLabel={model.undoPending ? "Undoing…" : "Undo delivery"}
+        cancelLabel="Keep delivered"
+        pending={model.undoPending}
+        confirmDisabled={!model.canConfirmUndo}
+        feedback={model.undoMessage && <InlineNotice tone="error">{model.undoMessage}</InlineNotice>}
+        onConfirm={model.confirmUndo}
+        onCancel={model.closeUndo}
+      />
+      <ConfirmDialog
         open={model.confirmingDelete}
         title="Cancel this order?"
         description="It stays on your records so its number is never reused."

@@ -8,9 +8,12 @@ import {
   useDeleteOrder,
   useMarkOrderDelivered,
   useOrder,
+  useOrderForEdit,
+  useUndoOrderDelivery,
 } from "@/features/orders/ordersApi";
+import { ApiError } from "@/lib/api";
 import { toNumber } from "@/lib/format";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 export function useOrderDetailPage() {
@@ -42,6 +45,44 @@ export function useOrderDetailPage() {
     : null;
 
   const markOrder = useMarkOrderDelivered(userId, activeShopId);
+  const undoOrder = useUndoOrderDelivery(userId, activeShopId);
+  const [confirmingUndo, setConfirmingUndo] = useState(false);
+  const [undoConflict, setUndoConflict] = useState(false);
+  const undoRequest = useRef<{ id: string; baseVersion: number; mutationId: string; version: number } | null>(null);
+  const undoSnapshot = useOrderForEdit(userId, activeShopId, id, confirmingUndo && canEdit);
+  const undoBaseVersion = undoSnapshot.data?.syncVersion;
+  const canConfirmUndo = undoSnapshot.data?.order.status === "delivered" &&
+    Number.isSafeInteger(undoBaseVersion) && !undoSnapshot.isFetching && !undoConflict && !undoSnapshot.error;
+  const undoError = undoOrder.error ?? undoSnapshot.error;
+  const undoMessage = undoError?.message ?? (undoSnapshot.data && !undoSnapshot.isFetching && !canConfirmUndo
+    ? "This order changed. Close this dialog and reopen it before retrying."
+    : null);
+
+  const openUndo = () => {
+    undoOrder.reset();
+    undoRequest.current = null;
+    setUndoConflict(false);
+    setConfirmingUndo(true);
+  };
+  const closeUndo = () => {
+    if (!undoOrder.isPending) setConfirmingUndo(false);
+  };
+  const confirmUndo = async () => {
+    if (!canConfirmUndo || undoBaseVersion === undefined || undoOrder.isPending) return;
+    const request = undoRequest.current ?? {
+      id, baseVersion: undoBaseVersion, mutationId: crypto.randomUUID(),
+      version: Math.max(Date.now(), undoBaseVersion + 1),
+    };
+    undoRequest.current = request;
+    try {
+      await undoOrder.mutateAsync({ ...request, body: { confirmedMarkedByMistake: true } });
+      setConfirmingUndo(false);
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 409 || error.status === 404)) {
+        setUndoConflict(true);
+      }
+    }
+  };
 
   const deleteOrder = useDeleteOrder(userId, activeShopId);
 
@@ -126,6 +167,13 @@ export function useOrderDetailPage() {
     shop,
     order,
     markError,
+    confirmingUndo,
+    openUndo,
+    closeUndo,
+    confirmUndo,
+    canConfirmUndo,
+    undoMessage,
+    undoPending: undoOrder.isPending,
     confirmingDelete,
     setConfirmingDelete,
     loading,

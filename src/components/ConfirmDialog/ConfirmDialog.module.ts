@@ -20,10 +20,13 @@ export function useConfirmDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const cancelAction = useRef(onCancel);
+  useEffect(() => { cancelAction.current = onCancel; }, [onCancel]);
 
   useEffect(() => {
     if (!open) return;
 
+    const trigger = document.activeElement;
     cancelRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -31,7 +34,7 @@ export function useConfirmDialog({
         // Own the key while open: without this the Sheet behind the dialog
         // hears the same Escape and closes out from under the confirmation.
         event.stopImmediatePropagation();
-        onCancel();
+        cancelAction.current();
         return;
       }
       // Keep focus inside the dialog while it owns the screen.
@@ -64,8 +67,9 @@ export function useConfirmDialog({
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       document.body.style.overflow = previousOverflow;
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
     };
-  }, [open, onCancel]);
+  }, [open]);
   return { dialogRef, cancelRef };
 }
 export type ConfirmDialogModel = ReturnType<typeof useConfirmDialog>;
