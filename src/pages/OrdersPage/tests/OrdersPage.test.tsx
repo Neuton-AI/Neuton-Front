@@ -184,7 +184,7 @@ describe("OrdersPage", () => {
     const noaRow = screen.getByText(/Noa R\. · #1046/).closest("a")!;
     expect(within(mayaRow).getByText("Processing")).toBeInTheDocument();
     expect(within(danielRow).getByText("Delivered")).toBeInTheDocument();
-    expect(within(noaRow).getByText("Deleted")).toBeInTheDocument();
+    expect(within(noaRow).getByText("Canceled")).toBeInTheDocument();
   });
 
   it("filters by status through the server query, defaulting to all", async () => {

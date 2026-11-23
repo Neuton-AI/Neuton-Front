@@ -2,6 +2,44 @@ import type { DocumentSource } from '@/features/uploads/types';
 
 export type OrderStatus = 'processing' | 'delivered' | 'cancelled';
 
+export type OrderPaymentSummary = {
+  status: 'unpaid' | 'deposited' | 'paid' | 'pending_refund' | 'refunded';
+  totalReceived: string;
+  balanceDue: string;
+  refundDue: string;
+  depositAmount: string;
+  depositDate: string | null;
+};
+
+export type RecordPaymentBody = {
+  kind: 'deposit' | 'payment';
+  amount: string;
+  occurredAt: string;
+};
+
+export type OrderPayment = Omit<RecordPaymentBody, 'kind'> & {
+  id: string;
+  kind: RecordPaymentBody['kind'] | 'refund';
+  recordedAt: string;
+  recordedByUserId: string | null;
+};
+
+export type CancelOrderBody = {
+  madeItems: boolean;
+  stockItems: { orderItemId: string; quantity: number }[];
+};
+
+export type FinishedStock = {
+  id: string;
+  recipeId: string;
+  sourceOrderItemId: string;
+  quantityAdded: number;
+  quantityRemaining: number;
+  unitCost: string;
+  costComplete: boolean | null;
+  createdAt: string;
+};
+
 export type Order = {
   id: string;
   /**
@@ -24,6 +62,7 @@ export type Order = {
   totalAmount: string;
   documentUrl: string | null;
   status: OrderStatus;
+  paymentSummary?: OrderPaymentSummary;
   netProfit: number;
   createdAt: string;
 };
@@ -51,7 +90,16 @@ export type OrderDetailItem = {
 export type OrderDetail = Order & {
   items: OrderDetailItem[];
   sources?: DocumentSource[];
+  paymentHistory?: OrderPayment[];
+  cancellationMadeItems?: boolean | null;
+  cancelledAt?: string | null;
+  cancelledByUserId?: string | null;
+  stockAdded?: FinishedStock[];
 };
+
+export type CancelOrderResult =
+  | { outcome: 'deleted'; orderId: string }
+  | (OrderEditSnapshot & { outcome: 'cancelled'; stockAdded: FinishedStock[] });
 
 export type StatusFilter = 'all' | OrderStatus;
 

@@ -10,14 +10,15 @@ export function toNumber(value: string | number | null | undefined): number {
 export function formatMoney(
   value: string | number | null | undefined,
   currency = 'USD',
-  options: { compact?: boolean } = {},
+  options: { compact?: boolean; exact?: boolean } = {},
 ): string {
   const amount = toNumber(value);
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-      maximumFractionDigits: options.compact || Math.abs(amount) >= 10000 ? 0 : 2,
+      minimumFractionDigits: options.exact ? 2 : undefined,
+      maximumFractionDigits: !options.exact && (options.compact || Math.abs(amount) >= 10000) ? 0 : 2,
       notation: options.compact && Math.abs(amount) >= 10000 ? 'compact' : 'standard',
     }).format(amount);
   } catch {

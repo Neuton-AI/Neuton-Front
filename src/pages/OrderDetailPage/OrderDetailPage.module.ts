@@ -5,13 +5,16 @@ import {
   useShopMemberships,
 } from "@/features/auth/auth";
 import {
-  useDeleteOrder,
   useMarkOrderDelivered,
   useOrder,
+  useOrderForEdit,
+  useUndoOrderDelivery,
 } from "@/features/orders/ordersApi";
+import { ApiError } from "@/lib/api";
 import { toNumber } from "@/lib/format";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useOrderCancellation } from "./components/CancelOrderDialog/useOrderCancellation";
 
 export function useOrderDetailPage() {
   const { id = "" } = useParams();
@@ -42,18 +45,51 @@ export function useOrderDetailPage() {
     : null;
 
   const markOrder = useMarkOrderDelivered(userId, activeShopId);
+  const undoOrder = useUndoOrderDelivery(userId, activeShopId);
+  const [confirmingUndo, setConfirmingUndo] = useState(false);
+  const [undoConflict, setUndoConflict] = useState(false);
+  const undoRequest = useRef<{ id: string; baseVersion: number; mutationId: string; version: number } | null>(null);
+  const undoSnapshot = useOrderForEdit(userId, activeShopId, id, confirmingUndo && canEdit);
+  const undoBaseVersion = undoSnapshot.data?.syncVersion;
+  const canConfirmUndo = undoSnapshot.data?.order.status === "delivered" &&
+    Number.isSafeInteger(undoBaseVersion) && !undoSnapshot.isFetching && !undoConflict && !undoSnapshot.error;
+  const undoError = undoOrder.error ?? undoSnapshot.error;
+  const undoMessage = undoError?.message ?? (undoSnapshot.data && !undoSnapshot.isFetching && !canConfirmUndo
+    ? "This order changed. Close this dialog and reopen it before retrying."
+    : null);
 
-  const deleteOrder = useDeleteOrder(userId, activeShopId);
+  const openUndo = () => {
+    undoOrder.reset();
+    undoRequest.current = null;
+    setUndoConflict(false);
+    setConfirmingUndo(true);
+  };
+  const closeUndo = () => {
+    if (!undoOrder.isPending) setConfirmingUndo(false);
+  };
+  const confirmUndo = async () => {
+    if (!canConfirmUndo || undoBaseVersion === undefined || undoOrder.isPending) return;
+    const request = undoRequest.current ?? {
+      id, baseVersion: undoBaseVersion, mutationId: crypto.randomUUID(),
+      version: Math.max(Date.now(), undoBaseVersion + 1),
+    };
+    undoRequest.current = request;
+    try {
+      await undoOrder.mutateAsync({ ...request, body: { confirmedMarkedByMistake: true } });
+      setConfirmingUndo(false);
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 409 || error.status === 404)) {
+        setUndoConflict(true);
+      }
+    }
+  };
 
-  /** A failed delete belongs in the load-error slot whose retry refetches. */
-  const [actionError, setActionError] = useState<string | null>(null);
+  const cancellation = useOrderCancellation(userId, activeShopId, id, sourceOrder, canEdit,
+    () => navigate("/orders", { replace: true }));
 
   /** Kept apart from the load error: a failed transition belongs next to its
    *  button, not in the slot whose retry only refetches the order. */
   const [markError, setMarkError] = useState<string | null>(null);
-
-  /** The delete confirmation is an in-app dialog, not a native confirm. */
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const loading = orderQuery.isLoading && !order;
 
@@ -61,10 +97,9 @@ export function useOrderDetailPage() {
     ? orderQuery.error instanceof Error
       ? orderQuery.error.message
       : "Could not load the order."
-    : actionError;
+    : null;
 
   const retry = () => {
-    setActionError(null);
     void orderQuery.refetch();
   };
 
@@ -74,21 +109,6 @@ export function useOrderDetailPage() {
 
   const justSaved =
     (location.state as { fresh?: boolean } | null)?.fresh === true;
-
-  const remove = async () => {
-    if (!userId || !activeShopId || !id || deleteOrder.isPending) return;
-    setConfirmingDelete(false);
-
-    setActionError(null);
-    try {
-      await deleteOrder.mutateAsync({ id });
-      navigate("/orders", { replace: true });
-    } catch (cause) {
-      setActionError(
-        cause instanceof Error ? cause.message : "Could not delete the order.",
-      );
-    }
-  };
 
   /**
    * Human verification gate: `processing` → `delivered`. Any shop member may
@@ -119,28 +139,31 @@ export function useOrderDetailPage() {
       : 0;
 
   const markOrderPending = markOrder.isPending;
-  const deleteOrderPending = deleteOrder.isPending;
   return {
     userId,
     activeShopId,
     shop,
     order,
     markError,
-    confirmingDelete,
-    setConfirmingDelete,
+    confirmingUndo,
+    openUndo,
+    closeUndo,
+    confirmUndo,
+    canConfirmUndo,
+    undoMessage,
+    undoPending: undoOrder.isPending,
+    cancellation,
     loading,
     error,
     retry,
     currency,
     close,
     justSaved,
-    remove,
     markDelivered,
     canEdit,
     edit: () => navigate(`/orders/${id}/edit`, { state: { fromOrderDetail: true } }),
     marginPercent,
     markOrderPending,
-    deleteOrderPending,
   };
 }
 export type OrderDetailPageModel = ReturnType<typeof useOrderDetailPage>;
