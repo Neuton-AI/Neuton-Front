@@ -41,16 +41,16 @@ const StockLine: React.FC<IStockLine> = ({ line, select, setQuantity }) => (
 export const CancelOrderDialog: React.FC<ICancelOrderDialog> = ({ order, currency, pending = false,
   loading = false, error, onReload, onConfirm, onCancel }) => {
   const model = useCancelOrderDialog(order, currency, onConfirm);
-  return <ConfirmDialog open variant="standard" title="Cancel order"
+  return <ConfirmDialog open variant="standard" confirmTone="danger" title="Cancel order"
     description={`Order #${order.orderNumber}${order.customerName ? ` · ${order.customerName}` : ''}`}
     cancelLabel="Keep order" confirmLabel={model.permanent ? 'Delete order' : 'Cancel order'}
-    confirmDisabled={loading || !!onReload || model.madeItems === null || model.invalid || !model.hasPaymentData}
+    confirmDisabled={loading || !!onReload || order.status !== 'processing' || model.madeItems === null || model.invalid || !model.hasPaymentData}
     pending={pending} onConfirm={model.confirm} onCancel={onCancel} feedback={<div className="flex flex-col gap-3">
       <fieldset disabled={pending || loading} className="min-w-0">
         <legend className="mb-2 text-label font-semibold text-ink">Was anything made for this order?</legend>
         <div className="grid grid-cols-2 gap-2">
-          {[true, false].map(answer => <label key={String(answer)} className="pressable relative grid min-h-11 cursor-pointer place-items-center rounded-[10px] border border-hairline text-label has-[:checked]:bg-brand-teal has-[:focus-visible]:outline-2">
-            <input className="absolute inset-0 size-full cursor-pointer opacity-0" type="radio" name="made-items"
+          {[true, false].map(answer => <label key={String(answer)} className="pressable flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-hairline px-3 text-label font-medium has-[:checked]:bg-brand-teal">
+            <input className="size-4 shrink-0 accent-[#225D51]" type="radio" name="made-items"
               checked={model.madeItems === answer} onChange={() => model.choose(answer)} />
             {answer ? 'Yes' : 'No'}
           </label>)}

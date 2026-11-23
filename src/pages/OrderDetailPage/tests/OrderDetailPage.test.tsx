@@ -116,7 +116,7 @@ function renderDetail() {
     <Routes>
       <Route path="/orders/:id" element={<OrderDetailPage />} />
       <Route path="/orders/:id/edit" element={<h1>Edit order</h1>} />
-      <Route path="/orders" element={null} />
+      <Route path="/orders" element={<h1>Orders</h1>} />
     </Routes>,
     { route: "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" },
   );
@@ -345,9 +345,14 @@ describe("OrderDetailPage cancellation", () => {
     expect(await screen.findByText("Order #42")).toBeInTheDocument();
   });
 
-  it("asks for confirmation in an app dialog before deleting", async () => {
+  it("requires an explicit No before permanently deleting and returning to Orders", async () => {
     const user = userEvent.setup();
-    api.apiFetch.mockResolvedValue({ order: makeOrderDetail("processing") });
+    const order = { ...makeOrderDetail("processing"), paymentSummary: { status: "unpaid",
+      totalReceived: "0.00", balanceDue: "62.12", refundDue: "0.00", depositAmount: "0.00", depositDate: null } };
+    api.apiFetch.mockImplementation(async (path: string, options?: { syncSnapshot?: boolean }) => {
+      if (path.endsWith("/cancel")) return { outcome: "deleted", orderId: order.id };
+      return options?.syncSnapshot ? { order, syncVersion: 100 } : { order };
+    });
     renderDetail();
 
     await user.click(
@@ -355,29 +360,30 @@ describe("OrderDetailPage cancellation", () => {
     );
 
     const dialog = await screen.findByRole("dialog", {
-      name: "Cancel this order?",
+      name: "Cancel order",
     });
     expect(
       within(dialog).getByText(
-        "It stays on your records so its number is never reused.",
+        "Was anything made for this order?",
       ),
     ).toBeInTheDocument();
     // Nothing is sent until the dialog is confirmed.
     expect(api.apiFetch).not.toHaveBeenCalledWith(
-      "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-      expect.objectContaining({ method: "DELETE" }),
+      "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/cancel",
+      expect.objectContaining({ method: "POST" }),
     );
 
-    await user.click(
-      within(dialog).getByRole("button", { name: "Cancel order" }),
-    );
+    await user.click(within(dialog).getByRole("radio", { name: "No" }));
+    await user.click(within(dialog).getByRole("button", { name: "Delete order" }));
 
     await waitFor(() =>
       expect(api.apiFetch).toHaveBeenCalledWith(
-        "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        expect.objectContaining({ method: "DELETE", shopId: "shop-1" }),
+        "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/cancel",
+        expect.objectContaining({ method: "POST", shopId: "shop-1", body: { madeItems: false, stockItems: [] },
+          sync: expect.objectContaining({ baseVersion: 100 }) }),
       ),
     );
+    expect(await screen.findByRole("heading", { name: "Orders" })).toBeInTheDocument();
   });
 
   it("closes the confirmation without deleting when cancelled", async () => {
@@ -389,18 +395,61 @@ describe("OrderDetailPage cancellation", () => {
       await screen.findByRole("button", { name: "Cancel" }),
     );
     const dialog = await screen.findByRole("dialog", {
-      name: "Cancel this order?",
+      name: "Cancel order",
     });
 
     await user.click(within(dialog).getByRole("button", { name: "Keep order" }));
 
     expect(
-      screen.queryByRole("dialog", { name: "Cancel this order?" }),
+      screen.queryByRole("dialog", { name: "Cancel order" }),
     ).toBeNull();
     expect(api.apiFetch).not.toHaveBeenCalledWith(
-      "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-      expect.objectContaining({ method: "DELETE" }),
+      "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/cancel",
+      expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("refreshes a stale cancellation after a deposit and waits for a new decision", async () => {
+    const user = userEvent.setup();
+    const order: OrderDetail = { ...makeOrderDetail("processing"), paymentSummary: { status: "unpaid",
+      totalReceived: "0.00", balanceDue: "62.12", refundDue: "0.00", depositAmount: "0.00", depositDate: null } };
+    let current = { order, syncVersion: 100 };
+    let attempts = 0;
+    let failReload = true;
+    api.apiFetch.mockImplementation(async (path: string, options?: { syncSnapshot?: boolean }) => {
+      if (path.endsWith("/cancel")) {
+        attempts++;
+        if (attempts === 1) {
+          current = { order: { ...order, paymentSummary: { ...order.paymentSummary!, status: "deposited",
+            totalReceived: "20.00", balanceDue: "42.12" } }, syncVersion: 101 };
+          throw new ApiError("This order changed. Reload it before canceling.", 409);
+        }
+        current = { order: { ...current.order, status: "cancelled", cancellationMadeItems: false,
+          paymentSummary: { ...current.order.paymentSummary!, status: "pending_refund", balanceDue: "0.00", refundDue: "20.00" } }, syncVersion: 102 };
+        return { ...current, outcome: "cancelled", stockAdded: [] };
+      }
+      if (options?.syncSnapshot && attempts === 1 && failReload) {
+        failReload = false;
+        throw new ApiError("Could not reload the order. Try again.", 503);
+      }
+      return options?.syncSnapshot ? current : { order: current.order };
+    });
+    renderDetail();
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+    const dialog = () => within(screen.getByRole("dialog", { name: "Cancel order" }));
+    await user.click(dialog().getByRole("radio", { name: "No" }));
+    await user.click(dialog().getByRole("button", { name: "Delete order" }));
+    await user.click(await dialog().findByRole("button", { name: "Reload order" }));
+    expect(await dialog().findByText("Could not reload the order. Try again.")).toBeInTheDocument();
+    expect(dialog().getByRole("button", { name: "Delete order" })).toBeDisabled();
+    await user.click(dialog().getByRole("button", { name: "Reload order" }));
+    await waitFor(() => expect(dialog().getByRole("radio", { name: "No" })).not.toBeChecked());
+    expect(attempts).toBe(1);
+    await user.click(dialog().getByRole("radio", { name: "No" }));
+    expect(dialog().getByText("Refund due · $20.00")).toBeInTheDocument();
+    await user.click(dialog().getByRole("button", { name: "Cancel order" }));
+    expect(await screen.findByText("Pending refund")).toBeInTheDocument();
+    expect(screen.getByText("Nothing was made for this order.")).toBeInTheDocument();
   });
 
   it("dismisses the confirmation with Escape but keeps the order sheet open", async () => {
@@ -411,29 +460,26 @@ describe("OrderDetailPage cancellation", () => {
     await user.click(
       await screen.findByRole("button", { name: "Cancel" }),
     );
-    await screen.findByRole("dialog", { name: "Cancel this order?" });
+    await screen.findByRole("dialog", { name: "Cancel order" });
 
     await user.keyboard("{Escape}");
 
     expect(
-      screen.queryByRole("dialog", { name: "Cancel this order?" }),
+      screen.queryByRole("dialog", { name: "Cancel order" }),
     ).toBeNull();
     // The Sheet behind it must not also answer the same Escape.
     expect(
       screen.getByRole("dialog", { name: "Order details" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
   });
 
-  it("shows a deleted order as a frozen void with no actions", async () => {
+  it("shows a legacy canceled order with an unknown production answer", async () => {
     api.apiFetch.mockResolvedValue({ order: makeOrderDetail("cancelled") });
     renderDetail();
 
-    expect(await screen.findByText("Deleted")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /This order was deleted\. It stays on your records so its number is never reused/,
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Canceled")).toBeInTheDocument();
+    expect(screen.getByText("Production answer unavailable.")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Deliver" }),
     ).toBeNull();

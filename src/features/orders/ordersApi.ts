@@ -1,11 +1,11 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
-import type { OrderEditSnapshot, RecordPaymentBody, ReviewedCreateOrderBody, StatusFilter, UpdateOrderBody } from '@/features/orders/types';
+import type { CancelOrderBody, CancelOrderResult, OrderEditSnapshot, RecordPaymentBody, ReviewedCreateOrderBody, StatusFilter, UpdateOrderBody } from '@/features/orders/types';
 import { type Order, type OrderDetail } from '@/features/orders/types';
 import { apiFetch as onlineFetch, requestScopeSignal } from '@/lib/api';
 import { changed, result, transaction } from '@/features/sync/store';
 import { syncDocuments } from '@/features/sync/engine';
-import { documentKey, scopeFor, type LocalDocument } from '@/features/sync/types';
+import { documentKey, scopeFor, type LocalDocument, type PendingWrite } from '@/features/sync/types';
 import { documentFetch as apiFetch } from '@/features/sync/documentsApi';
 import type { ShopId, UserId } from '@/lib/queryTypes';
 import { enabled } from '@/lib/queryTypes';
@@ -15,6 +15,7 @@ import {
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
+  type QueryClient,
 } from '@tanstack/react-query';
 
 export function useOrders(
@@ -32,7 +33,6 @@ export function useOrders(
     enabled: enabled(userId, shopId),
   });
 }
-
 export function useOrder(
   userId: UserId,
   shopId: ShopId,
@@ -97,7 +97,63 @@ export function useRecordOrderPayment(userId: UserId, shopId: ShopId) {
   return useOrderSnapshotMutation<RecordPaymentBody>(userId, shopId, 'POST', '/payments');
 }
 
-function useOrderSnapshotMutation<Body>(userId: UserId, shopId: ShopId, method: 'PATCH' | 'POST', action: string) {
+export function useCancelOrder(userId: UserId, shopId: ShopId) {
+  return useOrderSnapshotMutation<CancelOrderBody, CancelOrderResult>(userId, shopId, 'POST', '/cancel');
+}
+
+async function cacheOrderVersion(queryClient: QueryClient, userId: UserId, shopId: ShopId,
+  id: string, version: number, order: OrderDetail | null, signal?: AbortSignal) {
+  const scope = scopeFor(userId, shopId);
+  const key = documentKey(scope, 'order', id);
+  const queryKey = ordersKeys.order(shopId, id);
+  const data = order ?? { id };
+  const updateQuery = () => {
+    if (order) queryClient.setQueryData(queryKey, { order });
+    else queryClient.removeQueries({ queryKey, exact: true });
+  };
+  try {
+    const accepted = await transaction(['documents', 'writes'], async tx => {
+      const docs = tx.objectStore('documents');
+      const current = await result<LocalDocument | undefined>(docs.get(key));
+      signal?.throwIfAborted();
+      if (order && current && (current.deleted || current.syncStatus === 'pending-push' || current.updatedAt > version)) {
+        return false;
+      }
+      if (!order) {
+        const writes = tx.objectStore('writes');
+        const pending = await result<PendingWrite[]>(writes.index('scope').getAll(scope.key));
+        signal?.throwIfAborted();
+        for (const write of pending) {
+          if (write.documentKey === key) writes.delete(write.key);
+        }
+      }
+      docs.put({ key, scope: scope.key, kind: 'order', id, deleted: !order,
+        updatedAt: version, serverVersion: version, serverData: data, data, syncStatus: 'synced',
+        lastSyncedAt: Date.now() } satisfies LocalDocument);
+      return true;
+    });
+    signal?.throwIfAborted();
+    if (accepted) {
+      updateQuery();
+      changed();
+    }
+  } catch {
+    if (!signal?.aborted) {
+      updateQuery();
+      void syncDocuments(scope, { userId, shopId }, { force: true, queueIfRunning: true }).catch(() => undefined);
+    }
+  }
+}
+
+export function useCacheOrderSnapshot(userId: UserId, shopId: ShopId) {
+  const client = useQueryClient();
+  return (snapshot: OrderEditSnapshot) => cacheOrderVersion(client, userId, shopId, snapshot.order.id,
+    snapshot.syncVersion, snapshot.order, requestScopeSignal(userId, shopId));
+}
+
+function useOrderSnapshotMutation<Body, Result extends OrderEditSnapshot | CancelOrderResult = OrderEditSnapshot>(
+  userId: UserId, shopId: ShopId, method: 'PATCH' | 'POST', action: string,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     retry: false,
@@ -105,40 +161,13 @@ function useOrderSnapshotMutation<Body>(userId: UserId, shopId: ShopId, method: 
     mutationFn: async ({ id, baseVersion, body, mutationId, version }: {
       id: string; baseVersion: number; body: Body; mutationId: string; version: number;
     }) => {
-      const scope = scopeFor(userId, shopId);
       const signal = requestScopeSignal(userId, shopId);
-      const snapshot = await onlineFetch<OrderEditSnapshot>(`/orders/${id}${action}`, {
+      const snapshot = await onlineFetch<Result>(`/orders/${id}${action}`, {
         method, userId, shopId, signal, body,
         sync: { id: mutationId, updatedAt: version, baseVersion },
       });
-      const key = documentKey(scope, 'order', id);
-      try {
-        const accepted = await transaction(['documents'], async tx => {
-          const docs = tx.objectStore('documents');
-          const current = await result<LocalDocument | undefined>(docs.get(key));
-          signal?.throwIfAborted();
-          if (current && (current.syncStatus === 'pending-push' || current.updatedAt > snapshot.syncVersion)) {
-            return false;
-          }
-          docs.put({
-            key, scope: scope.key, kind: 'order', id, deleted: false,
-            updatedAt: snapshot.syncVersion, serverVersion: snapshot.syncVersion,
-            serverData: snapshot.order, data: snapshot.order, syncStatus: 'synced',
-            lastSyncedAt: Date.now(),
-          } satisfies LocalDocument);
-          return true;
-        });
-        signal?.throwIfAborted();
-        if (accepted) {
-          queryClient.setQueryData(ordersKeys.order(shopId, id), { order: snapshot.order });
-          changed();
-        }
-      } catch {
-        if (!signal?.aborted) {
-          queryClient.setQueryData(ordersKeys.order(shopId, id), { order: snapshot.order });
-          void syncDocuments(scope, { userId, shopId }, { force: true, queueIfRunning: true }).catch(() => undefined);
-        }
-      }
+      if ('order' in snapshot) await cacheOrderVersion(queryClient, userId, shopId, id, snapshot.syncVersion, snapshot.order, signal);
+      else await cacheOrderVersion(queryClient, userId, shopId, id, version, null, signal);
       return snapshot;
     },
     onSuccess: () => {
@@ -169,22 +198,6 @@ export function useMarkOrderDelivered(
       );
       void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
-    },
-  });
-}
-
-export function useDeleteOrder(
-  userId: UserId,
-  shopId: ShopId,
-): UseMutationResult<undefined, Error, { id: string }> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id }) =>
-      apiFetch<undefined>(`/orders/${id}`, { method: 'DELETE', userId, shopId }),
-    onSuccess: (_data, { id }) => {
-      queryClient.removeQueries({ queryKey: ordersKeys.order(shopId, id) });
-      void queryClient.invalidateQueries({ queryKey: ordersKeys.ordersRoot });
-      void queryClient.invalidateQueries({ queryKey: analyticsKeys.dashboardRoot });
     },
   });
 }

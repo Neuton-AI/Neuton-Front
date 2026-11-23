@@ -13,6 +13,7 @@ interface IConfirmDialog {
   confirmLabel: string;
   cancelLabel?: string;
   variant?: "destructive" | "standard";
+  confirmTone?: "danger";
   pending?: boolean;
   confirmDisabled?: boolean;
   feedback?: ReactNode;
@@ -27,6 +28,7 @@ export const ConfirmDialog: React.FC<IConfirmDialog> = ({
   confirmLabel,
   cancelLabel = "Cancel",
   variant = "destructive",
+  confirmTone,
   pending = false,
   confirmDisabled = false,
   feedback,
@@ -46,7 +48,9 @@ export const ConfirmDialog: React.FC<IConfirmDialog> = ({
   const standard = variant === "standard";
   const surfaceClass = standard ? "bg-surface-canvas" : "bg-white";
   const titleClass = standard ? "font-display text-[28px] font-semibold" : "text-[20px] font-bold";
-  const confirmClass = standard ? "bg-brand-primary text-ink hover:bg-brand-primary/90" : "bg-semantic-error text-white hover:bg-[#B03C3C]";
+  let confirmClass = "bg-semantic-error text-white hover:bg-[#B03C3C]";
+  if (standard) confirmClass = "bg-brand-primary text-ink hover:bg-brand-primary/90";
+  if (confirmTone === "danger") confirmClass = "bg-[#9F3734] text-white hover:bg-[#A8413D]";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <button

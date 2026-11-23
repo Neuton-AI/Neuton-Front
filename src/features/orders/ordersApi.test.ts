@@ -12,7 +12,7 @@ import type { ReviewedCreateOrderBody } from './types';
 import { ordersKeys } from './keys';
 import {
   useCreateOrder,
-  useDeleteOrder,
+  useCancelOrder,
   useMarkOrderDelivered,
   useOrder,
   useOrders,
@@ -76,15 +76,20 @@ describe('orders API contracts', () => {
     client.setQueryData(ordersKeys.orders('shop-1', 'all'), { orders: [], total: 0 });
     client.setQueryData(analyticsKeys.dashboard('shop-1', '30d'), {});
     server.use(
-      http.delete(
-        apiPath('/orders/o1'),
-        ({ request }) => requireContext(request) ?? new HttpResponse(null, { status: 204 }),
+      http.post(
+        apiPath('/orders/o1/cancel'),
+        async ({ request }) => {
+          expect(request.headers.get('x-sync-base-version')).toBe('100');
+          expect(await request.json()).toEqual({ madeItems: false, stockItems: [] });
+          return requireContext(request) ?? HttpResponse.json({ outcome: 'deleted', orderId: 'o1' });
+        },
       ),
     );
-    const { result } = renderHookWithProviders(() => useDeleteOrder('userId-1', 'shop-1'), {
+    const { result } = renderHookWithProviders(() => useCancelOrder('userId-1', 'shop-1'), {
       queryClient: client,
     });
-    await act(() => result.current.mutateAsync({ id: 'o1' }));
+    await act(() => result.current.mutateAsync({ id: 'o1', baseVersion: 100, version: 101,
+      mutationId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', body: { madeItems: false, stockItems: [] } }));
     expect(client.getQueryData(ordersKeys.order('shop-1', 'o1'))).toBeUndefined();
     expect(client.getQueryState(ordersKeys.orders('shop-1', 'all'))?.isInvalidated).toBe(true);
     expect(client.getQueryState(analyticsKeys.dashboard('shop-1', '30d'))?.isInvalidated).toBe(

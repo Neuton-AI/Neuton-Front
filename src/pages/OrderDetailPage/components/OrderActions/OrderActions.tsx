@@ -27,7 +27,7 @@ export function OrderActions({ model }: { model: OrderDetailPageModel }) {
   }
   if (status !== "processing") return null;
 
-  const actionPending = model.deleteOrderPending || model.markOrderPending;
+  const actionPending = model.cancellation.pending || model.markOrderPending;
 
   return (
     <div className="shrink-0 px-5">
@@ -39,9 +39,9 @@ export function OrderActions({ model }: { model: OrderDetailPageModel }) {
           <button
             type="button"
             className={`${actionClassName} pressable bg-[#F6DEDA] text-[#A63B3B] disabled:opacity-45`}
-            disabled={actionPending}
-            aria-busy={model.deleteOrderPending}
-            onClick={() => model.setConfirmingDelete(true)}
+            disabled={!model.canEdit || actionPending}
+            aria-busy={model.cancellation.pending}
+            onClick={model.cancellation.start}
           >
             <svg
               aria-hidden="true"

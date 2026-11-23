@@ -12,7 +12,7 @@ export const useCancelOrderDialog = (order: OrderDetail, currency: string, onCon
   const invalid = selected.some(line => !/^\d+$/.test(line.entered) || Number(line.entered) < 1 || Number(line.entered) > line.maximum);
   const received = toNumber(order.paymentSummary?.totalReceived);
   const hasPaymentData = !!order.paymentSummary;
-  const permanent = madeItems === false && hasPaymentData && received === 0;
+  const permanent = madeItems === false && hasPaymentData && received === 0 && !order.paymentHistory?.length;
 
   const choose = (answer: boolean) => {
     setMadeItems(answer);
