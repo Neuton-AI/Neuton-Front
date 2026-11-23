@@ -1,4 +1,5 @@
 import type { OrderDetail, OrderStatus } from "@/features/orders/types";
+import { ApiError } from "@/lib/api";
 import { renderWithRouter } from "@/test/render";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -120,6 +121,76 @@ function renderDetail() {
     { route: "/orders/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" },
   );
 }
+
+describe("OrderDetailPage payments", () => {
+  it("records a deposit and shows the payment history and balance from the server", async () => {
+    const user = userEvent.setup();
+    const order = makeOrderDetail("processing");
+    const initial = { status: "unpaid" as const, totalReceived: "0.00", balanceDue: "62.12",
+      refundDue: "0.00", depositAmount: "0.00", depositDate: null };
+    let snapshot: { order: OrderDetail; syncVersion: number } = { order: { ...order, paymentSummary: initial }, syncVersion: 100 };
+    api.apiFetch.mockImplementation(async (path: string, options?: { syncSnapshot?: boolean }) => {
+      if (path.endsWith("/payments")) {
+        snapshot = { order: { ...order, paymentSummary: { ...initial, status: "deposited", totalReceived: "20.00",
+          balanceDue: "42.12", depositAmount: "20.00" }, paymentHistory: [{ id: "deposit-1", kind: "deposit",
+          amount: "20.00", occurredAt: "2026-09-28T10:00:00.000Z", recordedAt: "2026-09-28T10:00:00.000Z",
+          recordedByUserId: "u1" }] }, syncVersion: Date.now() };
+        return snapshot;
+      }
+      return options?.syncSnapshot ? snapshot : { order: snapshot.order };
+    });
+    renderDetail();
+    await user.click(await screen.findByRole("button", { name: "Record payment" }));
+    const dialog = await screen.findByRole("dialog", { name: "Record payment" });
+    await user.click(within(dialog).getByRole("radio", { name: "Deposit" }));
+    const amount = within(dialog).getByLabelText("Amount");
+    await user.clear(amount);
+    await user.type(amount, "20.00");
+    await user.click(within(dialog).getByRole("button", { name: "Record payment" }));
+    const payments = await screen.findByRole("region", { name: "Payments" });
+    expect(await within(payments).findByText("Deposited")).toBeInTheDocument();
+    expect(within(payments).getByText("$42.12")).toBeInTheDocument();
+    expect(within(payments).getByText("Deposit")).toBeInTheDocument();
+    expect(api.apiFetch).toHaveBeenCalledWith(expect.stringMatching(/\/payments$/), expect.objectContaining({
+      method: "POST", body: expect.objectContaining({ kind: "deposit", amount: "20.00" }),
+      sync: expect.objectContaining({ baseVersion: 100 }),
+    }));
+  });
+
+  it("preserves a stale payment draft and requires another confirmation after reload", async () => {
+    const user = userEvent.setup();
+    const order = makeOrderDetail("processing");
+    let baseVersion = 100;
+    const submittedVersions: number[] = [];
+    api.apiFetch.mockImplementation(async (path: string, options?: { syncSnapshot?: boolean; sync?: { baseVersion: number } }) => {
+      if (path.endsWith("/payments")) {
+        submittedVersions.push(options!.sync!.baseVersion);
+        baseVersion = 101;
+        throw new ApiError("This order changed", 409);
+      }
+      const current: OrderDetail = { ...order, paymentSummary: { status: "unpaid", totalReceived: "0.00",
+        balanceDue: baseVersion === 100 ? "62.12" : "40.00", refundDue: "0.00", depositAmount: "0.00", depositDate: null } };
+      return options?.syncSnapshot ? { order: current, syncVersion: baseVersion } : { order: current };
+    });
+    renderDetail();
+    await user.click(await screen.findByRole("button", { name: "Record payment" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Record payment" }));
+    const amount = dialog.getByLabelText("Amount");
+    await user.clear(amount);
+    await user.type(amount, "20.00");
+    const confirm = dialog.getByRole("button", { name: "Record payment" });
+    await user.click(confirm);
+    expect(await dialog.findByText("This order changed")).toBeInTheDocument();
+    expect(confirm).toBeDisabled();
+    await user.click(dialog.getByRole("button", { name: "Reload order" }));
+    await waitFor(() => expect(confirm).toBeEnabled());
+    expect(amount).toHaveValue(20);
+    expect(dialog.getByText("Balance due after payment · $20.00")).toBeInTheDocument();
+    expect(submittedVersions).toEqual([100]);
+    await user.click(confirm);
+    await waitFor(() => expect(submittedVersions).toEqual([100, 101]));
+  });
+});
 
 describe("OrderDetailPage delivery", () => {
   it("shows the order number, customer, date, and profit metrics", async () => {

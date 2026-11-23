@@ -10,6 +10,7 @@ import {
   OrderSummary,
 } from "./components/OrderSummary/OrderSummary";
 import { OrderActions } from "./components/OrderActions/OrderActions";
+import { OrderPayments } from "./components/OrderPayments/OrderPayments";
 import { useOrderDetailPage } from "./OrderDetailPage.module";
 
 export const OrderDetailPage: React.FC = () => {
@@ -38,6 +39,8 @@ export const OrderDetailPage: React.FC = () => {
               marginPercent={model.marginPercent}
             />
             <OrderItems order={order} currency={currency} />
+            <OrderPayments key={order.id} order={order} currency={currency} canEdit={model.canEdit}
+              userId={model.userId} shopId={model.activeShopId} />
             <OrderDelivery
               order={order}
               currency={currency}

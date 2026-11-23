@@ -2,6 +2,28 @@ import type { DocumentSource } from '@/features/uploads/types';
 
 export type OrderStatus = 'processing' | 'delivered' | 'cancelled';
 
+export type OrderPaymentSummary = {
+  status: 'unpaid' | 'deposited' | 'paid' | 'pending_refund' | 'refunded';
+  totalReceived: string;
+  balanceDue: string;
+  refundDue: string;
+  depositAmount: string;
+  depositDate: string | null;
+};
+
+export type RecordPaymentBody = {
+  kind: 'deposit' | 'payment';
+  amount: string;
+  occurredAt: string;
+};
+
+export type OrderPayment = Omit<RecordPaymentBody, 'kind'> & {
+  id: string;
+  kind: RecordPaymentBody['kind'] | 'refund';
+  recordedAt: string;
+  recordedByUserId: string | null;
+};
+
 export type Order = {
   id: string;
   /**
@@ -24,6 +46,7 @@ export type Order = {
   totalAmount: string;
   documentUrl: string | null;
   status: OrderStatus;
+  paymentSummary?: OrderPaymentSummary;
   netProfit: number;
   createdAt: string;
 };
@@ -51,6 +74,7 @@ export type OrderDetailItem = {
 export type OrderDetail = Order & {
   items: OrderDetailItem[];
   sources?: DocumentSource[];
+  paymentHistory?: OrderPayment[];
 };
 
 export type StatusFilter = 'all' | OrderStatus;

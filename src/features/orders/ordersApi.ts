@@ -1,6 +1,6 @@
 import { analyticsKeys } from '@/features/analytics/keys';
 import { ordersKeys } from '@/features/orders/keys';
-import type { OrderEditSnapshot, ReviewedCreateOrderBody, StatusFilter, UpdateOrderBody } from '@/features/orders/types';
+import type { OrderEditSnapshot, RecordPaymentBody, ReviewedCreateOrderBody, StatusFilter, UpdateOrderBody } from '@/features/orders/types';
 import { type Order, type OrderDetail } from '@/features/orders/types';
 import { apiFetch as onlineFetch, requestScopeSignal } from '@/lib/api';
 import { changed, result, transaction } from '@/features/sync/store';
@@ -91,6 +91,10 @@ export function useUpdateOrder(userId: UserId, shopId: ShopId) {
 
 export function useUndoOrderDelivery(userId: UserId, shopId: ShopId) {
   return useOrderSnapshotMutation<{ confirmedMarkedByMistake: true }>(userId, shopId, 'POST', '/undo-delivery');
+}
+
+export function useRecordOrderPayment(userId: UserId, shopId: ShopId) {
+  return useOrderSnapshotMutation<RecordPaymentBody>(userId, shopId, 'POST', '/payments');
 }
 
 function useOrderSnapshotMutation<Body>(userId: UserId, shopId: ShopId, method: 'PATCH' | 'POST', action: string) {
