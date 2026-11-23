@@ -44,14 +44,7 @@ export const useOrderPayments = (order: OrderDetail, currency: string, canEdit: 
   const validAmount = amountCents > 0 && amountCents <= balanceCents;
   const baseVersion = snapshot.data?.syncVersion;
   const canConfirm = ready && validAmount && Number.isFinite(timestamp.getTime()) && baseVersion !== undefined;
-  const renderMoney = (value: string | number) => {
-    try {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency,
-        minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
-    } catch {
-      return formatMoney(value, currency);
-    }
-  };
+  const renderMoney = (value: string | number) => formatMoney(value, currency, { exact: true });
 
   const openForm = () => {
     request.current = null;

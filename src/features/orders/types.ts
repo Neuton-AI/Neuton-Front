@@ -24,6 +24,22 @@ export type OrderPayment = Omit<RecordPaymentBody, 'kind'> & {
   recordedByUserId: string | null;
 };
 
+export type CancelOrderBody = {
+  madeItems: boolean;
+  stockItems: { orderItemId: string; quantity: number }[];
+};
+
+export type FinishedStock = {
+  id: string;
+  recipeId: string;
+  sourceOrderItemId: string;
+  quantityAdded: number;
+  quantityRemaining: number;
+  unitCost: string;
+  costComplete: boolean | null;
+  createdAt: string;
+};
+
 export type Order = {
   id: string;
   /**
@@ -75,7 +91,15 @@ export type OrderDetail = Order & {
   items: OrderDetailItem[];
   sources?: DocumentSource[];
   paymentHistory?: OrderPayment[];
+  cancellationMadeItems?: boolean | null;
+  cancelledAt?: string | null;
+  cancelledByUserId?: string | null;
+  stockAdded?: FinishedStock[];
 };
+
+export type CancelOrderResult =
+  | { outcome: 'deleted'; orderId: string }
+  | (OrderEditSnapshot & { outcome: 'cancelled'; stockAdded: FinishedStock[] });
 
 export type StatusFilter = 'all' | OrderStatus;
 

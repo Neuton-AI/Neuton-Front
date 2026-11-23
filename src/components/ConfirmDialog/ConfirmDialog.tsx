@@ -64,7 +64,7 @@ export const ConfirmDialog: React.FC<IConfirmDialog> = ({
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
         aria-busy={pending}
-        className={`relative flex w-full max-w-[400px] flex-col gap-4 rounded-[16px] border border-hairline p-6 shadow-[0_20px_50px_rgba(20,20,19,0.18)] motion-safe:animate-[sheet-in_220ms_cubic-bezier(0.32,0.72,0,1)] ${surfaceClass}`}
+        className={`relative flex max-h-[calc(100dvh-48px)] w-full max-w-[400px] flex-col gap-4 rounded-[16px] border border-hairline p-6 shadow-[0_20px_50px_rgba(20,20,19,0.18)] motion-safe:animate-[sheet-in_220ms_cubic-bezier(0.32,0.72,0,1)] ${surfaceClass}`}
       >
         {!standard && (
           <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-[#FEF3C7] text-ink">
@@ -88,8 +88,8 @@ export const ConfirmDialog: React.FC<IConfirmDialog> = ({
             {description}
           </p>
         </div>
-        {feedback}
-        <div className="flex gap-2.5">
+        {feedback && <div className="min-h-0 overflow-y-auto">{feedback}</div>}
+        <div className="flex shrink-0 gap-2.5">
           <button
             ref={cancelRef}
             type="button"
