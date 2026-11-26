@@ -2,22 +2,14 @@ import { ErrorState, InlineNotice, Spinner } from "@/components/feedback";
 import { IconChevronRight, IconClose, IconSearch } from "@/components/icons";
 import { Sheet } from "@/components/Sheet/Sheet";
 import { Button } from "@/components/ui";
-import type { InviteRole, ShopAccountMatch } from "@/features/shops/shopTeamApi";
+import type { InviteRole } from "@/features/shops/shopTeamApi";
 import { useInviteTeammateSheet, type InviteTeammateSheetProps } from "./InviteTeammateSheet.module";
+import { TeamAccountIdentity } from "./TeamAccountIdentity";
 
 const eligibilityLabels = { member: "Already on team", pending: "Invite pending" };
 const accountRow = "flex min-h-[59px] w-full items-center justify-between gap-2 px-3 py-2 text-left";
 const roleLabels = { member: "Member", admin: "Admin" };
 const roles: InviteRole[] = ["member", "admin"];
-
-function AccountIdentity({ account }: { account: ShopAccountMatch }) {
-  return (
-    <span className="min-w-0">
-      <span className="block break-words text-body font-semibold text-ink">{account.fullName?.trim() || "No name set"}</span>
-      <span className="block break-all text-[13px] text-ink-muted">{account.email}</span>
-    </span>
-  );
-}
 
 export function InviteTeammateSheet(props: InviteTeammateSheetProps) {
   return <ScopedInviteTeammateSheet key={`${props.userId}/${props.shopId}`} {...props} />;
@@ -27,7 +19,7 @@ function ScopedInviteTeammateSheet(props: InviteTeammateSheetProps) {
   const { shopName } = props;
   const {
     account, role, setRole, selectAccount, input, changeInput, page, changePage, results,
-    closeRef, searchRef, roleRef, close, submit, backToSearch, inviting, inviteFailed,
+    closeRef, searchRef, roleRef, close, submit, backToSearch, inviting, inviteError,
     searchFailed, searching, retry,
   } = useInviteTeammateSheet(props);
 
@@ -52,7 +44,7 @@ function ScopedInviteTeammateSheet(props: InviteTeammateSheetProps) {
           <form className="flex flex-col gap-3" onSubmit={submit}>
             <p className="text-body text-ink-muted">Invite to {shopName}</p>
             <div className={`${accountRow} rounded-card bg-[#E7F0E7]`}>
-              <AccountIdentity account={account} />
+              <TeamAccountIdentity account={account} />
             </div>
             <fieldset disabled={inviting}>
               <legend className="mb-2 text-body font-semibold text-ink">Role</legend>
@@ -76,7 +68,7 @@ function ScopedInviteTeammateSheet(props: InviteTeammateSheetProps) {
               </div>
             </fieldset>
             <p className="text-[13px] text-ink-muted">Members can view orders. Admins can create and edit them.</p>
-            {inviteFailed && <InlineNotice tone="error">Couldn’t send the invitation. Try again or choose another account.</InlineNotice>}
+            {inviteError && <InlineNotice tone="error">{inviteError}</InlineNotice>}
             <Button type="submit" loading={inviting} block>Send invite</Button>
             <Button variant="outline" disabled={inviting} onClick={backToSearch}>Back to search</Button>
           </form>
@@ -111,12 +103,12 @@ function ScopedInviteTeammateSheet(props: InviteTeammateSheetProps) {
                   <li key={candidate.id}>
                     {candidate.eligibility === "eligible" ? (
                       <button type="button" className={`${accountRow} hover:bg-surface-soft focus-visible:outline focus-visible:-outline-offset-2`} onClick={() => selectAccount(candidate)}>
-                        <AccountIdentity account={candidate} />
+                        <TeamAccountIdentity account={candidate} />
                         <IconChevronRight className="h-5 w-5 shrink-0 text-ink-muted" />
                       </button>
                     ) : (
                       <div className={accountRow}>
-                        <AccountIdentity account={candidate} />
+                        <TeamAccountIdentity account={candidate} />
                         <span className="max-w-[40%] shrink-0 rounded-pill bg-surface-soft px-2 py-1 text-center text-[11px] font-medium text-ink-muted">
                           {eligibilityLabels[candidate.eligibility]}
                         </span>

@@ -1,7 +1,9 @@
 import type React from "react";
 import { FormFields } from "@/components/FormFields/FormFields";
 import { ErrorState, InlineNotice, Skeleton } from "@/components/feedback";
+import { IconChevronRight } from "@/components/icons";
 import { Button } from "@/components/ui";
+import { Link } from "react-router-dom";
 import { DeleteShopDialog } from "./DeleteShopDialog";
 import { useShopTab } from "./ShopTab.module";
 
@@ -109,6 +111,15 @@ export const ShopTab: React.FC<IShopTab> = ({
         </p>
       )}
     </form>
+    {role === "owner" && userId && (
+      <Link
+        to="?tab=shop&view=team"
+        className="pressable flex min-h-11 items-center justify-between rounded-card border border-hairline px-3 py-2 text-body font-semibold text-ink hover:bg-surface-soft"
+      >
+        Team
+        <IconChevronRight className="h-5 w-5 shrink-0 text-ink-muted" />
+      </Link>
+    )}
     {canDelete ? (
       <section className="flex flex-col gap-3 border-t border-hairline pt-6">
         <h2 className="text-[16px] font-bold text-ink">Danger Zone</h2>

@@ -17,6 +17,7 @@ it("renders account status and forwards tab and sign-out actions", async () => {
     activeShopId: null,
     activeShop: null,
     tab: "me",
+    teamOpen: false,
     setTab: vi.fn(),
     notice: "Shop ready",
     sessionNotice: undefined,

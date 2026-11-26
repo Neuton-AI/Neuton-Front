@@ -1,4 +1,4 @@
-import { useShopAccountSearch, type InviteRole, type ShopAccountMatch } from "@/features/shops/shopTeamApi";
+import { isStaleTeamAction, useShopAccountSearch, type InviteRole, type ShopAccountMatch } from "@/features/shops/shopTeamApi";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -70,9 +70,15 @@ export function useInviteTeammateSheet({ userId, shopId, onClose, onInvite }: In
   }
 
   const results = settled ? search.data : undefined;
+  let inviteError: string | undefined;
+  if (isStaleTeamAction(invite.error)) {
+    inviteError = "This account is no longer eligible. Go back to refresh your search.";
+  } else if (invite.isError) {
+    inviteError = "Couldn’t send the invitation. Check the pending list before trying again.";
+  }
   return {
     account, role, setRole, selectAccount, input, changeInput, page, changePage, results,
-    closeRef, searchRef, roleRef, close, submit, backToSearch, inviting, inviteFailed: invite.isError,
+    closeRef, searchRef, roleRef, close, submit, backToSearch, inviting, inviteError,
     searchFailed: Boolean(query) && settled && search.isError,
     searching: Boolean(query) && (!settled || search.isFetching) && !results,
     retry: () => void search.refetch(),
