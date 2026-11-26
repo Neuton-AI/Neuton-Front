@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -73,6 +74,38 @@ it('preserves an established session when a background session refresh is unavai
   await act(() => auth.restoreSession());
   expect(result.current.sessionId).toBe(session.id);
   expect(result.current.unavailable).toBe(false);
+});
+
+it('switches away from a removed shop and clears its local data on foreground refresh', async () => {
+  const otherShop = buildShop({ id: 'retained-shop' });
+  const memberships = [{ shop, role: 'member' }, { shop: otherShop, role: 'owner' }];
+  server.use(http.get(apiPath('/session'), () => HttpResponse.json({ user, session, memberships })));
+  const auth = await import('./auth');
+  await auth.restoreSession();
+  const store = await import('@/features/sync/store');
+  const { requestScopeSignal } = await import('@/lib/api');
+  const oldScope = `${user.id}:${shop.id}`;
+  const keptScope = `${user.id}:${otherShop.id}`;
+  const retained = { key: `${keptScope}:fixture`, scope: keptScope };
+  await store.transaction(['settings'], (tx) => {
+    tx.objectStore('settings').put({ key: `${oldScope}:fixture`, scope: oldScope });
+    tx.objectStore('settings').put(retained);
+  });
+  const oldRequest = requestScopeSignal(user.id, shop.id);
+  const { result } = renderHookWithProviders(() => {
+    auth.useForegroundSessionRefresh();
+    return auth.useShopMemberships(user.id);
+  });
+  expect(result.current.activeShopId).toBe(shop.id);
+
+  memberships.shift();
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  await waitFor(() => expect(result.current.activeShopId).toBe(otherShop.id));
+  expect(result.current.memberships.map((item) => item.shopId)).toEqual([otherShop.id]);
+  expect(oldRequest?.aborted).toBe(true);
+  expect(await store.rows('settings', oldScope)).toEqual([]);
+  expect(await store.rows('settings', keptScope)).toEqual([retained]);
+  await store.dropShopPartition(user.id, otherShop.id);
 });
 
 it('clears the session only after the server confirms it can no longer be restored', async () => {

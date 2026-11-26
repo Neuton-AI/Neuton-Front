@@ -111,8 +111,15 @@ export function restoreSession() {
   const result = (async () => {
     try {
       const session = await readSession();
+      if (started !== revision) return;
+      const shopIds = session.memberships.map(({ shop }) => shop.id);
+      const selected = readActiveShopId();
+      if (snapshot.session?.user.id === session.user.id && selected && !shopIds.includes(selected)) {
+        // Stop in-flight work before deleting data from the revoked partition.
+        setRequestShop(null);
+      }
       try {
-        await dropUnlistedShopPartitions(session.user.id, session.memberships.map(({ shop }) => shop.id));
+        await dropUnlistedShopPartitions(session.user.id, shopIds);
       } catch {
         // IndexedDB can fail closed. The next session load retries the drop.
       }
@@ -345,6 +352,22 @@ export function useAuth() {
     userId: current.session?.user.id ?? null,
     sessionId: current.session?.session.id ?? null,
   };
+}
+
+export function useForegroundSessionRefresh() {
+  useEffect(() => {
+    const refresh = () => {
+      if (snapshot.status === 'authenticated' && document.visibilityState === 'visible') void restoreSession();
+    };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 }
 
 export function useShopMemberships(userId: string | undefined) {

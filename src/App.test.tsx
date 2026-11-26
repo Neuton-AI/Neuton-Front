@@ -14,6 +14,8 @@ const authState = vi.hoisted(() => ({
   session: null as { user: { id: string } } | null,
   loading: false,
   unavailable: false,
+  activeShopId: null as string | null,
+  memberships: [] as { shopId: string }[],
 }));
 
 const authActions = vi.hoisted(() => ({
@@ -25,6 +27,7 @@ const authActions = vi.hoisted(() => ({
 vi.mock("@/features/auth/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/auth/auth")>()),
   ...authActions,
+  useShopMemberships: () => ({ activeShopId: authState.activeShopId, memberships: authState.memberships }),
   useAuth: () => ({
     session: authState.session,
     loading: authState.loading,
@@ -92,9 +95,25 @@ beforeEach(() => {
   authState.session = null;
   authState.loading = false;
   authState.unavailable = false;
+  authState.activeShopId = null;
+  authState.memberships = [];
 });
 
 describe("RequireAuth", () => {
+  it("exits a shop detail route when the signed-in account loses the selected shop", async () => {
+    authState.session = { user: { id: "u1" } };
+    authState.activeShopId = "old-shop";
+    authState.memberships = [{ shopId: "old-shop" }, { shopId: "other-shop" }];
+    const app = () => <><App /><WhereAmI /></>;
+    const view = renderWithRouter(app(), { route: "/orders/o-123" });
+    expect(await screen.findByRole("heading", { name: "Order detail" })).toBeVisible();
+    authState.activeShopId = "other-shop";
+    authState.memberships.shift();
+    view.rerender(app());
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeVisible();
+    expect(screen.getByTestId("where")).toHaveTextContent("/dashboard");
+  });
+
   it("waits on the loader instead of redirecting while the session resolves", async () => {
     // Redirecting mid-resolve bounces a signed-in user out on every hard refresh.
     authState.loading = true;

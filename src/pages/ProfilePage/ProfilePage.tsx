@@ -8,6 +8,7 @@ import { InstallAppButton } from "@/features/pwa/InstallApp";
 import { MeTab } from "./components/MeTab/MeTab";
 import { useProfilePage } from "./ProfilePage.module";
 import { ShopTab } from "./components/ShopTab/ShopTab";
+import { ShopTeam } from "./components/ShopTeam/ShopTeam";
 import { SessionDevices } from './components/SessionDevices';
 
 export const ProfilePage: React.FC = () => {
@@ -21,6 +22,8 @@ export const ProfilePage: React.FC = () => {
     activeShopId,
     activeShop,
     tab,
+    unreadInvites,
+    teamOpen,
     setTab,
     notice,
     sessionNotice,
@@ -29,6 +32,14 @@ export const ProfilePage: React.FC = () => {
     createShop,
     createShopPending,
   } = useProfilePage();
+  if (teamOpen && role === "owner" && userId && activeShopId && activeShop) {
+    return (
+      <Layout
+        mainContent={<ShopTeam key={`${userId}/${activeShopId}`} userId={userId} shopId={activeShopId} shopName={activeShop.name} />}
+        footer={<BottomNav />}
+      />
+    );
+  }
   return (
     <Layout
       className="shell"
@@ -74,6 +85,7 @@ export const ProfilePage: React.FC = () => {
                 email={user?.email ?? "—"}
                 memberships={memberships}
                 activeShopId={activeShopId}
+                unreadInvites={unreadInvites}
                 creating={createShopPending}
                 onSelectShop={handleSelectShop}
                 onCreateShop={(name) => void createShop(name)}

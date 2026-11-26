@@ -17,8 +17,9 @@ interface IRequireAuth {
 }
 
 export const RequireAuth: React.FC<IRequireAuth> = ({ children }) => {
-  const { session, loading, from } = useRequireAuth();
+  const { session, loading, from, leaveRevokedShop } = useRequireAuth();
   if (loading) return <FullPageLoader />;
   if (!session) return <Navigate to="/signin" replace state={{ from }} />;
+  if (leaveRevokedShop) return <Navigate to="/dashboard" replace />;
   return children;
 };
