@@ -35,6 +35,15 @@ export function useShopTeamMembers(userId: string, shopId: string) {
   });
 }
 
+export function useChangeShopTeamRole(userId: string, shopId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: InviteRole }) =>
+      apiFetch<void>(`${teamPath}/members/${encodeURIComponent(id)}`, { method: "PATCH", userId, shopId, body: { role } }),
+    onSettled: () => client.invalidateQueries({ queryKey: teamKey(userId, shopId) }),
+  });
+}
+
 export function useOutgoingInvitations(userId: string, shopId: string) {
   return useQuery({
     queryKey: [...teamKey(userId, shopId), "invitations"],

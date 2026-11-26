@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { InviteTeammateSheet } from "./InviteTeammateSheet";
 import { useShopTeam } from "./ShopTeam.module";
 import { TeamAccountIdentity } from "./TeamAccountIdentity";
+import { TeamMemberActions } from "./TeamMemberActions";
 
 type TeamListProps = {
   label: string;
@@ -44,6 +45,7 @@ export function ShopTeam({ userId, shopId, shopName }: { userId: string; shopId:
   const {
     roster, outgoing, pickerOpen, setPickerOpen, invite, cancelInvitation, notice,
     headingRef, invitationsHeadingRef, cancelingId,
+    updateMemberRole, changingRole,
   } = useShopTeam(userId, shopId);
   const members = roster.data?.members ?? [];
   const invitations = outgoing.data?.invitations ?? [];
@@ -87,6 +89,7 @@ export function ShopTeam({ userId, shopId, shopName }: { userId: string; shopId:
               </span>
               <div className="min-w-0 flex-1"><TeamAccountIdentity account={member} /></div>
               <span className="shrink-0 rounded-pill bg-surface-card px-2 py-1 text-xs font-semibold text-ink">{roleLabels[member.role]}</span>
+              <TeamMemberActions member={member} busy={changingRole} onChangeRole={(role) => void updateMemberRole(member, role)} />
             </li>
           ))}
         </TeamList>

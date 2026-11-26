@@ -1,6 +1,6 @@
 import {
-  isStaleTeamAction, useCancelShopInvitation, useOutgoingInvitations, useSendShopInvitation, useShopTeamMembers,
-  type InviteRole,
+  isStaleTeamAction, useCancelShopInvitation, useChangeShopTeamRole, useOutgoingInvitations,
+  useSendShopInvitation, useShopTeamMembers, type InviteRole, type ShopTeamMember,
 } from "@/features/shops/shopTeamApi";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,6 +9,7 @@ export function useShopTeam(userId: string, shopId: string) {
   const outgoing = useOutgoingInvitations(userId, shopId);
   const send = useSendShopInvitation(userId, shopId);
   const cancel = useCancelShopInvitation(userId, shopId);
+  const changeRole = useChangeShopTeamRole(userId, shopId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; message: string }>();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -39,8 +40,26 @@ export function useShopTeam(userId: string, shopId: string) {
     if (document.activeElement === document.body) invitationsHeadingRef.current?.focus();
   }
 
+  async function updateMemberRole(member: ShopTeamMember, role: InviteRole) {
+    if (changeRole.isPending) return;
+    setNotice(undefined);
+    const name = member.fullName?.trim() || member.email;
+    try {
+      await changeRole.mutateAsync({ id: member.id, role });
+      setNotice({ tone: "success", message: `${name} is now ${role === "admin" ? "an Admin" : "a Member"}.` });
+    } catch (error) {
+      if (isStaleTeamAction(error)) {
+        setNotice({ tone: "info", message: "This teammate is no longer on the team." });
+      } else {
+        setNotice({ tone: "error", message: "Couldn’t confirm the role change. Check the team and try again." });
+      }
+    }
+    if (document.activeElement === document.body) headingRef.current?.focus();
+  }
+
   return {
     roster, outgoing, pickerOpen, setPickerOpen, invite, cancelInvitation, notice,
     headingRef, invitationsHeadingRef, cancelingId: cancel.isPending ? cancel.variables : undefined,
+    updateMemberRole, changingRole: changeRole.isPending,
   };
 }

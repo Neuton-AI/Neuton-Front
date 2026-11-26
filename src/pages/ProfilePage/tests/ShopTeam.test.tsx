@@ -96,3 +96,28 @@ it("refreshes the roster and pending list when an invitation was already accepte
   expect(screen.getByText("No pending invitations")).toBeInTheDocument();
   expect(within(screen.getByRole("list", { name: "Team members" })).getByText(invite.email)).toBeInTheDocument();
 });
+
+it("lets an owner promote and downgrade a teammate in the selected shop", async () => {
+  const member = { id: "maya-membership", fullName: "Maya Cohen", email: "maya@example.test", role: "member" };
+  server.use(
+    http.get(apiPath(`${team}/members`), () => HttpResponse.json({ members: [member] })),
+    http.get(apiPath(`${team}/invitations`), () => HttpResponse.json({ invitations: [] })),
+    http.patch(apiPath(`${team}/members/${member.id}`), async ({ request }) => {
+      expect(request.headers.get("x-shop-id")).toBe("shop-1");
+      const { role } = await request.json() as { role: string };
+      member.role = role;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  const user = userEvent.setup();
+  renderWithRouter(<ProfilePage />, { route: "/profile?tab=shop&view=team" });
+  const actions = await screen.findByRole("button", { name: "Actions for Maya Cohen" });
+  await user.click(actions);
+  await user.click(screen.getByRole("button", { name: "Promote to Admin" }));
+  expect(await screen.findByText("Maya Cohen is now an Admin.")).toBeVisible();
+  expect(actions.closest("li")).toHaveTextContent("Admin");
+  await user.click(actions);
+  await user.click(screen.getByRole("button", { name: "Downgrade to Member" }));
+  expect(await screen.findByText("Maya Cohen is now a Member.")).toBeVisible();
+  expect(actions.closest("li")).toHaveTextContent("Member");
+});
