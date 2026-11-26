@@ -22,6 +22,7 @@ export const ProfilePage: React.FC = () => {
     activeShopId,
     activeShop,
     tab,
+    unreadInvites,
     teamOpen,
     setTab,
     notice,
@@ -84,6 +85,7 @@ export const ProfilePage: React.FC = () => {
                 email={user?.email ?? "—"}
                 memberships={memberships}
                 activeShopId={activeShopId}
+                unreadInvites={unreadInvites}
                 creating={createShopPending}
                 onSelectShop={handleSelectShop}
                 onCreateShop={(name) => void createShop(name)}

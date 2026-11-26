@@ -5,6 +5,7 @@ import {
   useShopMemberships,
 } from "@/features/auth/auth";
 import { useCreateShop } from "@/features/shops/shopsApi";
+import { useIncomingInvitations } from "@/features/shops/shopInvitationsApi";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 type Tab = "me" | "shop";
@@ -18,6 +19,8 @@ export function useProfilePage() {
 
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "shop" ? "shop" : "me";
+  const inbox = useIncomingInvitations(tab === "me" ? userId : null);
+  const unreadInvites = inbox.data?.invitations.filter((invitation) => invitation.readAt === null).length || 0;
   const teamOpen = tab === "shop" && params.get("view") === "team";
   const setTab = (next: Tab) => setParams((current) => {
     const updated = new URLSearchParams(current);
@@ -74,6 +77,7 @@ export function useProfilePage() {
     activeShopId,
     activeShop,
     tab,
+    unreadInvites,
     teamOpen,
     setTab,
     notice,

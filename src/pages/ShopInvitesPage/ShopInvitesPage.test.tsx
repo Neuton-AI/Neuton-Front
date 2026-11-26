@@ -1,9 +1,10 @@
 import { restoreSession } from "@/features/auth/auth";
+import { ProfilePage } from "@/pages/ProfilePage/ProfilePage";
 import { buildShop } from "@/test/factories/shops.factory";
 import { apiPath } from "@/test/mocks/handlers/context";
 import { server } from "@/test/mocks/server";
 import { renderWithRouter } from "@/test/render";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router-dom";
@@ -16,11 +17,11 @@ const invitedShop = buildShop({ id: "invited-shop", name: "North & Grain" });
 const existingShop = buildShop({ id: "existing-shop", name: "Current Shop" });
 const invitation = {
   id: "invitation-1", shopId: invitedShop.id, shopName: invitedShop.name,
-  offeredRole: "admin", createdAt: "2026-01-01T00:00:00.000Z", readAt: null,
+  offeredRole: "admin", createdAt: "2026-01-01T00:00:00.000Z", readAt: "2026-01-02T00:00:00.000Z" as string | null,
 };
 const activeShopKey = "neuton.activeShopId";
 
-async function openInbox(hasShop = false) {
+async function openInbox(hasShop = false, route = "/profile/invites") {
   const sessionId = crypto.randomUUID();
   const memberships = hasShop ? [{ shop: existingShop, role: "owner" }] : [];
   const expires = new Date(Date.now() + 60_000).toISOString();
@@ -30,17 +31,53 @@ async function openInbox(hasShop = false) {
       session: { id: sessionId, idleExpiresAt: expires, absoluteExpiresAt: expires, nextRenewalAt: expires },
     })),
     http.post(apiPath("/auth/csrf"), () => HttpResponse.json({ token: "invite-proof" })),
+    http.get(apiPath("/auth/sessions"), () => HttpResponse.json({ sessions: [] })),
   );
   await restoreSession();
   renderWithRouter(
     <Routes>
+      <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/invites" element={<ShopInvitesPage />} />
       <Route path="/dashboard" element={<h1>Shop dashboard</h1>} />
     </Routes>,
-    { route: "/profile/invites" },
+    { route },
   );
   return { user: userEvent.setup(), memberships, sessionId };
 }
+
+it("shows unread invites in Profile and marks only the unread invitations shown in the inbox", async () => {
+  const first = { ...invitation, id: "unread-1", shopName: "New Shop", readAt: null };
+  const late = { ...invitation, id: "unread-2", shopName: "Late Shop", readAt: null };
+  const pending = [invitation, first];
+  const batches: string[][] = [];
+  server.use(
+    http.get(apiPath(inbox), () => HttpResponse.json({ invitations: pending })),
+    http.post(apiPath(`${inbox}/read`), async ({ request }) => {
+      const { invitationIds } = await request.json() as { invitationIds: string[] };
+      batches.push(invitationIds);
+      expect(request.headers.get("x-csrf-token")).toBe("invite-proof");
+      expect(request.headers.has("x-shop-id")).toBe(false);
+      expect(screen.getByRole("heading", { name: "New Shop" })).toBeVisible();
+      for (const row of pending) {
+        if (invitationIds.includes(row.id)) row.readAt = "2026-01-02T00:00:00.000Z";
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  const { user } = await openInbox(false, "/profile");
+  const invites = await screen.findByRole("link", { name: "My Invites 1 new invitation" });
+  expect(batches).toEqual([]);
+  await user.click(invites);
+  await waitFor(() => expect(batches).toEqual([[first.id]]));
+  await user.click(screen.getByRole("link", { name: "Back to Profile" }));
+  expect(await screen.findByRole("link", { name: "My Invites" })).toBeVisible();
+
+  pending.push(late);
+  await user.click(screen.getByRole("tab", { name: "shop" }));
+  await user.click(screen.getByRole("tab", { name: "me" }));
+  await user.click(await screen.findByRole("link", { name: "My Invites 1 new invitation" }));
+  await waitFor(() => expect(batches).toEqual([[first.id], [late.id]]));
+});
 
 it.each([false, true])("accepts an invitation and waits for Open shop (existing shop: %s)", async (hasShop) => {
   let pending = true;

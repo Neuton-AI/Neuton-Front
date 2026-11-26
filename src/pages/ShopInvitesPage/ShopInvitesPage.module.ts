@@ -2,6 +2,7 @@ import { useAuth, useShopMemberships } from "@/features/auth/auth";
 import {
   invitationResponseMessage,
   useIncomingInvitations,
+  useMarkShopInvitationsRead,
   useRespondToShopInvitation,
   type IncomingInvitation,
   type InvitationDecision,
@@ -17,6 +18,7 @@ export function useShopInvitesAccount() {
 export function useShopInvitesPage(userId: string) {
   const navigate = useNavigate();
   const inbox = useIncomingInvitations(userId);
+  useMarkDisplayedInvitationsRead(userId, inbox.isSuccess ? inbox.data.invitations : undefined, inbox.dataUpdatedAt);
   const response = useRespondToShopInvitation(userId);
   const { memberships, reload, setActiveShopId } = useShopMemberships(userId);
   const busy = useRef(false);
@@ -77,4 +79,28 @@ export function useShopInvitesPage(userId: string) {
   }
 
   return { inbox, respond, action, notice, accepted, openShop, opening, memberships, headingRef };
+}
+
+function useMarkDisplayedInvitationsRead(
+  userId: string,
+  invitations: IncomingInvitation[] | undefined,
+  updatedAt: number,
+) {
+  const { mutate, isPending } = useMarkShopInvitationsRead(userId);
+  const attempted = useRef<{ invitations: IncomingInvitation[]; updatedAt: number }>();
+
+  useEffect(() => {
+    if (!invitations || isPending) return;
+    const ids = invitations.filter((invitation) => invitation.readAt === null).map((invitation) => invitation.id);
+    if (ids.length === 0) return;
+    const markRead = () => {
+      if (document.visibilityState !== "visible") return;
+      if (attempted.current?.invitations === invitations && attempted.current.updatedAt === updatedAt) return;
+      attempted.current = { invitations, updatedAt };
+      mutate(ids);
+    };
+    markRead();
+    document.addEventListener("visibilitychange", markRead);
+    return () => document.removeEventListener("visibilitychange", markRead);
+  }, [invitations, isPending, mutate, updatedAt]);
 }

@@ -1,5 +1,5 @@
 import { ApiError, apiFetch } from "@/lib/api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InviteRole } from "./shopTeamApi";
 
 export type IncomingInvitation = {
@@ -15,7 +15,8 @@ export type InvitationDecision = "accept" | "decline";
 type Inbox = { invitations: IncomingInvitation[] };
 type Acceptance = { membership: { shopId: string; role: InviteRole } };
 const inboxPath = "/shop-invitations";
-const inboxKey = (userId: string) => ["shop-invitations", userId] as const;
+const inboxKey = (userId: string | null) => ["shop-invitations", userId] as const;
+const readBatchSize = 100;
 
 export function invitationResponseMessage(error: unknown, stillPending: boolean) {
   if (error instanceof ApiError) {
@@ -27,12 +28,25 @@ export function invitationResponseMessage(error: unknown, stillPending: boolean)
   return "Couldn’t confirm your response. Check the updated invitation list before trying again.";
 }
 
-export function useIncomingInvitations(userId: string) {
+export function useIncomingInvitations(userId: string | null) {
   return useQuery({
     queryKey: inboxKey(userId),
-    queryFn: ({ signal }) => apiFetch<Inbox>(inboxPath, { userId, signal }),
+    queryFn: userId ? ({ signal }) => apiFetch<Inbox>(inboxPath, { userId, signal }) : skipToken,
     staleTime: 0,
     gcTime: 0,
+  });
+}
+
+export function useMarkShopInvitationsRead(userId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (let offset = 0; offset < ids.length; offset += readBatchSize) {
+        const invitationIds = ids.slice(offset, offset + readBatchSize);
+        await apiFetch<void>(`${inboxPath}/read`, { method: "POST", userId, body: { invitationIds } });
+      }
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: inboxKey(userId) }),
   });
 }
 
