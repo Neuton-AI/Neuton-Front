@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@/components/ConfirmDialog/ConfirmDialog";
 import { ErrorState, InlineNotice, Skeleton } from "@/components/feedback";
 import { IconChevronLeft, IconPlus } from "@/components/icons";
 import { Button } from "@/components/ui";
@@ -44,8 +45,9 @@ function TeamList({ label, loading, errorMessage, retry, emptyMessage, children 
 export function ShopTeam({ userId, shopId, shopName }: { userId: string; shopId: string; shopName: string }) {
   const {
     roster, outgoing, pickerOpen, setPickerOpen, invite, cancelInvitation, notice,
-    headingRef, invitationsHeadingRef, cancelingId,
+    headingRef, membersHeadingRef, invitationsHeadingRef, cancelingId,
     updateMemberRole, changingRole,
+    removalTarget, requestRemoval, cancelRemoval, confirmRemoval, removing, removalError,
   } = useShopTeam(userId, shopId);
   const members = roster.data?.members ?? [];
   const invitations = outgoing.data?.invitations ?? [];
@@ -74,7 +76,7 @@ export function ShopTeam({ userId, shopId, shopName }: { userId: string; shopId:
       </header>
       {notice && <InlineNotice tone={notice.tone}>{notice.message}</InlineNotice>}
       <section className="flex flex-col gap-3" aria-labelledby="team-members-heading">
-        <h2 id="team-members-heading" className="eyebrow font-semibold">Team members</h2>
+        <h2 id="team-members-heading" ref={membersHeadingRef} tabIndex={-1} className="eyebrow font-semibold">Team members</h2>
         <TeamList
           label="Team members"
           loading={roster.isPending}
@@ -89,7 +91,8 @@ export function ShopTeam({ userId, shopId, shopName }: { userId: string; shopId:
               </span>
               <div className="min-w-0 flex-1"><TeamAccountIdentity account={member} /></div>
               <span className="shrink-0 rounded-pill bg-surface-card px-2 py-1 text-xs font-semibold text-ink">{roleLabels[member.role]}</span>
-              <TeamMemberActions member={member} busy={changingRole} onChangeRole={(role) => void updateMemberRole(member, role)} />
+              <TeamMemberActions member={member} busy={changingRole || removing}
+                onChangeRole={(role) => void updateMemberRole(member, role)} onRemove={() => requestRemoval(member)} />
             </li>
           ))}
         </TeamList>
@@ -126,6 +129,20 @@ export function ShopTeam({ userId, shopId, shopName }: { userId: string; shopId:
           ))}
         </TeamList>
       </section>
+      {removalTarget && (
+        <ConfirmDialog
+          open
+          variant="standard"
+          confirmTone="danger"
+          title={`Remove ${removalTarget.fullName?.trim() || removalTarget.email}?`}
+          description={`They’ll lose access to ${shopName} immediately.`}
+          confirmLabel="Remove access"
+          pending={removing}
+          feedback={removalError && <InlineNotice tone="error">{removalError}</InlineNotice>}
+          onCancel={cancelRemoval}
+          onConfirm={() => void confirmRemoval()}
+        />
+      )}
       {pickerOpen && (
         <InviteTeammateSheet
           userId={userId}

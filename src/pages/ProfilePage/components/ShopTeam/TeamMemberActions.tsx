@@ -1,10 +1,11 @@
 import type { InviteRole, ShopTeamMember } from "@/features/shops/shopTeamApi";
 import { useId, useRef, useState } from "react";
 
-export function TeamMemberActions({ member, busy, onChangeRole }: {
+export function TeamMemberActions({ member, busy, onChangeRole, onRemove }: {
   member: ShopTeamMember;
   busy: boolean;
   onChangeRole: (role: InviteRole) => void;
+  onRemove: () => void;
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -48,6 +49,12 @@ export function TeamMemberActions({ member, busy, onChangeRole }: {
             onChangeRole(isAdmin ? "member" : "admin");
           }} className="pressable min-h-11 w-full rounded-input px-2.5 text-left text-body text-ink hover:bg-surface-card disabled:opacity-50">
             {isAdmin ? "Downgrade to Member" : "Promote to Admin"}
+          </button>
+          <button type="button" disabled={busy} onClick={() => {
+            closeAndFocus();
+            onRemove();
+          }} className="pressable min-h-11 w-full rounded-input px-2.5 text-left text-body text-semantic-error hover:bg-surface-card disabled:opacity-50">
+            Remove access
           </button>
         </div>
       )}

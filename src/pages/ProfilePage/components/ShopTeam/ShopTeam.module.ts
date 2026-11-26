@@ -1,6 +1,6 @@
 import {
   isStaleTeamAction, useCancelShopInvitation, useChangeShopTeamRole, useOutgoingInvitations,
-  useSendShopInvitation, useShopTeamMembers, type InviteRole, type ShopTeamMember,
+  useRemoveShopTeamMember, useSendShopInvitation, useShopTeamMembers, type InviteRole, type ShopTeamMember,
 } from "@/features/shops/shopTeamApi";
 import { useEffect, useRef, useState } from "react";
 
@@ -10,14 +10,26 @@ export function useShopTeam(userId: string, shopId: string) {
   const send = useSendShopInvitation(userId, shopId);
   const cancel = useCancelShopInvitation(userId, shopId);
   const changeRole = useChangeShopTeamRole(userId, shopId);
+  const remove = useRemoveShopTeamMember(userId, shopId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; message: string }>();
+  const [removalTarget, setRemovalTarget] = useState<ShopTeamMember>();
+  const [removalError, setRemovalError] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const membersHeadingRef = useRef<HTMLHeadingElement>(null);
   const invitationsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusAfterRemoval = useRef(false);
 
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!removalTarget && focusAfterRemoval.current) {
+      focusAfterRemoval.current = false;
+      membersHeadingRef.current?.focus();
+    }
+  }, [removalTarget]);
 
   async function invite(recipientId: string, role: InviteRole) {
     const invitation = await send(recipientId, role);
@@ -57,9 +69,38 @@ export function useShopTeam(userId: string, shopId: string) {
     if (document.activeElement === document.body) headingRef.current?.focus();
   }
 
+  function requestRemoval(member: ShopTeamMember) {
+    setRemovalError("");
+    setRemovalTarget(member);
+  }
+
+  function cancelRemoval() {
+    if (!remove.isPending) setRemovalTarget(undefined);
+  }
+
+  async function confirmRemoval() {
+    if (!removalTarget || remove.isPending) return;
+    setRemovalError("");
+    setNotice(undefined);
+    try {
+      await remove.mutateAsync(removalTarget.id);
+      const name = removalTarget.fullName?.trim() || removalTarget.email;
+      setNotice({ tone: "success", message: `Access removed for ${name}.` });
+    } catch (error) {
+      if (!isStaleTeamAction(error)) {
+        setRemovalError("Couldn’t confirm removal. Try again or check the team.");
+        return;
+      }
+      setNotice({ tone: "info", message: "This teammate is no longer on the team." });
+    }
+    focusAfterRemoval.current = true;
+    setRemovalTarget(undefined);
+  }
+
   return {
     roster, outgoing, pickerOpen, setPickerOpen, invite, cancelInvitation, notice,
-    headingRef, invitationsHeadingRef, cancelingId: cancel.isPending ? cancel.variables : undefined,
+    headingRef, membersHeadingRef, invitationsHeadingRef, cancelingId: cancel.isPending ? cancel.variables : undefined,
     updateMemberRole, changingRole: changeRole.isPending,
+    removalTarget, requestRemoval, cancelRemoval, confirmRemoval, removing: remove.isPending, removalError,
   };
 }

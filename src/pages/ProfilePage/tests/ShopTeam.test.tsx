@@ -121,3 +121,38 @@ it("lets an owner promote and downgrade a teammate in the selected shop", async 
   expect(await screen.findByText("Maya Cohen is now a Member.")).toBeVisible();
   expect(actions.closest("li")).toHaveTextContent("Member");
 });
+
+it("keeps access when removal is canceled and revokes it after explicit confirmation", async () => {
+  const member = { id: "maya-membership", fullName: "Maya Cohen", email: "maya@example.test", role: "admin" };
+  let removed = false;
+  const remove = vi.fn(({ request }: { request: Request }) => {
+    expect(request.headers.get("x-shop-id")).toBe("shop-1");
+    removed = true;
+    return new HttpResponse(null, { status: 204 });
+  });
+  server.use(
+    http.get(apiPath(`${team}/members`), () => HttpResponse.json({ members: removed ? [] : [member] })),
+    http.get(apiPath(`${team}/invitations`), () => HttpResponse.json({ invitations: [] })),
+    http.delete(apiPath(`${team}/members/${member.id}`), remove),
+  );
+  const user = userEvent.setup();
+  renderWithRouter(<ProfilePage />, { route: "/profile?tab=shop&view=team" });
+  const actions = await screen.findByRole("button", { name: "Actions for Maya Cohen" });
+  await user.click(actions);
+  await user.click(screen.getByRole("button", { name: "Remove access" }));
+  let confirm = await screen.findByRole("dialog", { name: "Remove Maya Cohen?" });
+  const cancel = within(confirm).getByRole("button", { name: "Cancel" });
+  expect(cancel).toHaveFocus();
+  await user.click(cancel);
+  expect(actions).toHaveFocus();
+  expect(remove).not.toHaveBeenCalled();
+
+  await user.click(actions);
+  await user.click(screen.getByRole("button", { name: "Remove access" }));
+  confirm = await screen.findByRole("dialog", { name: "Remove Maya Cohen?" });
+  await user.click(within(confirm).getByRole("button", { name: "Remove access" }));
+  expect(await screen.findByText("Access removed for Maya Cohen.")).toBeVisible();
+  expect(screen.getByText("No team members yet")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Team members" })).toHaveFocus();
+  expect(remove).toHaveBeenCalledOnce();
+});
