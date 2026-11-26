@@ -49,6 +49,11 @@ const ProfilePage = lazy(() =>
     default: m.ProfilePage,
   })),
 );
+const ShopInvitesPage = lazy(() =>
+  import("@/pages/ShopInvitesPage/ShopInvitesPage").then((m) => ({
+    default: m.ShopInvitesPage,
+  })),
+);
 const ReceiptDetailPage = lazy(() =>
   import("@/pages/ReceiptDetailPage/ReceiptDetailPage").then((m) => ({
     default: m.ReceiptDetailPage,
@@ -79,6 +84,7 @@ export const AuthenticatedRoutes: React.FC = () => {
         <Route path="catalog/recipes/:id/edit" element={<RecipeEditPage />} />
         <Route path="catalog/receipts/:id" element={<ReceiptDetailPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="profile/invites" element={<ShopInvitesPage />} />
         <Route path="capture" element={<CapturePage />} />
         <Route path="error" element={<ErrorPage />} />
         <Route path="*" element={<NotFoundPage />} />

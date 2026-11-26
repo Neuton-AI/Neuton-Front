@@ -30,6 +30,8 @@ it("renders account status and forwards tab and sign-out actions", async () => {
   renderWithRouter(<ProfilePage />);
   const user = userEvent.setup();
   expect(screen.getByText("Shop ready")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "My Invites" })).toHaveAttribute("href", "/profile/invites");
+  expect(screen.getByRole("heading", { name: "Your shops" })).toBeVisible();
   await user.click(screen.getByRole("tab", { name: "shop" }));
   expect(model.setTab).toHaveBeenCalledWith("shop");
   await user.click(screen.getByRole("button", { name: "Sign out" }));

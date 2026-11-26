@@ -1,6 +1,7 @@
 import type React from "react";
-import { IconStore } from "@/components/icons";
+import { IconChevronRight, IconEnvelope, IconStore } from "@/components/icons";
 import type { ShopMembership } from "@/features/shops/types";
+import { Link } from "react-router-dom";
 import { CreateShopForm } from "./CreateShopForm/CreateShopForm";
 import { SignInMethods } from "../SignInMethods";
 interface IMeTab {
@@ -28,6 +29,17 @@ export const MeTab: React.FC<IMeTab> = ({
       </section>
 
       <SignInMethods email={email} />
+
+      <Link
+        to="/profile/invites"
+        className="pressable flex min-h-[66px] items-center gap-3 rounded-card border border-hairline bg-surface-card px-3 py-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary-active"
+      >
+        <span className="grid size-[38px] shrink-0 place-items-center rounded-input bg-surface-cream-strong text-brand-primary-active">
+          <IconEnvelope className="size-5" />
+        </span>
+        <span className="flex-1 text-body font-semibold text-ink">My Invites</span>
+        <IconChevronRight className="size-[17px] shrink-0 text-ink-muted" />
+      </Link>
 
       <section>
         <h2 className="eyebrow">Your shops</h2>
